@@ -7,6 +7,7 @@
 package maspack.geometry;
 
 import maspack.matrix.Point3d;
+import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector3d;
 import maspack.render.RenderList;
 import maspack.render.Renderer;
@@ -553,7 +554,7 @@ public class AABB extends BVNode {
    }
    
    public void render (Renderer renderer, int flags) {
-      
+
       renderer.setShading (Shading.NONE);
       renderer.setColor (0f, 0f, 1f);
       renderer.beginDraw (DrawMode.LINE_LOOP);
@@ -579,6 +580,22 @@ public class AABB extends BVNode {
       renderer.addVertex (myMin.x, myMax.y, myMax.z);
       renderer.endDraw();
       renderer.setShading (Shading.FLAT);
+   }
+   
+   public void render (Renderer renderer, int flags, RigidTransform3d X) {
+      Point3d savedMin = myMin;
+      Point3d savedMax = myMax;
+      
+      myMin = new Point3d(myMin);
+      myMax = new Point3d(myMax);
+      
+      myMin.transform (X);
+      myMax.transform (X);
+      
+      render (renderer, flags);
+      
+      myMin = savedMin;
+      myMax = savedMax;
    }
 
    /**

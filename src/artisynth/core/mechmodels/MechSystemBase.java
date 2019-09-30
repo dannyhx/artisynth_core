@@ -308,8 +308,16 @@ public abstract class MechSystemBase extends RenderableModelBase
       }      
    }
 
+   public boolean hasUnilateralConstraints() {
+      updateForceComponentList();
+      
+      myUnilateralSizes.setSize (0);
+      getUnilateralConstraintSizes (myUnilateralSizes);
+      
+      return (myUnilateralSizes.size () != 0);
+   }
+   
    public void getUnilateralConstraints (SparseBlockMatrix NT, VectorNd dn) {
-
       if (NT.numBlockRows() != 0 || NT.numBlockCols() != 0) {
          throw new IllegalArgumentException (
             "On entry, NT should be empty with zero size");
@@ -483,8 +491,16 @@ public abstract class MechSystemBase extends RenderableModelBase
       updateForceComponentList();
       double maxpen = 0;
       boolean hasConstraints = false;
+      
       for (int i=0; i<myConstrainers.size(); i++) {
          double pen = myConstrainers.get(i).updateConstraints (t, flags);
+         // DANCOLEDIT - There's a bug where if the mesh topology is modified (e.g. new element),
+         // updateConstraints() will notify the surface mesh to be updated, which in turn,
+         // causes the cache to be updated --- clearing "myConstrainers" along with it.
+         if (myConstrainers == null) {
+            updateForceComponentList();
+         }
+         
          if (pen >= 0) {
             hasConstraints = true;
             if (pen > maxpen) {

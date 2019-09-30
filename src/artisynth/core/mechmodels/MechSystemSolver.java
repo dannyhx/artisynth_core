@@ -8,20 +8,32 @@ package artisynth.core.mechmodels;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 
+import _custom.cont.CCRV;
+import _custom.cont.ContinuousCollider;
+import _custom.cont.SweptMeshInfo;
+import _custom.cont.SweptTriangle;
+import _custom.cont.SweptVertex;
+import artisynth.core.mechmodels.CollisionManager.ColliderType;
 import artisynth.core.mechmodels.MechSystem.ConstraintInfo;
 import artisynth.core.mechmodels.MechSystem.FrictionInfo;
 import artisynth.core.modelbase.ModelComponent;
 import artisynth.core.modelbase.StepAdjustment;
 import artisynth.core.util.ArtisynthIO;
 import maspack.function.Function1x1;
+import maspack.geometry.BVNode;
+import maspack.geometry.Vertex3d;
 import maspack.matrix.Matrix;
 import maspack.matrix.Matrix3dBase;
 import maspack.matrix.Matrix3x1;
 import maspack.matrix.Matrix6d;
 import maspack.matrix.MatrixBlock;
 import maspack.matrix.MatrixNd;
+import maspack.matrix.Point3d;
+import maspack.matrix.RigidTransform3d;
 import maspack.matrix.RotationMatrix3d;
 import maspack.matrix.SparseBlockMatrix;
 import maspack.matrix.SparseNumberedBlockMatrix;
@@ -34,6 +46,7 @@ import maspack.solvers.IterativeSolver.ToleranceType;
 import maspack.solvers.KKTSolver;
 import maspack.solvers.PardisoSolver;
 import maspack.solvers.UmfpackSolver;
+import maspack.util.DataBuffer;
 import maspack.util.FunctionTimer;
 import maspack.util.InternalErrorException;
 import maspack.util.NumberFormat;
@@ -1226,7 +1239,6 @@ public class MechSystemSolver {
       int sizeD = myDT.colSize();
       myBd.setSize (sizeD);
       myPhi.setSize (sizeD);
-
       // compute friction offsets
       if (sizeD > 0 && myParametricVelSize > 0) {
          myDT.mulTranspose (
@@ -1383,7 +1395,7 @@ public class MechSystemSolver {
       updateStateSizes();
 
       int velSize = myActiveVelSize;
-
+      
       boolean analyze = myAlwaysAnalyze;
 
       updateSolveMatrixStructure();
@@ -1392,7 +1404,7 @@ public class MechSystemSolver {
          analyze = true;
       }
 
-      SparseNumberedBlockMatrix S = mySolveMatrix;      
+      SparseNumberedBlockMatrix S = mySolveMatrix;   
 
       S.setZero();
       myC.setSize (S.rowSize());
@@ -1480,7 +1492,7 @@ public class MechSystemSolver {
       // convert forces to impulses:
       myLam.scale (h);
       myThe.scale (h);
-
+    
       if (profileKKTSolveTime) {
          timerStop("    KKT solve: update constraints");
          timerStart();
@@ -1512,6 +1524,7 @@ public class MechSystemSolver {
             // set vel to vel0 in case the solver needs a warm start
             vel.set (vel0);
          }
+         
          if (analyze) {
             myKKTSolver.analyze (
                S, velSize, myGT, myRg, mySys.getSolveMatrixType());
@@ -1520,6 +1533,7 @@ public class MechSystemSolver {
             timerStop("    KKT solve: analyze");
             timerStart();            
          }
+
          if (myHybridSolveP && !analyze && myNT.colSize() == 0) {
             myKKTSolver.factorAndSolve (
                S, velSize, myGT, myRg, vel, myLam, bf, myBg, myHybridSolveTol);
@@ -1535,6 +1549,9 @@ public class MechSystemSolver {
                timerStop ("    KKTsolve");
                timerStart();
             }
+            
+            // DANCOLEDIT KKT Velocity 
+//            System.out.println ("\nKKT Velocity: " + vel.toString ("%.4f") + "\n");
          }
          if (computeKKTResidual) {
             double res = myKKTSolver.residual (
@@ -1608,6 +1625,7 @@ public class MechSystemSolver {
       
       mySys.setBilateralForces (myLam, 1/h);
       mySys.setUnilateralForces (myThe, 1/h);
+      
       if (myUpdateForcesAtStepEnd) {
          if (myGsize > 0) {
             myGT.mulAdd (myFcon, myLam, velSize, myGsize);
@@ -2041,7 +2059,11 @@ public class MechSystemSolver {
 
    protected boolean projectFrictionConstraints (VectorNd vel, double t0) {
       // BEGIN project friction constraints
-      if (updateFrictionConstraints()) {
+      
+      // DANCOLEDIT: projectFrictionConstraints (change it back for TRI_INTERSECTION to work).
+      if (updateFrictionConstraints ()) {
+         // isFirst is turned off in KKT when it tries to update unilateral constraints
+         
          // assumes that updateMassMatrix() has been called
          int version = (myAlwaysAnalyze ? -1 : myGTVersion);
          myRBSolver.updateStructure (myMass, myGT, version);
@@ -2371,6 +2393,7 @@ public class MechSystemSolver {
       if (myConMassVersion != myMassVersion || myConGTVersion != myGTVersion) {
          analyze = true;
       }
+      
       if (analyze) {
          myConSolver.analyze (myMass, velSize, myGT, myRg, Matrix.SPD);
          myConMassVersion = myMassVersion;
@@ -2382,6 +2405,7 @@ public class MechSystemSolver {
          double res = myConSolver.residual (
             myMass, velSize, myGT, myRg, myNT, myRn, 
             vel, myLam, myThe, myBf, myBg, myBn);
+         
          System.out.println (
             "mass pos cor residual ("+velSize+","+myGT.colSize()+","+
                myNT.colSize()+"): " + res);
@@ -2449,18 +2473,175 @@ public class MechSystemSolver {
       mySys.setActiveForces (myF);      
    }
 
+   boolean isContCollisionOccurred = false;
+   double impulseScale = 1;
+   public ArrayList<CollisionHandler> collisionHandlers;
    protected void applyPosCorrection (
       VectorNd pos, VectorNd vel,
       double t, StepAdjustment stepAdjust) {
       
-      boolean hasConstraints = mySys.updateConstraints (
-         t, stepAdjust, /*flags=*/MechSystem.COMPUTE_CONTACTS);
-      if (hasConstraints) {
+      System.out.println (">>>> applyPosCorrection()");
+
+      int debug_numLoops = 0;
+      DataBuffer dataBuf = new DataBuffer();
+      MechSystemBase mechBase = (MechSystemBase)mySys;
+      ArrayList<Constrainer> constrainers = mechBase.myConstrainers;
+      
+      CollisionManager colMgr = null;
+      for (Constrainer constrainer : constrainers) {
+         if (constrainer instanceof CollisionManager)
+            colMgr = (CollisionManager)constrainer;
+         else
+            colMgr = null;
+      }
+      
+      LinkedHashMap<DynamicComponent,RigidTransform3d> preCorrPoses = new LinkedHashMap<DynamicComponent,RigidTransform3d>();
+      
+      VectorNd velBp = new VectorNd(vel);
+      
+      impulseScale = 1.00;
+      ContinuousCollider.myDistScale = 1.00;
+      while (mySys.updateConstraints (t, stepAdjust, /*flags=*/MechSystem.COMPUTE_CONTACTS)) {
          updateMassMatrix (-1);
-         if (computePosCorrections (pos, vel, t)) {
+         
+         ContinuousCollider.myDistScale += 0.05;
+         boolean isCorrectionNeeded = false;
+         
+         if (debug_numLoops < 25) {
+//            impulseScale = 0.25; 
+         }
+         else if (debug_numLoops >= 25){
+//            ContinuousCollider.myDistScale += 0.01;
+//            impulseScale = 1.00;
+         } 
+         else if (debug_numLoops % 25 == 0) {
+            ContinuousCollider.myDistScale = 1.00;
+         }
+            
+         debug_numLoops++;
+         System.out.printf ("\n\nLoop: %d at t=%.2f\n", debug_numLoops, t);
+
+         if (isCorrectionNeeded = computePosCorrections (pos, vel, t))
             mySys.setActivePosState (pos);
+
+         if (isCorrectionNeeded) {
+            for (int i=0; i < vel.size (); i+=3) {
+               if (vel.get (i+0) > 1e-6 || vel.get (i+1) > 1e-6  || 
+                   vel.get (i+2) > 1e-6 ) {
+                  System.out.printf ("Impulse for %d: %.5f,%.5f,%.5f", i/3, 
+                     vel.get (i+0), vel.get (i+1), vel.get (i+2));
+                  System.out.println ();
+               }
+            }
+         }
+         else {
+            System.out.println ("No position correction.");
+         }
+
+         System.out.println ("Number of unilaterals: " + colMgr.myHandlers.get(0).getUnilaterals ().size());
+         
+         /*
+         If use first collision, you get appropriate amount of impulse instead of
+         impulse from small secondary correction. 
+         
+         However, the first collision's contact points will not coincides with 
+         accumulated impulses. 
+          */
+
+         if (debug_numLoops == 1) {
+            dataBuf.clear ();
+            colMgr.getState (dataBuf);
+         }
+         
+         if (debug_numLoops == 50) {
+            System.out.println ("Infinite loop.");
+//            break;
+         }
+            
+         if (colMgr.getColliderType () != ColliderType.CONTINUOUS) {
+            break;
+         }
+      } 
+ 
+      isContCollisionOccurred = (debug_numLoops > 0);
+      if (isContCollisionOccurred) {
+         colMgr.setState (dataBuf);   // Keep constraints in play
+         System.out.printf ("Collision Handled at t=%.2f\n\n", t);
+         
+         System.out.println ("Number of unilaterals: " + colMgr.myHandlers.get(0).getUnilaterals ().size());
+         collisionHandlers = colMgr.myHandlers;
+      }
+      else {
+         collisionHandlers = null;
+      }
+      impulseScale = 1;
+      
+      
+      
+////    System.out.println ("Handlers: " + colMgr.myHandlers.size ());
+//    for (int h=0; h<colMgr.myHandlers.size(); h++) {
+//       for (ContactConstraint c : colMgr.myHandlers.get(h).getUnilaterals ()) {
+//          for (int m=0; m<c.getMasters ().size (); m++) {
+//             // Master's previous pose
+//             RigidBody rb = (RigidBody)c.getMasters ().get (m).myComp;
+//             
+//             RigidTransform3d prvPose = preCorrPoses.get (rb);
+//             RigidTransform3d corPose = rb.getPose ();
+//             
+////             System.out.println ("PrvPose: " + prvPose.toString ("%.4f"));
+////             System.out.println ("CorPose: " + corPose.toString ("%.4f"));
+//             
+//             ContactPoint cpnt = (m==0) ? c.myCpnt0 : c.myCpnt1;
+//             
+////             System.out.println ("Prevous contact point: " + cpnt.myPoint.toString ("%.4f"));
+////             cpnt.myPoint.inverseTransform (prvPose);
+////             cpnt.myPoint.transform (corPose);
+////             System.out.println ("Corrected contact point: " + cpnt.myPoint.toString ("%.4f"));
+//          }
+//       }
+//    }
+      
+      
+      if (t == 0.59) {
+//         System.out.println ("clear");
+//         colMgr.clear ();
+      }
+      
+      if (colMgr != null && colMgr.myBody2SweptMeshInfo != null) {
+         for (SweptMeshInfo smi : colMgr.myBody2SweptMeshInfo.values ()) {
+            smi.savePrevPositions ();
          }
       }
+      
+//      System.out.println ("Velocity: " + velBp.toString ("%.4f"));
+      
+//      boolean detected = false;
+//      for (Vertex3d vtx : colMgr.mySweptMeshInfos[1].myMesh.getVertices ()) {
+//         Point3d wPnt = vtx.getWorldPoint ();
+//         if (wPnt.z < 0) {
+//            System.out.printf ("Detected vertex (%d) below surface: %s\n", vtx.getIndex (), vtx.getWorldPoint ().toString ("%.4f"));
+//            detected = true;
+//         }
+//      }
+//      
+//      if (detected) {
+//         SweptMeshInfo[] smis = colMgr.mySweptMeshInfos;
+//         
+//         ArrayList<BVNode> nodes1 = new ArrayList<BVNode>();
+//         ArrayList<BVNode> nodes2 = new ArrayList<BVNode>();
+//         smis[1].myVertexTree.intersectTree (nodes1, nodes2, smis[0].myTriangleTree);
+//
+//         for (int i = 0; i < nodes1.size (); i++) {
+//            SweptVertex sv   = (SweptVertex)nodes1.get (i).getElements ()[0];
+//            SweptTriangle st = (SweptTriangle)nodes2.get (i).getElements ()[0];
+//            
+//            // Confirm collision (narrow-phase)
+//            CCRV ccrv = colMgr.myContCldr.isVertexTriangleCollision (sv, st, smis[1], smis[0]);
+//            if (ccrv.hitTime > 0) {   // No collision
+//               System.out.println ("Collision detected");
+//            }
+//         }
+//      }
    }
 
    protected boolean computePosCorrections (
@@ -2472,13 +2653,13 @@ public class MechSystemSolver {
       if (velSize == 0) {
          return false;
       }            
+      
       if (myConSolver == null) {
          myConSolver = new KKTSolver();
       }
       updateBilateralConstraints ();
       updateUnilateralConstraints ();
 
-      // myVel.setSize (velSize);
       if (myGsize > 0 || myNsize > 0) {
          boolean allConstraintsCompliant = true;
          mySys.getBilateralInfo (myGInfo);
@@ -2508,6 +2689,7 @@ public class MechSystemSolver {
                nbuf[i] = 0;
             }
          }
+         
          // only need to do the correction if some constraints are non-compliant
          if (!allConstraintsCompliant) {
             correctionNeeded = true;
@@ -2526,9 +2708,24 @@ public class MechSystemSolver {
             }
          }
       }
+      
       if (correctionNeeded) {
+         // DANCOLEDIT
+         vel.scale (impulseScale);
+         
+         // DANCOLEDIT HACK. BackNode gets same impulse as its FrontNode.
+         // This is needed b/c unilaterals aren't created for the BackNodes.
+         double[] velBuf = vel.getBuffer ();
+//         for (int n=0; n<vel.size ()/6; n++) {
+//            int i = n*6;
+//            
+//            velBuf[i+3] = velBuf[i];
+//            velBuf[i+4] = velBuf[i+1];
+//            velBuf[i+5] = velBuf[i+2];
+//         }
          mySys.addActivePosImpulse (pos, 1, vel);
       }
+
       return correctionNeeded;
    }
 
@@ -2731,6 +2928,8 @@ public class MechSystemSolver {
    public void constrainedBackwardEuler (
       double t0, double t1, StepAdjustment stepAdjust) {
 
+      System.out.println ("\n\n>>>> constrainedBackwardEuler(), t1: " + t1);
+      
       if (myMatrixSolver == MatrixSolver.None) {
          throw new UnsupportedOperationException (
             "MatrixSolver cannot be 'None' for this integrator");
@@ -2754,6 +2953,8 @@ public class MechSystemSolver {
       myFparC.setSize (myParametricVelSize);
 
       // update constraints and forces appropriately for time t1.
+      
+      // DANCOLEDIT: Commented out updateConstraints in physics step
       mySys.updateConstraints (t1, null, MechSystem.UPDATE_CONTACTS);
       if (profileConstrainedBE) {
          timer.stop();
@@ -2775,6 +2976,12 @@ public class MechSystemSolver {
       myF.add (myMassForces);
       myB.scaledAdd (h, myF, myB);
 
+      // DANCOLEDIT - print KKT
+//      System.out.printf ("myUtmp: %s ,\nmyFparC: %s ,\nmyB: %s ,\nmyF: %s ,\nmyU: %s ,\n",
+//         myUtmp.toString ("%.2f"), myFparC.toString ("%.2f"), myB.toString ("%.2f"),
+//         myF.toString ("%.2f"), myU.toString ("%.2f")
+//      );
+      
       // solve constrained system for velocities at t1; store in uTmp
       KKTFactorAndSolve (myUtmp, myFparC, myB, /*tmp=*/myF, myU, h);
       if (profileConstrainedBE) {
@@ -2782,7 +2989,7 @@ public class MechSystemSolver {
          System.out.println ("  KKT solve " + timer.result(1));
          timer.start();
       }
-      
+
       // store velocities in system
       mySys.setActiveVelState (myUtmp);
       if (profileConstrainedBE) {
@@ -2795,9 +3002,13 @@ public class MechSystemSolver {
          if (profileConstrainedBE) {
             timer.start();
          }
+
+         // DANCOLEDIT: Note - KTTFactorAndSolve will set forces to the unilateral constraints.
+         // Make the unilateral constraints persist.
          if (projectFrictionConstraints (myUtmp, t0)) {
             mySys.setActiveVelState (myUtmp);
          }
+
          if (profileConstrainedBE) {
             timer.stop();
             System.out.println ("  friction " + timer.result(1));

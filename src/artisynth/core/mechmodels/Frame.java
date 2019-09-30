@@ -1315,10 +1315,21 @@ public class Frame extends DynamicComponentBase
 
    public void setContactConstraint (
       double[] buf, double w, Vector3d dir, ContactPoint cpnt) {
-
+ 
       double lx = cpnt.myPoint.x - myState.pos.x;
       double ly = cpnt.myPoint.y - myState.pos.y;
       double lz = cpnt.myPoint.z - myState.pos.z;
+      
+//      double lx = cpnt.myPoint.x - cpnt.myColState.x;
+//      double ly = cpnt.myPoint.y - cpnt.myColState.y;
+//      double lz = cpnt.myPoint.z - cpnt.myColState.z;
+      
+//      System.out.printf ("cpnt.myPoint: %s, lvec: %s, myState: %s\n",
+//         cpnt.myPoint.toString ("%.4f"), 
+//         new Point3d(lx,ly,lz).toString ("%.4f"),
+//         myState.pos.toString ("%.4f"));
+      
+     
 
       double nx = w*dir.x;
       double ny = w*dir.y;

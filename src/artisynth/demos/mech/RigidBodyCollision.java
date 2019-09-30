@@ -24,6 +24,7 @@ import artisynth.core.workspace.RootModel;
 import artisynth.core.gui.ControlPanel;
 import artisynth.core.driver.Main;
 
+// artisynth.demos.mech.RigidBodyCollision
 public class RigidBodyCollision extends RootModel {
    public static String rbpath =
       ArtisynthPath.getHomeRelativePath (
@@ -76,10 +77,10 @@ public class RigidBodyCollision extends RootModel {
          box0.transformGeometry (trans);
          box0.setInertia (SpatialInertia.createBoxInertia (4, 1, 1, 1));
 
-         addBox (box0, Color.GREEN);
-         if (wireFrame) {
-            setWireFrame (box0);
-         }
+//         addBox (box0, Color.GREEN);
+//         if (wireFrame) {
+//            setWireFrame (box0);
+//         }
 
          box1 = new RigidBody("box1"); // long thin box, bottom of pile
          box1.setMesh (new PolygonalMesh (new File (rbpath + "box.obj")), null);
@@ -87,10 +88,10 @@ public class RigidBodyCollision extends RootModel {
          trans.applyScaling (0.6, 0.1, 1.9);
          box1.transformGeometry (trans);
          box1.setInertia (SpatialInertia.createBoxInertia (1, 1, 0.1, 4));
-         addBox (box1, Color.YELLOW);
-         if (wireFrame) {
-            setWireFrame (box1);
-         }
+//         addBox (box1, Color.YELLOW);
+//         if (wireFrame) {
+//            setWireFrame (box1);
+//         }
 
          box2 = new RigidBody("box2"); // left hand box falling on unsupported end of
          // box1
@@ -99,10 +100,10 @@ public class RigidBodyCollision extends RootModel {
          trans.applyScaling (0.5, 0.5, 0.5);
          box2.transformGeometry (trans);
          box2.setInertia (SpatialInertia.createBoxInertia (20, 1, 1, 1));
-         addBox (box2, Color.BLUE);
-         if (wireFrame) {
-            setWireFrame (box2);
-         }
+//         addBox (box2, Color.BLUE);
+//         if (wireFrame) {
+//            setWireFrame (box2);
+//         }
 
          box3 = new RigidBody("box3"); // top box in pile
          box3.setMesh (new PolygonalMesh (new File (rbpath + "box.obj")), null);
@@ -111,11 +112,11 @@ public class RigidBodyCollision extends RootModel {
          box3.transformGeometry (trans);
          box3.setInertia (SpatialInertia.createBoxInertia (
             0.5, 0.5, 0.5, 4));
-         addBox (box3, Color.CYAN);
-         //box3.getMesh().name = "box3";
-         if (wireFrame) {
-            setWireFrame (box3);
-         }
+//         addBox (box3, Color.CYAN);
+//         //box3.getMesh().name = "box3";
+//         if (wireFrame) {
+//            setWireFrame (box3);
+//         }
 
          box4 = new RigidBody("box4"); // solo box off to the right.
          box4.setMesh (new PolygonalMesh (new File (rbpath + "box.obj")), null);
@@ -238,7 +239,7 @@ public class RigidBodyCollision extends RootModel {
       double t0, double t1, int flags) {
       StepAdjustment adj = super.advance (t0, t1, flags);
       if ((adj == null || adj.getScaling() >= 1) && TimeBase.compare (t1-lastResetTime, 6) > 0) {
-         reset();
+//         reset();
          lastResetTime = t1;
       }
       return adj;

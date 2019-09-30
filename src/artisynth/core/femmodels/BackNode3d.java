@@ -13,7 +13,20 @@ import artisynth.core.modelbase.*;
 import artisynth.core.util.*;
 
 public class BackNode3d extends DynamicComponentBase 
-   implements MotionTargetComponent {
+   implements MotionTargetComponent, CollidableDynamicComponent {
+
+   @Override
+   public void setContactConstraint (
+      double[] buf, double w, Vector3d dir, ContactPoint cpnt) {
+      buf[0] = w*dir.x;
+      buf[1] = w*dir.y;
+      buf[2] = w*dir.z;
+   }
+
+   @Override
+   public void addToPointVelocity (Vector3d vel, double w, ContactPoint cpnt) {
+      vel.scaledAdd (w, myVel);    
+   }
 
    FemNode3d myNode;
    Point3d myPos = new Point3d();

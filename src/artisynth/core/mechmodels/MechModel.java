@@ -1663,6 +1663,7 @@ TransformableGeometry, ScalableUnits {
    
    @Override
    public void getMassMatrixValues (SparseBlockMatrix M, VectorNd f, double t) {
+      // DANCOLEDIT - here getMassMatrixValues
       updateLocalModels();
       for (MechSystemModel m : myLocalModels) {
          m.getMassMatrixValues (M, f, t);

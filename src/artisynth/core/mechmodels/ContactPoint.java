@@ -23,7 +23,9 @@ public class ContactPoint {
    Point3d myPoint;     // location of the point (world coordinates)
    Vertex3d[] myVtxs;   // vertices associated with the point
    double[] myWgts;     // weights associated with each vertex
-
+   
+   public boolean isBack = false;
+   
    public ContactPoint () {
       myPoint = new Point3d();
    }
@@ -237,6 +239,7 @@ public class ContactPoint {
          data.zput (-1);
          return;
       }
+      
       data.dput (cpnt.myPoint);
       if (cpnt.myVtxs == null) {
          data.zput (0);
@@ -251,6 +254,9 @@ public class ContactPoint {
          data.zput (vtxs[i].getIndex());
          data.dput (wgts[i]);
       }
+      
+      // DANCOLEDIT
+      data.zput((cpnt.isBack) ? 1: 0);
    }
 
    protected static ContactPoint setState (
@@ -261,6 +267,7 @@ public class ContactPoint {
          return null;
       }
       ContactPoint cpnt = new ContactPoint();
+      
       data.dget(cpnt.myPoint);
       if (numv == 0) {
          return cpnt;
@@ -273,10 +280,17 @@ public class ContactPoint {
       }
       cpnt.myVtxs = vtxs;
       cpnt.myWgts = wgts;
+      
+      // DANCOLEDIT
+      cpnt.isBack = (data.zget () == 1); 
+      
       return cpnt;
    }
 
    public int hashCode() {
+      // DANCOLEDIT. == `null` originally. Modified to `!= null` in order 
+      // to handle case where a vertex can have multiple collisions 
+      // in a single timestep.
       if (myVtxs == null) {
          return super.hashCode();
       }

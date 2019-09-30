@@ -28,6 +28,9 @@ public class PenetratingPoint implements Comparable<PenetratingPoint> {
    public PenetrationRegion region; // region associated with vertex, 
                            // if available
 
+   // DANCOLEDIT
+   public double hitTime = -1;          // Only for continuous case.
+   
    public Face getFace() {
       return face;
    }

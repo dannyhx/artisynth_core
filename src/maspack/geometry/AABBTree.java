@@ -6,7 +6,9 @@
  */
 package maspack.geometry;
 
+import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector3d;
+import maspack.render.Renderer;
 
 public class AABBTree extends BVTree {
 
@@ -168,5 +170,16 @@ public class AABBTree extends BVTree {
    public void update() {
       updateRecursively (myRoot);
    }
-
+   
+   protected void recursivelyRender (
+      Renderer renderer, int flags, BVNode node) {
+      AABB aabb = (AABB)node;
+      
+      aabb.render (renderer, flags, this.myBvhToWorld);
+      BVNode child = aabb.myFirstChild;
+      while (child != null) {
+         recursivelyRender (renderer, flags, child);
+         child = child.myNext;
+      }
+   }
 }

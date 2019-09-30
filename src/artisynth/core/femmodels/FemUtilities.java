@@ -697,32 +697,34 @@ public class FemUtilities {
       
       // Stress component 
       
-      Vector3d sjGradMu = new Vector3d( jGradMu );   
-      matStress.mul (sjGradMu);
-      
-      Vector3d sjGradMd = new Vector3d( jGradMd ); 
-      matStress.mul (sjGradMd);
-                              
-      double sKuu = iGradMu.dot(sjGradMu) * dv;
-      double sKud = iGradMu.dot(sjGradMd) * dv;
-      double sKdu = iGradMd.dot(sjGradMu) * dv;
-      double sKdd = iGradMd.dot(sjGradMd) * dv;
-      
-      K00.m00 += sKuu;
-      K00.m11 += sKuu;
-      K00.m22 += sKuu; 
-      
-      K01.m00 += sKud;
-      K01.m11 += sKud;
-      K01.m22 += sKud; 
-      
-      K10.m00 += sKdu;
-      K10.m11 += sKdu;
-      K10.m22 += sKdu;
-      
-      K11.m00 += sKdd;
-      K11.m11 += sKdd;
-      K11.m22 += sKdd;
+      if (matStress.numNonZeroVals () > 0) {
+         Vector3d sjGradMu = new Vector3d( jGradMu );   
+         matStress.mul (sjGradMu);
+         
+         Vector3d sjGradMd = new Vector3d( jGradMd ); 
+         matStress.mul (sjGradMd);
+                                 
+         double sKuu = iGradMu.dot(sjGradMu) * dv;
+         double sKud = iGradMu.dot(sjGradMd) * dv;
+         double sKdu = iGradMd.dot(sjGradMu) * dv;
+         double sKdd = iGradMd.dot(sjGradMd) * dv;
+         
+         K00.m00 += sKuu;
+         K00.m11 += sKuu;
+         K00.m22 += sKuu; 
+         
+         K01.m00 += sKud;
+         K01.m11 += sKud;
+         K01.m22 += sKud; 
+         
+         K10.m00 += sKdu;
+         K10.m11 += sKdu;
+         K10.m22 += sKdu;
+         
+         K11.m00 += sKdd;
+         K11.m11 += sKdd;
+         K11.m22 += sKdd;
+      }
    }
    
    public static void addMembraneMaterialStiffness (

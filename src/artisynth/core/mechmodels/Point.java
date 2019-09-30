@@ -704,7 +704,7 @@ public class Point extends DynamicComponentBase
 
    public void setContactConstraint (
       double[] buf, double w, Vector3d dir, ContactPoint cpnt) {
-
+      
       buf[0] = w*dir.x;
       buf[1] = w*dir.y;
       buf[2] = w*dir.z;

@@ -11,6 +11,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import _custom.cont.ContinuousCollider;
+import _custom.cont.SweptMeshInfo;
+import _custom.cont.SweptTriangle;
+import _custom.cont.SweptVertex;
 import maspack.collision.AbstractCollider;
 import maspack.collision.ContactInfo;
 import maspack.collision.MeshCollider;
@@ -18,7 +22,9 @@ import maspack.collision.SurfaceMeshIntersector;
 import maspack.collision.SurfaceMeshIntersector.RegionType;
 import maspack.collision.SignedDistanceCollider;
 import maspack.geometry.PolygonalMesh;
+import maspack.geometry.Vertex3d;
 import maspack.geometry.DistanceGrid;
+import maspack.matrix.Point3d;
 import maspack.matrix.SparseBlockMatrix;
 import maspack.matrix.Vector3d;
 import maspack.matrix.VectorNd;
@@ -42,6 +48,9 @@ import maspack.util.ReaderTokenizer;
 import maspack.util.FunctionTimer;
 import artisynth.core.mechmodels.CollisionBehavior.Method;
 import artisynth.core.mechmodels.CollisionBehavior.ColorMapType;
+import artisynth.core.femmodels.FemMeshComp;
+import artisynth.core.femmodels.FemModel;
+import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.mechmodels.Collidable.Collidability;
 import artisynth.core.mechmodels.Collidable.Group;
 import artisynth.core.mechmodels.MechSystem.ConstraintInfo;
@@ -122,6 +131,9 @@ import artisynth.core.util.ScanToken;
 public class CollisionManager extends RenderableCompositeBase
    implements ScalableUnits, Constrainer, HasNumericState {
 
+   // DANCOLEDIT - mIsPrevMeshSyncedToCurWorld
+   public boolean mIsPrevMeshSyncedToCurWorld = false;
+   
    // Current assumptions:
    //
    // 1) Collidable hierarchies are no more than one deep
@@ -1393,7 +1405,7 @@ public class CollisionManager extends RenderableCompositeBase
             ModelComponent c = comp.get (i);
             if (c instanceof Collidable) {
                Collidable col = (Collidable)c;
-               if (isCollidableBody (col) && isInternallyCollidable (col)) {
+               if (isCollidableBody (col) && isInternallyCollidable (col)) {  
                   list.add ((CollidableBody)c);
                }
             }
@@ -1700,7 +1712,7 @@ public class CollisionManager extends RenderableCompositeBase
                Group g1 = (Group)c1;
                if (g1.includesSelf()) {
                   if (myDeformableIntBehaviors.get (c0) == null) {
-                     myDeformableIntBehaviors.put (c0, behav);
+                     myDeformableIntBehaviors.put (c0, behav);  // DANCOLEDIT HERE
                   }
                }
                if (g1.includesRigid() || g1.includesDeformable()) {
@@ -1712,13 +1724,18 @@ public class CollisionManager extends RenderableCompositeBase
                         }
                      }
                   }
-                  if (g1.includesDeformable()) {
+                  if (g1.includesDeformable()) {  
                      for (CollidableBody cb : bodies) {
                         if (myDeformableExtBehaviors.get (cb) == null) {
                            myDeformableExtBehaviors.put (cb, behav);
                         }
                      }
                   }
+               }
+               
+               // DANCOLEDIT - special case for deformable self-collision
+               if (c0.isDeformable () && c1 == Group.Self) {
+                  setExplicitBehavior (myExplicitBehaviors, new CollidablePair(c0,c0), behav);
                }
             }
             else {
@@ -1743,7 +1760,7 @@ public class CollisionManager extends RenderableCompositeBase
                else {
                   list.clear();
                   getExternallyCollidableBodies (list, c);
-                  myDeformableExts.addAll (list);
+                  myDeformableExts.addAll (list);   // DANCOLEDIT - gets populated here
 
                   list.clear();
                   getInternallyCollidableBodies (list, c);
@@ -2139,6 +2156,9 @@ public class CollisionManager extends RenderableCompositeBase
          return behavior;
       }
    }
+   
+   public LinkedHashMap<CollidableBody,SweptMeshInfo> myBody2SweptMeshInfo;
+   public ContinuousCollider myContCldr;
 
    ContactInfo computeContactInfo (
       CollidableBody c0, CollidableBody c1, CollisionBehavior behav) {
@@ -2202,12 +2222,90 @@ public class CollisionManager extends RenderableCompositeBase
                mesh1, gcomp1 != null ? gcomp1.getGrid() : null);
             break;
          }
+         // DANCOLEDIT - CONTINUOUS case
+         case CONTINUOUS: {
+            if (myContCldr == null) {
+               myContCldr = new ContinuousCollider ();
+            }
+            
+            if (myBody2SweptMeshInfo == null) {
+               myBody2SweptMeshInfo = 
+                  new LinkedHashMap<CollidableBody,SweptMeshInfo> ();
+            }
+            
+            for (CollidableBody body : new CollidableBody[] {c0,c1} ) {
+               SweptMeshInfo smi = myBody2SweptMeshInfo.get (body);
+               
+               if (smi == null) {
+                  smi = new SweptMeshInfo(body.getCollisionMesh ());
+                  myBody2SweptMeshInfo.put (body, smi);
+               }
+               
+               smi.updatePrevPositionsX0 ();
+               smi.updateBVTrees ();
+               
+               if (c0 == c1) 
+                  break;
+            }
+            
+//            SweptMeshInfo smi = myBody2SweptMeshInfo.get (c0);
+//            SweptVertex sv = (SweptVertex)smi.myVertexTree.getLeafNodes ().get (0).getElements ()[0];
+//            System.out.println ("Cur Vertex: " + sv.getPoint (0));
+//            System.out.println ("Prv Vertex: " + sv.getPoint (1));
+            
+            boolean isDynamic0 = isBodyDynamic(c0);
+            boolean isDynamic1 = isBodyDynamic(c1);
+            
+            System.out.printf ("Computing contact between %s-%s\n", 
+               c0.getName (), c1.getName ());
+            
+            if (c1.getName () == null) {
+               SweptMeshInfo smi = myBody2SweptMeshInfo.get (c0);
+               
+               System.out.println ("Shell normal: " + c0.getCollisionMesh ().getFace (0).getWorldNormal ());
+               System.out.println ("RB normal: " + c1.getCollisionMesh ().getFace (0).getWorldNormal ());
+               
+               SweptTriangle st = (SweptTriangle)smi.myTriangleTree.getLeafNodes ().get (0).getElements ()[0];
+               
+               System.out.println ("SweptTriangle Nrm: " + st.computeInstanteousNormal (0));
+            }
+            
+            cinfo = myContCldr.getContacts (
+               myBody2SweptMeshInfo.get (c0), myBody2SweptMeshInfo.get (c1),
+               isDynamic0, isDynamic1);
+
+            break;
+         }
          default: {
             throw new UnsupportedOperationException (
                "Unimplemented collider type " + colliderType);
          }
       }
+      
+      System.out.println ("---Contact Type: " + colliderType);
+      
       return cinfo;    
+   }
+   
+   protected boolean isBodyDynamic(CollidableBody body) {
+      if (body instanceof RigidBody) {
+         RigidBody rb = (RigidBody)body;
+         return rb.isDynamic ();
+      }
+      else if (body instanceof FemMeshComp) {
+         FemMeshComp femMeshComp = (FemMeshComp)body; 
+         FemModel3d femModel = (FemModel3d)femMeshComp.getParent ().getParent (); 
+         return femModel.getDynamicsEnabled ();
+      }
+      else {
+         throw new UnsupportedOperationException("Unsupported body instance.");
+      }
+   }
+   
+   public void rebuildSweptMeshInfo(CollidableBody body, PolygonalMesh surfaceMesh) {
+      // Copy surfaceMeshVertices to body's vertices
+      SweptMeshInfo smi = myBody2SweptMeshInfo.get (body);
+      smi.build (surfaceMesh);
    }
    
    void checkForContact (
@@ -2584,7 +2682,7 @@ public class CollisionManager extends RenderableCompositeBase
    
    double updateConstraints (
       ArrayList<CollisionHandler> handlers, double t, int flags) {
-
+      
       boolean testMode = ((flags & CONTACT_TEST_MODE) != 0);
 
       //updateCollider();
@@ -2622,12 +2720,14 @@ public class CollisionManager extends RenderableCompositeBase
             CollidablePair pair = e.getKey();
             CollidableBody c0 = (CollidableBody)pair.myComp0;
             CollidableBody c1 = (CollidableBody)pair.myComp1;
+            // DANCOLEDIT - here - VERTEX_EDGE_PENETRATION case 
             checkForContact (c0, c1, behav, BehaviorSource.EXPLICIT, testMode); 
          }
       }
       // compute implicit collisions
 
-      checkExternalCollisions (myRigidExts, testMode);
+      // DANCOLEDIT - here - checkExternalCollisions() commented out
+      checkExternalCollisions (myRigidExts, testMode);  // here CONTOUR_REGION()
       checkExternalCollisions (myDeformableExts, myRigidExts, testMode);
       checkExternalCollisions (myDeformableExts, testMode);
       checkInternalCollisions (myDeformableInts, testMode);
@@ -2686,7 +2786,7 @@ public class CollisionManager extends RenderableCompositeBase
             }
          }
       }
-
+ 
       return myMaxpen;
    }   
 

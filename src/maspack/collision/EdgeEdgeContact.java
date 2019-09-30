@@ -30,7 +30,9 @@ public class EdgeEdgeContact {
    public double s0, s1;
 
    // work vector
-   Vector3d w = new Vector3d();
+   public Vector3d w = new Vector3d();
+   
+   public double hitTime = -1;          // only in continuous case
 
    public EdgeEdgeContact () {
       point0 = new Point3d();

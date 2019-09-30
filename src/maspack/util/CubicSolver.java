@@ -19,8 +19,8 @@ public class CubicSolver {
    public static double RTOL = 1e-10;
    public static double PREC = 1e-16;
 
-   static int iterationCount;
-   static int bisectionCount;
+   public static int iterationCount;
+   public static int bisectionCount;
    static boolean useNewtonsMethod = true;
 
    public static int getRoots (

@@ -29,8 +29,9 @@ public class ContactConstraint {
    ArrayList<ContactMaster> myMasters; // underlying master components which
                          // will be required to resolve the contact
    //CollisionHandler myHandler; // handler to which the constraint belongs
-   ContactPoint myCpnt0; // first point associated with the contact
-   ContactPoint myCpnt1; // second point associated with the contact
+   // DANCOLEDIT: public contactpoints
+   public ContactPoint myCpnt0; // first point associated with the contact
+   public ContactPoint myCpnt1; // second point associated with the contact
    double myLambda;      // most recent force used to enforce the constraint
    double myDistance;    // contact penetration distance
    boolean myActive;     // whether or not this constraint is active
@@ -41,6 +42,9 @@ public class ContactConstraint {
                          // bilateral or unilateral constraint matrix (GT or NT)
    double myContactArea; // average area associated with the contact, or
                          // -1 if not available
+   
+   // DANCOLEDIT
+   public int m = 0;
 
    public double getForce() {
       return myLambda;
@@ -255,25 +259,33 @@ public class ContactConstraint {
             new ContactMaster (
                ((RigidMeshComp)collidable).getRigidBody(), w, cpnt));        
       }
-      else {
+      else {   // FemMeshComp
          Vertex3d[] vtxs = cpnt.getVertices();
          double[] wgts = cpnt.getWeights();
          ArrayList<ContactMaster> newMasters = new ArrayList<ContactMaster>();
+         
          for (int i=0; i<vtxs.length; i++) {
             newMasters.clear();
             collidable.getVertexMasters (newMasters, vtxs[i]);
+            
+            // Only 1 iteration (comp=FemNode, cpnt=null, weight=1.0)
             for (int j=0; j<newMasters.size(); j++) {
                ContactMaster cm = newMasters.get(j);
                // see if master has already been added; if so, just adjust weight
                boolean masterAlreadyAdded = false;
+               
+               // For each existing master
                for (int k=0; k<myMasters.size(); k++) {
                   ContactMaster pm = myMasters.get(k);
+                  // Is it the same master that we are inspecting?
                   if (pm.myComp == cm.myComp) {
+                     // Add more weight to the master
                      pm.myWeight += (w*wgts[i]*cm.myWeight);
                      masterAlreadyAdded = true;
                      break;
                   }
                }
+               
                if (!masterAlreadyAdded) {
                   cm.myWeight = w*wgts[i]*cm.myWeight;
                   cm.myCpnt = cpnt;
@@ -301,7 +313,9 @@ public class ContactConstraint {
    }
 
    public void getState (DataBuffer data) {
-
+      // DANCOLEDIT
+      data.zput (m);
+      
       ContactPoint.getState (data, myCpnt0);
       ContactPoint.getState (data, myCpnt1);
       data.dput (myLambda);
@@ -315,8 +329,13 @@ public class ContactConstraint {
    public void setState (
       DataBuffer data, CollidableBody collidable0, CollidableBody collidable1) {
       
-      myCpnt0 = ContactPoint.setState (data, collidable0.getCollisionMesh());
-      myCpnt1 = ContactPoint.setState (data, collidable1.getCollisionMesh());
+      // DANCOLEDIT here
+      m = data.zget ();
+      CollidableBody col0 = (m == 0) ? collidable0 : collidable1;
+      CollidableBody col1 = (m == 0) ? collidable1 : collidable0;
+      
+      myCpnt0 = ContactPoint.setState (data, col0.getCollisionMesh());
+      myCpnt1 = ContactPoint.setState (data, col1.getCollisionMesh());
       if (myCpnt1 == null) {
          myCpnt1 = myCpnt0;
       }
@@ -326,7 +345,7 @@ public class ContactConstraint {
       myIdentifyByPoint1 = data.zgetBool();
       data.dget(myNormal);
       myContactArea = data.dget();
-      assignMasters (collidable0, collidable1);
+      assignMasters (col0, col1);
    }
 
    public String toString (String fmtStr) {

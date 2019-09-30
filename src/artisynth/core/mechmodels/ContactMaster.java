@@ -19,7 +19,7 @@ public class ContactMaster {
    CollidableDynamicComponent myComp;
    double myWeight;
    ContactPoint myCpnt;
-
+   
    public ContactMaster (
       CollidableDynamicComponent comp, double wgt, ContactPoint cpnt) {
 
