@@ -31,8 +31,9 @@ public class EdgeEdgeContact {
 
    // work vector
    public Vector3d w = new Vector3d();
-   
+
    public double hitTime = -1;          // only in continuous case
+
 
    public EdgeEdgeContact () {
       point0 = new Point3d();
