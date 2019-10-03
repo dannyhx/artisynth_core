@@ -3,6 +3,7 @@ package _custom.cont;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 
+import artisynth.core.femmodels.FemMeshComp;
 import maspack.geometry.AABBTree;
 import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
@@ -15,6 +16,7 @@ import maspack.render.RenderableUtils;
 public class SweptMeshInfo {
    
    public PolygonalMesh myMesh;
+   public FemMeshComp myFemMeshComp;
    
    /** Previous positions of vertices in local-space. */
    public Point3d[] prevPositions;      
@@ -35,22 +37,19 @@ public class SweptMeshInfo {
    public AABBTree myEdgeTree;
    public AABBTree myTriangleTree;
 
-   public SweptMeshInfo (PolygonalMesh mesh) {
-      build(mesh);
-   }
-
-   public void build() {
-      build (myMesh);
+   public SweptMeshInfo (PolygonalMesh mesh, FemMeshComp femMeshComp) {
+      build(mesh, femMeshComp);
    }
    
-   public void build(PolygonalMesh mesh) {
+   public void build(PolygonalMesh mesh, FemMeshComp femMeshComp) {
       if (!mesh.isTriangular()) {
          throw new IllegalArgumentException (
             "Mesh is not triangular");
       }
       
       myMesh = mesh;
-  
+      myFemMeshComp = femMeshComp;
+      
       /* --- Vertices --- */
       
       int numv = mesh.numVertices();

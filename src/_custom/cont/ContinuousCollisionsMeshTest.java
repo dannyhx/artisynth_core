@@ -141,7 +141,7 @@ public class ContinuousCollisionsMeshTest extends RootModel {
       mSMI = new SweptMeshInfo[mNumModels];
       
       for (int i=0; i<mNumModels; i++) 
-         mSMI[i] = new SweptMeshInfo(mMesh[i]);
+         mSMI[i] = new SweptMeshInfo(mMesh[i], null);
    }
    
    protected void build_assembleUI() {

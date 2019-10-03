@@ -23,6 +23,7 @@ import maspack.util.Pair;
 public class MeshUtil {
    protected static final int SAME_FACE_FLAG = 1;
   
+   public static double ELIPSON = 1e-6;
    
    public static String getVertexIndices(Vertex3d[] vtxs) {
       String s = "[";
@@ -453,20 +454,6 @@ public class MeshUtil {
             
          }
       }
-      
-//      // DANMDEBUG
-//      for (int k = 0; k < rvEdges.size (); k++) { 
-//         for (int p = 0; p < rvEdges.size (); p++) {
-//            if (k==p) continue;
-//            HalfEdge kEdge = rvEdges.get (k);
-//            HalfEdge pEdge = rvEdges.get (p);
-//            if (MeshUtil.isShared2VtxsEdge (kEdge, pEdge)) {
-//               System.out.println ("DANMDEBUG: Duplicate bad edge");
-//               System.out.println (kEdge.vertexStr () + " " + pEdge.vertexStr ());
-//               System.out.println ("DANMDEBUG: here");
-//            }
-//         }
-//      }
       
       MeshUtil.clearEdgeFlags (visitedEdges, visitedFlag);
       ModelComponentBase.removeTempFlag (visitedFlag);

@@ -866,73 +866,78 @@ public class CollisionHandler extends ConstrainerBase
          
          // Duplicate unilaterals for BackNodes
          
-         LinkedList<ContactConstraint> unilateralsToAdd = 
-            new LinkedList<ContactConstraint> ();
+         boolean isCopyUnilateralsToBackNodes = true;
          
-         for (ContactConstraint cc : myUnilaterals) {
-            
-            if (! isUnilateralHaveShellMaster(cc))
-               continue;
-            
-            // Initialize duplicate unilateral
-            ContactConstraint cc_back = new ContactConstraint();
-            cc_back.setNormal ( cc.getNormal () );
-            cc_back.setDistance( cc.getDistance () );
-            cc_back.m = cc.m;
-            
-            // Duplicate unilateral's ContactPoints. Position will be
-            // adjusted later.
-            
-            cc_back.myCpnt0 = new ContactPoint();
-            cc_back.myCpnt0.set (
-               cc.myCpnt0.getPoint (), cc.myCpnt0.myVtxs, cc.myCpnt0.myWgts);
-            
-            cc_back.myCpnt1 = new ContactPoint();
-            cc_back.myCpnt1.set (
-               cc.myCpnt1.getPoint (), cc.myCpnt1.myVtxs, cc.myCpnt1.myWgts);
-            
-            // Duplicate unilateral's ContactMasters.
-            // Each cpnt has its own set of masters (either 1 or 3 nodes).
-            // However, all masters are grouped into a single array.
-            
-            for (ContactMaster cm : cc.getMasters ()) {
-               // If master is a rigidBody point
-               if (! isShellMaster (cm)) {  
-                  cc_back.myMasters.add (cm);
-                  continue;
-               }
-               
-               // Otherwise, master is a femNode
-               
-               CollidableDynamicComponent cmComp = cm.myComp;
-               FemNode3d cmNode = (FemNode3d)cmComp;
-               
-               ContactMaster cm_back = new ContactMaster( 
-                  cmNode.getBackNode (), 
-                  cm.myWeight, 
-                  (cm.myCpnt == cc.myCpnt0) ? cc_back.myCpnt0 : cc_back.myCpnt1
-               );
-               
-               cm_back.myCpnt.isBack = true;
-               
-               // Adjust cpnt's position to align with backnode, relative to
-               // front node.
-               
-               Vector3d front2back = new Vector3d();
-               front2back.sub (
-                  cmNode.getBackNode().getPosition (), cmNode.getPosition ());
-               
-               cm.myCpnt.myPoint.add (front2back);
-               
-               // Add duplicate contact master.
-               
-               cc_back.myMasters.add ( cm_back );
-            }
+         if (isCopyUnilateralsToBackNodes) {
 
-            unilateralsToAdd.add (cc_back);
-         }
-         
-         myUnilaterals.addAll (unilateralsToAdd);
+            LinkedList<ContactConstraint> unilateralsToAdd = 
+               new LinkedList<ContactConstraint> ();
+            
+            for (ContactConstraint cc : myUnilaterals) {
+               
+               if (! isUnilateralHaveShellMaster(cc))
+                  continue;
+               
+               // Initialize duplicate unilateral
+               ContactConstraint cc_back = new ContactConstraint();
+               cc_back.setNormal ( cc.getNormal () );
+               cc_back.setDistance( cc.getDistance () );
+               cc_back.m = cc.m;
+               
+               // Duplicate unilateral's ContactPoints. Position will be
+               // adjusted later.
+               
+               cc_back.myCpnt0 = new ContactPoint();
+               cc_back.myCpnt0.set (
+                  cc.myCpnt0.getPoint (), cc.myCpnt0.myVtxs, cc.myCpnt0.myWgts);
+               
+               cc_back.myCpnt1 = new ContactPoint();
+               cc_back.myCpnt1.set (
+                  cc.myCpnt1.getPoint (), cc.myCpnt1.myVtxs, cc.myCpnt1.myWgts);
+               
+               // Duplicate unilateral's ContactMasters.
+               // Each cpnt has its own set of masters (either 1 or 3 nodes).
+               // However, all masters are grouped into a single array.
+               
+               for (ContactMaster cm : cc.getMasters ()) {
+                  // If master is a rigidBody point
+                  if (! isShellMaster (cm)) {  
+                     cc_back.myMasters.add (cm);
+                     continue;
+                  }
+                  
+                  // Otherwise, master is a femNode
+                  
+                  CollidableDynamicComponent cmComp = cm.myComp;
+                  FemNode3d cmNode = (FemNode3d)cmComp;
+                  
+                  ContactMaster cm_back = new ContactMaster( 
+                     cmNode.getBackNode (), 
+                     cm.myWeight, 
+                     (cm.myCpnt == cc.myCpnt0) ? cc_back.myCpnt0 : cc_back.myCpnt1
+                  );
+                  
+                  cm_back.myCpnt.isBack = true;
+                  
+                  // Adjust cpnt's position to align with backnode, relative to
+                  // front node.
+                  
+                  Vector3d front2back = new Vector3d();
+                  front2back.sub (
+                     cmNode.getBackNode().getPosition (), cmNode.getPosition ());
+                  
+                  cm.myCpnt.myPoint.add (front2back);
+                  
+                  // Add duplicate contact master.
+                  
+                  cc_back.myMasters.add ( cm_back );
+               }
+   
+               unilateralsToAdd.add (cc_back);
+            }
+            
+            myUnilaterals.addAll (unilateralsToAdd);
+         } // End of unilateral to backnode copying 
       }
 
       removeInactiveContacts ();
@@ -1295,15 +1300,13 @@ public class CollisionHandler extends ConstrainerBase
          // DANCOLEDIT: addUnilateralConstraint - print
          System.out.printf ("addUnilateralConstraint() Pnt0: [%s], Pnt1: [%s], "
             +"Nrm: [%s], Dist: [%.4f], Lam: [%.3f], Temp: [%b], " 
-            +"IsCpntBack: [%b-%b]\n",
+            +"\n",
             c.myCpnt0.myPoint.toString ("%.6f"),
             (c.myCpnt1 != null) ? c.myCpnt1.myPoint.toString ("%.6f") : "null",
             c.myNormal.toString ("%.2f"),
             c.myDistance, 
             c.myLambda, 
-            c.myActive,
-            c.myCpnt0.isBack,
-            c.myCpnt1.isBack
+            c.myActive
          );
          
          c.addConstraintBlocks (NT, bj++);

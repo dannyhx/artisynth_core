@@ -2473,8 +2473,7 @@ public class MechSystemSolver {
       mySys.setActiveForces (myF);      
    }
 
-   boolean isContCollisionOccurred = false;
-   double impulseScale = 1;
+   double impulseScale = 1.00;
    public ArrayList<CollisionHandler> collisionHandlers;
    protected void applyPosCorrection (
       VectorNd pos, VectorNd vel,
@@ -2482,52 +2481,35 @@ public class MechSystemSolver {
       
       System.out.println (">>>> applyPosCorrection()");
 
-      int debug_numLoops = 0;
-      DataBuffer dataBuf = new DataBuffer();
-      MechSystemBase mechBase = (MechSystemBase)mySys;
-      ArrayList<Constrainer> constrainers = mechBase.myConstrainers;
-      
+      // Get collision manager
       CollisionManager colMgr = null;
-      for (Constrainer constrainer : constrainers) {
+      MechSystemBase mechBase = (MechSystemBase)mySys;
+      for (Constrainer constrainer : mechBase.myConstrainers) {
          if (constrainer instanceof CollisionManager)
             colMgr = (CollisionManager)constrainer;
          else
             colMgr = null;
       }
+      DataBuffer colMgrBuf = new DataBuffer();
       
-      LinkedHashMap<DynamicComponent,RigidTransform3d> preCorrPoses = new LinkedHashMap<DynamicComponent,RigidTransform3d>();
-      
-      VectorNd velBp = new VectorNd(vel);
+      // Is continuous 
+      boolean isContinuous = colMgr.getColliderType () == ColliderType.CONTINUOUS;
       
       impulseScale = 1.00;
       ContinuousCollider.myDistScale = 1.00;
+      int numCollisionIters = 0;
       while (mySys.updateConstraints (t, stepAdjust, /*flags=*/MechSystem.COMPUTE_CONTACTS)) {
+         numCollisionIters++;
+         System.out.printf ("\n\nLoop: %d at t=%.2f\n", numCollisionIters, t);
+//         impulseScale = 0.25;
          updateMassMatrix (-1);
          
-         ContinuousCollider.myDistScale += 0.05;
-         boolean isCorrectionNeeded = false;
-         
-         if (debug_numLoops < 25) {
-//            impulseScale = 0.25; 
-         }
-         else if (debug_numLoops >= 25){
-//            ContinuousCollider.myDistScale += 0.01;
-//            impulseScale = 1.00;
-         } 
-         else if (debug_numLoops % 25 == 0) {
-            ContinuousCollider.myDistScale = 1.00;
-         }
-            
-         debug_numLoops++;
-         System.out.printf ("\n\nLoop: %d at t=%.2f\n", debug_numLoops, t);
-
-         if (isCorrectionNeeded = computePosCorrections (pos, vel, t))
+         if (computePosCorrections (pos, vel, t)) {
             mySys.setActivePosState (pos);
-
-         if (isCorrectionNeeded) {
+            
             for (int i=0; i < vel.size (); i+=3) {
-               if (vel.get (i+0) > 1e-6 || vel.get (i+1) > 1e-6  || 
-                   vel.get (i+2) > 1e-6 ) {
+               if (vel.get (i+0) > 1e-10 || vel.get (i+1) > 1e-10  || 
+                   vel.get (i+2) > 1e-10 ) {
                   System.out.printf ("Impulse for %d: %.5f,%.5f,%.5f", i/3, 
                      vel.get (i+0), vel.get (i+1), vel.get (i+2));
                   System.out.println ();
@@ -2536,75 +2518,40 @@ public class MechSystemSolver {
          }
          else {
             System.out.println ("No position correction.");
-         }
-
-         System.out.println ("Number of unilaterals: " + colMgr.myHandlers.get(0).getUnilaterals ().size());
-         
-         /*
-         If use first collision, you get appropriate amount of impulse instead of
-         impulse from small secondary correction. 
-         
-         However, the first collision's contact points will not coincides with 
-         accumulated impulses. 
-          */
-
-         if (debug_numLoops == 1) {
-            dataBuf.clear ();
-            colMgr.getState (dataBuf);
+            
+            // Update impulse scaling
+            ContinuousCollider.myDistScale += 0.01;
          }
          
-         if (debug_numLoops == 50) {
+         if (ContinuousCollider.myDistScale > 1.50) {  
+            ContinuousCollider.myDistScale = 1.00;
+         }
+
+         if (numCollisionIters == 1) {
+            colMgrBuf.clear ();
+            colMgr.getState (colMgrBuf);
+         }
+         
+         if (numCollisionIters == 50) {
             System.out.println ("Infinite loop.");
-//            break;
          }
             
-         if (colMgr.getColliderType () != ColliderType.CONTINUOUS) {
+         // If using discrete collision handling, it's ok to let some 
+         // penetration remain.
+         if (! isContinuous) {
             break;
          }
       } 
  
-      isContCollisionOccurred = (debug_numLoops > 0);
-      if (isContCollisionOccurred) {
-         colMgr.setState (dataBuf);   // Keep constraints in play
-         System.out.printf ("Collision Handled at t=%.2f\n\n", t);
-         
-         System.out.println ("Number of unilaterals: " + colMgr.myHandlers.get(0).getUnilaterals ().size());
+      // Did we detected and resolved a collision?
+      if (isContinuous && numCollisionIters > 0) {
+         colMgr.setState (colMgrBuf);   // Keep contact constraints in-play
          collisionHandlers = colMgr.myHandlers;
       }
-      else {
+      else if (isContinuous) {
+         // No collisions found. No need to influence velocity in next
+         // physics step.
          collisionHandlers = null;
-      }
-      impulseScale = 1;
-      
-      
-      
-////    System.out.println ("Handlers: " + colMgr.myHandlers.size ());
-//    for (int h=0; h<colMgr.myHandlers.size(); h++) {
-//       for (ContactConstraint c : colMgr.myHandlers.get(h).getUnilaterals ()) {
-//          for (int m=0; m<c.getMasters ().size (); m++) {
-//             // Master's previous pose
-//             RigidBody rb = (RigidBody)c.getMasters ().get (m).myComp;
-//             
-//             RigidTransform3d prvPose = preCorrPoses.get (rb);
-//             RigidTransform3d corPose = rb.getPose ();
-//             
-////             System.out.println ("PrvPose: " + prvPose.toString ("%.4f"));
-////             System.out.println ("CorPose: " + corPose.toString ("%.4f"));
-//             
-//             ContactPoint cpnt = (m==0) ? c.myCpnt0 : c.myCpnt1;
-//             
-////             System.out.println ("Prevous contact point: " + cpnt.myPoint.toString ("%.4f"));
-////             cpnt.myPoint.inverseTransform (prvPose);
-////             cpnt.myPoint.transform (corPose);
-////             System.out.println ("Corrected contact point: " + cpnt.myPoint.toString ("%.4f"));
-//          }
-//       }
-//    }
-      
-      
-      if (t == 0.59) {
-//         System.out.println ("clear");
-//         colMgr.clear ();
       }
       
       if (colMgr != null && colMgr.myBody2SweptMeshInfo != null) {
@@ -2612,36 +2559,6 @@ public class MechSystemSolver {
             smi.savePrevPositions ();
          }
       }
-      
-//      System.out.println ("Velocity: " + velBp.toString ("%.4f"));
-      
-//      boolean detected = false;
-//      for (Vertex3d vtx : colMgr.mySweptMeshInfos[1].myMesh.getVertices ()) {
-//         Point3d wPnt = vtx.getWorldPoint ();
-//         if (wPnt.z < 0) {
-//            System.out.printf ("Detected vertex (%d) below surface: %s\n", vtx.getIndex (), vtx.getWorldPoint ().toString ("%.4f"));
-//            detected = true;
-//         }
-//      }
-//      
-//      if (detected) {
-//         SweptMeshInfo[] smis = colMgr.mySweptMeshInfos;
-//         
-//         ArrayList<BVNode> nodes1 = new ArrayList<BVNode>();
-//         ArrayList<BVNode> nodes2 = new ArrayList<BVNode>();
-//         smis[1].myVertexTree.intersectTree (nodes1, nodes2, smis[0].myTriangleTree);
-//
-//         for (int i = 0; i < nodes1.size (); i++) {
-//            SweptVertex sv   = (SweptVertex)nodes1.get (i).getElements ()[0];
-//            SweptTriangle st = (SweptTriangle)nodes2.get (i).getElements ()[0];
-//            
-//            // Confirm collision (narrow-phase)
-//            CCRV ccrv = colMgr.myContCldr.isVertexTriangleCollision (sv, st, smis[1], smis[0]);
-//            if (ccrv.hitTime > 0) {   // No collision
-//               System.out.println ("Collision detected");
-//            }
-//         }
-//      }
    }
 
    protected boolean computePosCorrections (

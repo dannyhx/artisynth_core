@@ -70,4 +70,23 @@ public class ContactMaster {
       myComp.addToPointVelocity (vel, myWeight, myCpnt);
    }
 
+   // DANCOLEDIT 
+   /* --- Set/Get Methods --- */
+   
+   public CollidableDynamicComponent getComp () {
+      return myComp;
+   }
+
+   public double getWeight () {
+      return myWeight;
+   }
+
+   public void setWeight (double weight) {
+      this.myWeight = weight;
+   }
+
+   public ContactPoint getCpnt () {
+      return myCpnt;
+   }
+   
 }

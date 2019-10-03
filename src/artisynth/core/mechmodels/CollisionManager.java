@@ -2242,7 +2242,10 @@ public class CollisionManager extends RenderableCompositeBase
                SweptMeshInfo smi = myBody2SweptMeshInfo.get (body);
                
                if (smi == null) {
-                  smi = new SweptMeshInfo(body.getCollisionMesh ());
+                  FemMeshComp fmc = (body instanceof FemMeshComp) ?
+                     (FemMeshComp)body : null;
+                     
+                  smi = new SweptMeshInfo(body.getCollisionMesh (), fmc);
                   myBody2SweptMeshInfo.put (body, smi);
                }
                
@@ -2253,27 +2256,11 @@ public class CollisionManager extends RenderableCompositeBase
                   break;
             }
             
-//            SweptMeshInfo smi = myBody2SweptMeshInfo.get (c0);
-//            SweptVertex sv = (SweptVertex)smi.myVertexTree.getLeafNodes ().get (0).getElements ()[0];
-//            System.out.println ("Cur Vertex: " + sv.getPoint (0));
-//            System.out.println ("Prv Vertex: " + sv.getPoint (1));
-            
             boolean isDynamic0 = isBodyDynamic(c0);
             boolean isDynamic1 = isBodyDynamic(c1);
             
             System.out.printf ("Computing contact between %s-%s\n", 
                c0.getName (), c1.getName ());
-            
-            if (c1.getName () == null) {
-               SweptMeshInfo smi = myBody2SweptMeshInfo.get (c0);
-               
-               System.out.println ("Shell normal: " + c0.getCollisionMesh ().getFace (0).getWorldNormal ());
-               System.out.println ("RB normal: " + c1.getCollisionMesh ().getFace (0).getWorldNormal ());
-               
-               SweptTriangle st = (SweptTriangle)smi.myTriangleTree.getLeafNodes ().get (0).getElements ()[0];
-               
-               System.out.println ("SweptTriangle Nrm: " + st.computeInstanteousNormal (0));
-            }
             
             cinfo = myContCldr.getContacts (
                myBody2SweptMeshInfo.get (c0), myBody2SweptMeshInfo.get (c1),
@@ -2310,7 +2297,7 @@ public class CollisionManager extends RenderableCompositeBase
    public void rebuildSweptMeshInfo(CollidableBody body, PolygonalMesh surfaceMesh) {
       // Copy surfaceMeshVertices to body's vertices
       SweptMeshInfo smi = myBody2SweptMeshInfo.get (body);
-      smi.build (surfaceMesh);
+      smi.build (surfaceMesh, null);
    }
    
    void checkForContact (

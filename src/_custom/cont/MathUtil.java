@@ -325,21 +325,6 @@ public class MathUtil {
       return min(min(a_centroid, b_centroid), c_centroid);
    }
    
-   public static double distFromPtToLine(Point3d p, Point3d l0, Point3d l1) {
-      // https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line#Vector_formulation
-      Point3d a = l0;
-      Point3d n = (Point3d)new Point3d().sub (l1, l0).normalize ();
-      
-      Vector3d a_p = new Vector3d().sub (a, p);
-      double a_p_dot_n = a_p.dot (n);
-      
-      Vector3d rv = new Vector3d();
-      rv.set (a_p);
-      rv.scaledAdd (-a_p_dot_n, n);
-      
-      return rv.normSquared ();
-   }
-   
    public static Vector3d getNormal(Point3d a, Point3d b, Point3d c) {
       Vector3d b_a = new Vector3d().sub (b, a);
       Vector3d c_a = new Vector3d().sub (c, a);
@@ -364,6 +349,36 @@ public class MathUtil {
          a.x*b.x, a.x*b.y, a.x*b.z,
          a.y*b.x, a.y*b.y, a.y*b.z,
          a.z*b.x, a.z*b.y, a.z*b.z );
+   }
+   
+   public static Vector3d vecFromPtToLine(Point3d p, Point3d l0, Point3d l1) {
+      // https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line#Vector_formulation
+      Point3d a = l0;
+      Point3d n = (Point3d)new Point3d().sub (l1, l0).normalize ();
+      
+      Vector3d a_p = new Vector3d().sub (a, p);
+      double a_p_dot_n = a_p.dot (n);
+      
+      Vector3d rv = new Vector3d();
+      rv.set (a_p);
+      rv.scaledAdd (-a_p_dot_n, n);
+      
+      return rv;
+   }
+   
+   public static Point3d projectPoint2plane(
+   Point3d p, Point3d q0, Point3d q1, Point3d q2) {
+      // https://math.stackexchange.com/questions/444968/project-a-point-in-3d-on-a-given-plane
+      Vector3d q10 = new Vector3d().sub (q1, q0);
+      Vector3d q21 = new Vector3d().sub (q2, q1);
+      
+      Vector3d nrm = q10.cross (q21);
+      
+      double nrmScale = new Point3d(p).sub (q0).dot (nrm);
+      
+      Point3d j = (Point3d)new Point3d(p).scaledAdd (nrmScale, nrm);
+      
+      return j;
    }
    
    /////////////

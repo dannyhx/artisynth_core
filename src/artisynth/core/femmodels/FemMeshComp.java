@@ -1773,6 +1773,9 @@ implements CollidableBody, PointAttachable {
       else {
          PointParticleAttachment ppa = (PointParticleAttachment)pa;
          mlist.add (new ContactMaster ((FemNode3d)ppa.getParticle(), 1));
+         
+         System.out.println ("Map: " + vtx.getIndex () + " into " + 
+          ((FemNode3d)ppa.getParticle()).getName ());
       }      
    }
 

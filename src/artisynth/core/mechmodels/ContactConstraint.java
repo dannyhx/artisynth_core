@@ -266,18 +266,19 @@ public class ContactConstraint {
          
          for (int i=0; i<vtxs.length; i++) {
             newMasters.clear();
+            
+            // Get master associated with vertex 
             collidable.getVertexMasters (newMasters, vtxs[i]);
             
             // Only 1 iteration (comp=FemNode, cpnt=null, weight=1.0)
             for (int j=0; j<newMasters.size(); j++) {
                ContactMaster cm = newMasters.get(j);
-               // see if master has already been added; if so, just adjust weight
                boolean masterAlreadyAdded = false;
                
-               // For each existing master
+               // For each existing master of this constraint
                for (int k=0; k<myMasters.size(); k++) {
                   ContactMaster pm = myMasters.get(k);
-                  // Is it the same master that we are inspecting?
+                  // Is the vertex alredy been added?
                   if (pm.myComp == cm.myComp) {
                      // Add more weight to the master
                      pm.myWeight += (w*wgts[i]*cm.myWeight);
@@ -287,7 +288,7 @@ public class ContactConstraint {
                }
                
                if (!masterAlreadyAdded) {
-                  cm.myWeight = w*wgts[i]*cm.myWeight;
+                  cm.myWeight = w*wgts[i]*cm.myWeight;   // Modify weight
                   cm.myCpnt = cpnt;
                   myMasters.add (cm);
                }

@@ -8,6 +8,14 @@ import maspack.geometry.*;
 
 public class SweptTriangle extends BoundablePointArray {
 
+   public final int A0 = 3;
+   public final int B0 = 4;
+   public final int C0 = 5;
+   
+   public final int A1 = 0;
+   public final int B1 = 1;
+   public final int C1 = 2;
+   
    Face myFace;
    protected RigidTransform3d X;
 
@@ -19,13 +27,13 @@ public class SweptTriangle extends BoundablePointArray {
          throw new IllegalArgumentException (
             "face is not a triangle (does not have three vertices)");
       }
-      myPnts[0] = vtxs[0].getPosition();
-      myPnts[1] = vtxs[1].getPosition();
-      myPnts[2] = vtxs[2].getPosition();
+      myPnts[A1] = vtxs[0].getPosition();
+      myPnts[B1] = vtxs[1].getPosition();
+      myPnts[C1] = vtxs[2].getPosition();
 
-      myPnts[3] = oldPositions[vtxs[0].getIndex()];
-      myPnts[4] = oldPositions[vtxs[1].getIndex()];
-      myPnts[5] = oldPositions[vtxs[2].getIndex()];
+      myPnts[A0] = oldPositions[vtxs[0].getIndex()];
+      myPnts[B0] = oldPositions[vtxs[1].getIndex()];
+      myPnts[C0] = oldPositions[vtxs[2].getIndex()];
    }  
 
    public Point3d[] computeInstanteousTriangle(double s) {

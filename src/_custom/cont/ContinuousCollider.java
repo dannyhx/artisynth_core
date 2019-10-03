@@ -402,68 +402,88 @@ public class ContinuousCollider {
    SweptVertex sv, SweptTriangle st, CCRV ccrv, SweptMeshInfo sv_smi, 
    SweptMeshInfo st_smi) {
       
-      Point3d v_cur = new Point3d(sv.getPoint (0));
-      Point3d v_prv = new Point3d(sv.getPoint (1));
+      // Compute vertex instantaneous positions
       
-      // Transform to world
-      sv_smi.myMesh.transformToWorld (v_cur);
-      sv_smi.myMesh.transformToWorld (v_prv);
+      sv.X = sv_smi.myMesh.getMeshToWorld ();
+      Point3d v_prv = sv.computeInstanteousPoint (0);
+      Point3d v_hit = sv.computeInstanteousPoint (ccrv.hitTime);
+      Point3d v_cur = sv.computeInstanteousPoint (1);
       
-      // Penetration vector (vector to undo the vertex penetration).
-      // `v_cur to facePt_cur`
+      // Compute face point instantaneous positions
       
       st.X = st_smi.myMesh.getMeshToWorld ();
-      Point3d[] facePts = st.computeInstanteousTriangle (1);
-      Point3d facePt_cur = baryInto3d (facePts[0], facePts[1], facePts[2], ccrv.bary);
       
-      Vector3d pentVec = new Vector3d();
-      pentVec.sub (facePt_cur, v_cur);
+      Point3d[] fPts = st.computeInstanteousTriangle (0);
+      Point3d fPt_prv = MathUtil.projectPoint2plane (v_prv, fPts[0], fPts[1], fPts[2]);
       
-      // Compute collision point
+      fPts = st.computeInstanteousTriangle (1);
+      Point3d fPt_cur = MathUtil.projectPoint2plane (v_cur, fPts[0], fPts[1], fPts[2]);
       
-      Point3d csnPt = sv.computeInstanteousPoint (ccrv.hitTime);
-      sv_smi.myMesh.transformToWorld (csnPt);;
+      // Penetration vectors (facePt to vtx)
+      
+      Vector3d f2v_prv = new Vector3d().sub (v_prv, fPt_prv);
+      Vector3d f2v_cur = new Vector3d().sub (v_cur, fPt_cur);
       
       // Create PenetratingPoint
       
-      PenetratingPoint pentPt = new PenetratingPoint(
-         sv.myVertex, st.myFace, ccrv.bary, csnPt, 
-         pentVec, null);
+      Vector3d v2f_cur = new Vector3d(f2v_cur).negate ();
       
-      pentPt.distance = pentVec.norm () * myDistScale;
+      PenetratingPoint pentPt = new PenetratingPoint(
+         sv.myVertex, st.myFace, ccrv.bary, v_hit, v2f_cur, null);
+      
+      pentPt.distance = f2v_cur.norm () * myDistScale;
       pentPt.hitTime = ccrv.hitTime;
       
-      pentPt.normal = new Vector3d(st.myFace.getWorldNormal ());
-      pentPt.normal.normalize ();
+      // Compute normal (direction that vertex should bounce from face).
       
-      // However, this assumes that pentVec direction is correct.
-      if (pentPt.normal.dot (pentVec) < 0) {
+      pentPt.normal = st.myFace.getNormal ();  // Assume 
+      
+      double nrm_dot_f2v_prv = pentPt.normal.dot (f2v_prv);
+      double nrm_dot_f2v_cur = pentPt.normal.dot (f2v_cur);
+      
+      // Rule: If constraint has positive rate, normal needs to be flipped.
+      if (nrm_dot_f2v_prv > nrm_dot_f2v_cur) {
          pentPt.normal.negate ();
-         System.out.println ("Negated!");
       }
-      
-      // Print
-      
-      Vertex3d[] faceVtxs = st.myFace.getTriVertices ();
-      String faceVtxStr = String.format ("[%d-%d-%d]", 
-         faceVtxs[0].getIndex (), 
-         faceVtxs[1].getIndex (),
-         faceVtxs[2].getIndex ()
-      );
       
       if (myDebug) {
          System.out.println ("Penetrating Point: " + 
             " V: " + sv.myVertex.getIndex () + 
             " T: " + st.myFace.vertexStr () + 
-            " T (manual): " + faceVtxStr +
-            " PentVec: " + pentVec.toString ("%.5f") + 
+            " f2v_prv: " + f2v_prv.toString ("%.5f") + 
+            " f2v_cur: " + f2v_cur.toString ("%.5f") + 
             " Normal: " + pentPt.normal.toString ("%.2f") + 
             " Dist: " + pentPt.distance + 
             " HitTime: " + ccrv.hitTime + 
-            " FaceNrm: " + st.myFace.getWorldNormal () +  
-            "\n"
+            " \n " +
+            " FaceNrm: " + st.myFace.getWorldNormal ().toString ("%.2f") +  
+            " nrm_dot_f2v_prv: " + nrm_dot_f2v_prv +
+            " nrm_dot_f2v_cur: " + nrm_dot_f2v_cur
          );
       }
+      
+      // Debug
+      
+//      facePts = st.computeInstanteousTriangle (0);
+//      Point3d facePt_prv = baryInto3d (facePts[0], facePts[1], facePts[2], ccrv.bary);
+//      
+//      facePts = st.computeInstanteousTriangle (0);
+//      Point3d facePt_prvCtr = baryInto3d (facePts[0], facePts[1], facePts[2], new Vector2d(1/3., 1/3.));
+//      
+//      GlobalDebug.prvTri = facePts;
+//      System.out.println ("PrvTri: " + 
+//      facePts[0].toString ("%.6f") + ", " +
+//      facePts[1].toString ("%.6f") + ", " +
+//      facePts[2].toString ("%.6f") + ", " 
+//   );
+//      
+//      facePts = st.computeInstanteousTriangle (1);
+//      GlobalDebug.curTri = facePts;
+//      System.out.println ("CurTri: " + 
+//         facePts[0].toString ("%.6f") + ", " +
+//         facePts[1].toString ("%.6f") + ", " +
+//         facePts[2].toString ("%.6f") + ", " 
+//      );
       
 //      Vector3d disp = new Vector3d().sub (cur, prv);
 //      
@@ -515,44 +535,63 @@ public class ContinuousCollider {
       eeCt.edge0 = se0.myEdge;
       eeCt.edge1 = se1.myEdge;
       
-      // Compute penetration depth (i.e. vector to undo e0's intersection).
+      // Compute penetration depth
 
       se0.X = se0_smi.myMesh.getMeshToWorld ();
       se1.X = se1_smi.myMesh.getMeshToWorld ();
       
-      Point3d e0_curPt = se0.computeInstanteousEdgePoint (1, ccrv.r);
-      Point3d e1_curPt = se1.computeInstanteousEdgePoint (1, ccrv.s);
+      Point3d e0_pt_prv = new Point3d();
+      Point3d e1_pt_prv = new Point3d();
+      se0.computeClosestEdgePairPoints (se1, 0, e0_pt_prv, e1_pt_prv, mySpaceElipson);
       
-      Vector3d pentVec = new Vector3d();
-      pentVec.sub (e1_curPt, e0_curPt);   // 1/2 to undo penetration
+      Point3d e0_pt_cur = new Point3d();
+      Point3d e1_pt_cur = new Point3d();
+      se0.computeClosestEdgePairPoints (se1, 1, e0_pt_cur, e1_pt_cur, mySpaceElipson);
+      
+      Vector3d e10_pt_prv = new Vector3d();
+      e10_pt_prv.sub (e1_pt_prv, e0_pt_prv); 
+      
+      Vector3d e10_pt_cur = new Vector3d();
+      e10_pt_cur.sub (e1_pt_cur, e0_pt_cur);  
       
       // Compute cross product between the 2 edges.
 
       Vector3d e01cross = new Vector3d();
       e01cross.cross (
-         se0.computeInstanteousEdgeVec (0), 
-         se1.computeInstanteousEdgeVec (0));
+         se0.computeInstanteousEdgeVec (ccrv.hitTime), 
+         se1.computeInstanteousEdgeVec (ccrv.hitTime));
       e01cross.normalize ();
       
-      // Cross product (e0 csn resolution) must be same direction as pentVec
-      if (e01cross.dot (pentVec) < 0)
+      double cross_dot_e10_prv = e01cross.dot (e10_pt_prv);
+      double cross_dot_e10_cur = e01cross.dot (e10_pt_cur);
+      
+      // Rule
+      if (cross_dot_e10_prv > 0)
          e01cross.negate ();
+      
+      Vector3d e01crossbp = new Vector3d(e01cross);
       
       eeCt.point0 = se0.computeInstanteousEdgePoint (ccrv.hitTime, ccrv.r);
       eeCt.point1 = se1.computeInstanteousEdgePoint (ccrv.hitTime, ccrv.s);
       
-      eeCt.displacement = pentVec.norm () * myDistScale;
+      eeCt.displacement = e10_pt_cur.norm () * myDistScale;
       eeCt.point1ToPoint0Normal = e01cross;
       
       if (myDebug)
          System.out.println ("Edge-Edge Contact: " + 
             " E0: " + eeCt.edge0.vertexStr () + 
             " E1: " + eeCt.edge1.vertexStr () + 
-            " PentVec: " + pentVec.toString ("%.4f") + 
+            " e10_pt_prv: " + e10_pt_prv.toString ("%.4f") + 
+            " dot: " + cross_dot_e10_prv + 
+            " e10_pt_cur: " + e10_pt_cur.toString ("%.4f") + 
+            " dot: " + cross_dot_e10_cur + 
+            " e01crossbp: " + e01crossbp.toString ("%.4f") + 
             " e01cross: " + e01cross.toString ("%.4f") + 
-            " disp: " + pentVec.norm () + 
+            " disp: " + eeCt.displacement + 
             "\n"
          );     
+      
+      System.out.println ("here");
 
 //      // Compute cross product between the 2 edges 
 //
