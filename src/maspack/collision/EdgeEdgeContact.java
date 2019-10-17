@@ -33,7 +33,8 @@ public class EdgeEdgeContact {
    public Vector3d w = new Vector3d();
 
    public double hitTime = -1;          // only in continuous case
-
+   public Point3d[] e0Pnts_justBefore_hitTime;
+   public Point3d[] e1Pnts_justBefore_hitTime;
 
    public EdgeEdgeContact () {
       point0 = new Point3d();

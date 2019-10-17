@@ -14,17 +14,23 @@ import java.util.LinkedHashMap;
 
 import _custom.cont.CCRV;
 import _custom.cont.ContinuousCollider;
+import _custom.cont.ContinuousCollisions;
 import _custom.cont.SweptMeshInfo;
 import _custom.cont.SweptTriangle;
 import _custom.cont.SweptVertex;
+import _custom.cont.ContinuousCollider.Stage;
 import artisynth.core.mechmodels.CollisionManager.ColliderType;
 import artisynth.core.mechmodels.MechSystem.ConstraintInfo;
 import artisynth.core.mechmodels.MechSystem.FrictionInfo;
 import artisynth.core.modelbase.ModelComponent;
 import artisynth.core.modelbase.StepAdjustment;
 import artisynth.core.util.ArtisynthIO;
+import maspack.collision.ContactInfo;
+import maspack.collision.EdgeEdgeContact;
+import maspack.collision.PenetratingPoint;
 import maspack.function.Function1x1;
 import maspack.geometry.BVNode;
+import maspack.geometry.Boundable;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Matrix;
 import maspack.matrix.Matrix3dBase;
@@ -2473,6 +2479,21 @@ public class MechSystemSolver {
       mySys.setActiveForces (myF);      
    }
 
+   
+   
+   // DANCOLEDIT
+   
+   public CollisionManager getCollisionManager() {
+      MechSystemBase mechBase = (MechSystemBase)mySys;
+      for (Constrainer constrainer : mechBase.myConstrainers) 
+         if (constrainer instanceof CollisionManager)
+            return (CollisionManager)constrainer;
+      return null;
+   }
+   
+   
+   // State before physics step.
+   VectorNd x0 = new VectorNd();
    double impulseScale = 1.00;
    public ArrayList<CollisionHandler> collisionHandlers;
    protected void applyPosCorrection (
@@ -2481,27 +2502,55 @@ public class MechSystemSolver {
       
       System.out.println (">>>> applyPosCorrection()");
 
-      // Get collision manager
-      CollisionManager colMgr = null;
-      MechSystemBase mechBase = (MechSystemBase)mySys;
-      for (Constrainer constrainer : mechBase.myConstrainers) {
-         if (constrainer instanceof CollisionManager)
-            colMgr = (CollisionManager)constrainer;
-         else
-            colMgr = null;
-      }
+      CollisionManager colMgr = getCollisionManager();
       DataBuffer colMgrBuf = new DataBuffer();
       
       // Is continuous 
       boolean isContinuous = colMgr.getColliderType () == ColliderType.CONTINUOUS;
       
-      impulseScale = 1.00;
-      ContinuousCollider.myDistScale = 1.00;
+      
+      // --- Handle imminent collisions --- //
+      
+      // State after physics step.
+      VectorNd x1 = new VectorNd();
+      
+      System.out.println ("---Handle imminent collisions");
+      
+      // Compute the repulsive forces (i.e. deter imminent collisions)
+      // using x0 positions. Add the impulses to x1.
+
+//      impulseScale = 1.00;
+//      ContinuousCollider.myDistScale = 1.00;
+//      
+//      // Save x1
+//      mySys.getActivePosState (x1);
+//      
+////      // Use x0 (state before physics step)
+////      mySys.setActivePosState (x0);
+//      
+//      ContinuousCollider.mStage = Stage.IMMINENT;
+//      if (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
+//         updateMassMatrix (-1);
+//         
+//         VectorNd imminentImpulse = new VectorNd(x1.size ());
+//         if (computePosCorrections (pos, imminentImpulse, t)) {
+//            // Do not used the resultant x0+impulse. Instead, use x1+impulse.
+//            x1.add (imminentImpulse);
+//         }
+//      }
+//      mySys.setActivePosState (x1);
+      
+      
+      // --- Handle actual collisions --- //
+      
+      System.out.println ("---Handle actual collisions");
+
       int numCollisionIters = 0;
-      while (mySys.updateConstraints (t, stepAdjust, /*flags=*/MechSystem.COMPUTE_CONTACTS)) {
-         numCollisionIters++;
+      int itersUntilHalfImpulse = 5;
+      mySys.getActivePosState (x1);
+      ContinuousCollider.mStage = Stage.ACTUAL;
+      while (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
          System.out.printf ("\n\nLoop: %d at t=%.2f\n", numCollisionIters, t);
-//         impulseScale = 0.25;
          updateMassMatrix (-1);
          
          if (computePosCorrections (pos, vel, t)) {
@@ -2518,22 +2567,17 @@ public class MechSystemSolver {
          }
          else {
             System.out.println ("No position correction.");
-            
-            // Update impulse scaling
-            ContinuousCollider.myDistScale += 0.01;
-         }
-         
-         if (ContinuousCollider.myDistScale > 1.50) {  
-            ContinuousCollider.myDistScale = 1.00;
          }
 
-         if (numCollisionIters == 1) {
+         if (numCollisionIters == 0) {
             colMgrBuf.clear ();
             colMgr.getState (colMgrBuf);
          }
          
-         if (numCollisionIters == 50) {
-            System.out.println ("Infinite loop.");
+         if (numCollisionIters > itersUntilHalfImpulse) {
+            itersUntilHalfImpulse += itersUntilHalfImpulse*2.1;
+            ContinuousCollider.myDistScale *= ContinuousCollider.myDistScaleDX;
+            mySys.setActivePosState (x1);
          }
             
          // If using discrete collision handling, it's ok to let some 
@@ -2541,24 +2585,38 @@ public class MechSystemSolver {
          if (! isContinuous) {
             break;
          }
+         
+         numCollisionIters++;
+         
+         if (numCollisionIters > ContinuousCollider.myMaxNumActualIters) {
+            ContinuousCollider.mStage = Stage.ZONE;
+            break;
+         }
+         
+         if (numCollisionIters > 50) {
+            break;
+         }
       } 
- 
+      
+
+      // --- Rigid Impact Zones --- //
+      
+      if (ContinuousCollider.mStage == Stage.ZONE) {
+         System.out.println ("---Handle unresolvable collisions");
+         
+         ContinuousCollider.mHitTimeBacktrack += 0.05;
+         while (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
+            System.out.println ("Zone reloop.");
+            ContinuousCollider.mHitTimeBacktrack += 0.05;
+         }
+         ContinuousCollider.mHitTimeBacktrack = 0;
+      }
+      
       // Did we detected and resolved a collision?
       if (isContinuous && numCollisionIters > 0) {
          colMgr.setState (colMgrBuf);   // Keep contact constraints in-play
-         collisionHandlers = colMgr.myHandlers;
-      }
-      else if (isContinuous) {
-         // No collisions found. No need to influence velocity in next
-         // physics step.
-         collisionHandlers = null;
       }
       
-      if (colMgr != null && colMgr.myBody2SweptMeshInfo != null) {
-         for (SweptMeshInfo smi : colMgr.myBody2SweptMeshInfo.values ()) {
-            smi.savePrevPositions ();
-         }
-      }
    }
 
    protected boolean computePosCorrections (
@@ -2629,17 +2687,6 @@ public class MechSystemSolver {
       if (correctionNeeded) {
          // DANCOLEDIT
          vel.scale (impulseScale);
-         
-         // DANCOLEDIT HACK. BackNode gets same impulse as its FrontNode.
-         // This is needed b/c unilaterals aren't created for the BackNodes.
-         double[] velBuf = vel.getBuffer ();
-//         for (int n=0; n<vel.size ()/6; n++) {
-//            int i = n*6;
-//            
-//            velBuf[i+3] = velBuf[i];
-//            velBuf[i+4] = velBuf[i+1];
-//            velBuf[i+5] = velBuf[i+2];
-//         }
          mySys.addActivePosImpulse (pos, 1, vel);
       }
 
@@ -2846,6 +2893,29 @@ public class MechSystemSolver {
       double t0, double t1, StepAdjustment stepAdjust) {
 
       System.out.println ("\n\n>>>> constrainedBackwardEuler(), t1: " + t1);
+      System.out.println (t0);
+
+      //////////////////// DANCOLEDIT - copyCurrent2PreviousPositions
+      
+      // Note: Assumes that remeshing was done already.
+      
+      CollisionManager colMgr = getCollisionManager ();
+      ContinuousCollider contCldr = 
+         (colMgr != null) ? colMgr.getContinuousCollider () : null;
+         
+      if (contCldr != null) {
+         mySys.getActivePosState (this.x0);
+         
+         if (t0 - 1e-6 < 0) {
+            System.out.println ("Clearing swept mesh info.");
+            contCldr.clearSweptMeshInfo ();
+         }
+         else {
+            contCldr.copyCurrent2PreviousPositions ();
+         }
+      }
+         
+      /////////////////// DANCOLEDIT - copyCurrent2PreviousPositions
       
       if (myMatrixSolver == MatrixSolver.None) {
          throw new UnsupportedOperationException (

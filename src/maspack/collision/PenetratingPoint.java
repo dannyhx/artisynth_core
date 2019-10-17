@@ -30,6 +30,9 @@ public class PenetratingPoint implements Comparable<PenetratingPoint> {
 
    // DANCOLEDIT
    public double hitTime = -1;          // Only for continuous case.
+   public Point3d vPnt_justBefore_hitTime;
+   public Point3d[] tPnts_justBefore_hitTime;
+   
    
    public Face getFace() {
       return face;

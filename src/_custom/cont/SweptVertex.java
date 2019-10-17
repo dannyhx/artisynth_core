@@ -4,14 +4,16 @@ import _custom.cont.BoundablePointArray;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
+import maspack.matrix.Vector3d;
+import maspack.util.DataBuffer;
 
 public class SweptVertex extends BoundablePointArray {
 
-   public final int V0 = 1;
    public final int V1 = 0;
+   public final int V0 = 1;
    
    Vertex3d myVertex;
-   public RigidTransform3d X;
+   
 
    public SweptVertex (Vertex3d vertex, Point3d[] oldPositions) {
       super(2);
@@ -35,5 +37,37 @@ public class SweptVertex extends BoundablePointArray {
          instPt.transform (X);
       
       return instPt;
+   }
+ 
+   
+   
+   
+   
+   
+   
+   
+   /* --- Functions for Continuous Collision Response --- */
+   
+   public void saveCurrentPositions() {
+      myPnts1Backup = new Point3d[myPnts.length/2];
+      myPnts1Backup[V1] = new Point3d( myPnts[V1] );
+   }
+   
+   public void loadCurrentPositions() {
+      myPnts[V1].set( myPnts1Backup[V1] );
+   }
+   
+   public void copyPrevious2CurrentPositions() {
+      myPnts[V1].set ( myPnts[V0] );
+   }
+   
+   public Vector3d[] computeAvgVelocity(double t) {
+      myAvgVels = new Vector3d[myPnts.length/2];
+      myAvgVels[V1] = new Vector3d();
+      
+      myAvgVels[V1].sub (myPnts[V1], myPnts[V0]);
+      myAvgVels[V1].scale (1/t);
+      
+      return myAvgVels;
    }
 }

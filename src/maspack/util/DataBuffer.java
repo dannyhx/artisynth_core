@@ -12,6 +12,7 @@ import java.util.Collection;
 import maspack.matrix.Vector3d;
 import maspack.matrix.VectorNd;
 import maspack.matrix.Matrix3dBase;
+import maspack.matrix.MatrixNd;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.SymmetricMatrix3d;
 
@@ -474,6 +475,29 @@ public class DataBuffer {
       dbuf[dsize++] = M.m12;
    }
    
+   public void dput (MatrixNd M) {
+      // Matrix size
+      
+      if (zsize > zbuf.length-2) {
+         zEnsureCapacity (zsize+2);
+      }
+      
+      zbuf[zsize++] = M.rowSize ();
+      zbuf[zsize++] = M.colSize ();
+      
+      // Elements
+      
+      double[] mtxBuf = M.getBuffer ();
+      
+      if (dsize > dbuf.length-mtxBuf.length) {
+         dEnsureCapacity (dsize+mtxBuf.length);
+      }
+
+      for (int i=0; i < mtxBuf.length; i++) {
+         dbuf[dsize++] = mtxBuf[i];
+      }
+   }
+   
    /**
     * Adds doubles from a VectorNd to the double buffer, increasing its
     * size.
@@ -626,6 +650,24 @@ public class DataBuffer {
       double[] vbuf = vec.getBuffer();
       for (int i=0; i<vsize; i++) {
          vbuf[i] = dbuf[doff++];
+      }
+   }
+   
+   public void dget (MatrixNd M) {
+      int numRows = zbuf[zoff++];
+      int numCols = zbuf[zoff++];
+      M.setSize (numRows, numCols);
+      
+      double[] mtxBuf = M.getBuffer ();
+      
+      if (doff > dsize-mtxBuf.length) {
+         throw new ArrayIndexOutOfBoundsException (
+            "buffer does not have "+mtxBuf.length+" doubles past the offset "+
+            "(doff=" + doff + ", size=" + dsize);
+      }
+      
+      for (int i=0; i < mtxBuf.length; i++) {
+         mtxBuf[i] = dbuf[doff++];
       }
    }
    

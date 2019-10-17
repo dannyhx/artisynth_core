@@ -141,7 +141,7 @@ public class ContinuousCollisionsMeshTest extends RootModel {
       mSMI = new SweptMeshInfo[mNumModels];
       
       for (int i=0; i<mNumModels; i++) 
-         mSMI[i] = new SweptMeshInfo(mMesh[i], null);
+         mSMI[i] = new SweptMeshInfo(mMesh[i]);
    }
    
    protected void build_assembleUI() {
@@ -317,7 +317,7 @@ public class ContinuousCollisionsMeshTest extends RootModel {
    
    protected void savePrevPositions(RigidBody rb, RigidBody rb_prev, SweptMeshInfo smi) {
       smi.myMesh = rb_prev.getSurfaceMesh ();
-      smi.savePrevPositions ();
+      smi.copyCurrent2PreviousPositions ();
       smi.myMesh = rb.getSurfaceMesh ();
    }
    

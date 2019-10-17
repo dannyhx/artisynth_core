@@ -5,8 +5,18 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.Set;
 
+import _custom.cont.ContinuousCollider.Stage;
+import artisynth.core.femmodels.BackNode3d;
+import artisynth.core.femmodels.FemElement3d;
+import artisynth.core.femmodels.FemMeshComp;
+import artisynth.core.femmodels.FemModel3d;
+import artisynth.core.femmodels.FemNode3d;
+import artisynth.core.femmodels.ShellTriElement;
+import artisynth.core.mechmodels.CollidableBody;
+import artisynth.core.mechmodels.RigidBody;
 import maspack.collision.ContactInfo;
 import maspack.collision.EdgeEdgeContact;
 import maspack.collision.PenetratingPoint;
@@ -19,28 +29,167 @@ import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector2d;
 import maspack.matrix.Vector3d;
+import maspack.util.DataBuffer;
 import maspack.util.Pair;
 
 public class ContinuousCollider {
 
    public static boolean myDebug = true;
-   
-   protected ContinuousCollisions myContCol;
-   
-   public static double myTimeElipson = 1e-4;
-   public static double mySpaceElipson = 1e-6;
-   
+   public static double myTimeElipson = 1e-8;
+   public static double mySpaceElipson = 1e-10;
    public static double myDistScale = 1.0;
    
+   public static double myClothThickness = 1e-2;
+   public static double mySpringStiffness = 1e3;
+   public static double myTimestep = 0.01;
+   public static double myImminentImpulseScale = 0.25;
+   public static double myAvgNodeMass = 0.0000880;
+   
+   public LinkedHashMap<CollidableBody,SweptMeshInfo> myBody2SweptMeshInfo;
+   protected ContinuousCollisions myContCol;
+   
+   protected FemMeshComp mFmc0;
+   protected FemMeshComp mFmc1;
+   
+   public enum Stage {IMMINENT, ACTUAL, ZONE};
+   public static Stage mStage = Stage.ACTUAL;
+   public static double mHitTimeBacktrack = 0.00;
+   public static double minHitTimeBacktrack = 0;
+
+   public static int myMaxNumActualIters = 10;
+   public static double myDistScaleDX = 0.5;
+   
+   public static ContinuousRenderable mContRend;
+   int m;
+   
    public ContinuousCollider() {
+      myBody2SweptMeshInfo = new LinkedHashMap<CollidableBody,SweptMeshInfo>();
       myContCol = new ContinuousCollisions();
    }
    
-   int m = 0;
    
-   /* --- Primary Methods (public) --- */
+   /* --- Setters and Getters --- */
    
-   public ContactInfo getContacts (SweptMeshInfo smi0, SweptMeshInfo smi1, 
+   public SweptMeshInfo getSweptMeshInfo(CollidableBody body) {
+      return myBody2SweptMeshInfo.get (body);
+   }
+   
+   
+   /* --- Primary Functions (public) --- */
+   
+   /** 
+    * Call this whenever a simulation is re-initialized.
+    */
+   public void clearSweptMeshInfo() {
+      this.myBody2SweptMeshInfo.clear ();
+   }
+   
+   /** 
+    * Call this at the beginning of each physics step.
+    */
+   public void copyCurrent2PreviousPositions() {
+      for (SweptMeshInfo smi : myBody2SweptMeshInfo.values ()) {
+         smi.copyCurrent2PreviousPositions ();
+      }
+   }
+   
+   public ContactInfo getContacts(CollidableBody body0, CollidableBody body1) {
+      for (CollidableBody body : new CollidableBody[] {body0,body1} ) {
+         SweptMeshInfo smi = myBody2SweptMeshInfo.get (body);
+         
+         if (smi == null) {
+            smi = new SweptMeshInfo(body.getCollisionMesh ());
+            myBody2SweptMeshInfo.put (body, smi);
+         }
+         
+         smi.updatePrevPositionsX0 ();
+         
+         if (mStage == Stage.IMMINENT) {
+            smi.computeAvgVelocities (myTimestep);
+            smi.saveCurrentPositions ();
+            smi.copyPrevious2CurrentPositions ();
+         }
+         
+         smi.updateBVTrees ();
+         
+         if (body0 == body1) break;
+      }
+      
+      SweptMeshInfo smi0 = myBody2SweptMeshInfo.get (body0);
+      SweptMeshInfo smi1 = myBody2SweptMeshInfo.get (body1);
+      
+      mFmc0 = (body0 instanceof FemMeshComp) ? (FemMeshComp) body0 : null;
+      mFmc1 = (body1 instanceof FemMeshComp) ? (FemMeshComp) body1 : null;
+      
+      boolean isDynamic0 = isBodyDynamic(body0);
+      boolean isDynamic1 = isBodyDynamic(body1);
+      
+      refreshSurfaceMeshes(body0);
+      refreshSurfaceMeshes(body1);
+      
+      System.out.printf ("Computing contact between %s-%s\n", 
+         body0.getName (), body1.getName ());
+      
+      ContactInfo cinfo = getContacts (smi0, smi1, isDynamic0, isDynamic1);
+      
+      for (SweptMeshInfo smi : new SweptMeshInfo[] {smi0,smi1} ) {
+         if (mStage == Stage.IMMINENT) {
+            smi.loadCurrentPositions ();
+         }
+         
+         if (smi0 == smi1) break;
+      }
+
+      return cinfo;
+   }
+   
+   /**
+    * Call this after remeshing.
+    * 
+    * @param comp
+    * MeshComponent of the FemModel that was remeshed.
+    */
+   public void rebuildSweptMeshInfo(FemMeshComp comp) {
+      FemModel3d femModel = (FemModel3d)comp.getParent ().getParent (); 
+
+      SweptMeshInfo smi = myBody2SweptMeshInfo.get (comp);
+      smi.build (femModel.getSurfaceMesh ());
+      
+      // Note that we have to use getSurfaceMesh() instead of 
+      // comp.getCollidableMesh() b/c getSurfaceMesh() will ensure that the 
+      // returned mesh is updated --- which is needed after remeshing.
+   }
+   
+   
+   /* --- Secondary Methods (protected) --- */
+ 
+   
+   protected boolean isBodyDynamic(CollidableBody body) {
+      if (body instanceof RigidBody) {
+         RigidBody rb = (RigidBody)body;
+         return rb.isDynamic ();
+      }
+      else if (body instanceof FemMeshComp) {
+         FemMeshComp femMeshComp = (FemMeshComp)body; 
+         FemModel3d femModel = (FemModel3d)femMeshComp.getParent ().getParent (); 
+
+         return femModel.getDynamicsEnabled ();
+      }
+      else {
+         throw new UnsupportedOperationException("Unsupported body instance.");
+      }
+   }
+   
+   protected void refreshSurfaceMeshes(CollidableBody body) {
+      if (body instanceof FemMeshComp) {
+         FemMeshComp femMeshComp = (FemMeshComp)body; 
+         FemModel3d femModel = (FemModel3d)femMeshComp.getParent ().getParent (); 
+         
+         femModel.updatePosState ();
+      }
+   }
+   
+   protected ContactInfo getContacts (SweptMeshInfo smi0, SweptMeshInfo smi1, 
    boolean isDynamic0, boolean isDynamic1) {
       
       if (! isDynamic0 && ! isDynamic1) 
@@ -48,12 +197,10 @@ public class ContinuousCollider {
       
       ContactInfo cinfo = new ContactInfo(smi0.myMesh, smi1.myMesh);
       
-      System.out.println ("Computing penetration points for m=0");
-      m = 0;
+      System.out.println ("Computing penetration points for m=0"); m=0;
       ArrayList<PenetratingPoint> pentPts0 = findPenetratingPoints(smi0, smi1);
       
-      System.out.println ("Computing penetration points for m=1");
-      m = 1;
+      System.out.println ("Computing penetration points for m=1"); m=1;
       ArrayList<PenetratingPoint> pentPts1 = (smi0 != smi1) ? 
          findPenetratingPoints(smi1, smi0) : new ArrayList<PenetratingPoint>();
        
@@ -71,17 +218,22 @@ public class ContinuousCollider {
       if (cinfo.getPenetratingPoints(0).isEmpty () &&
           cinfo.getPenetratingPoints(1).isEmpty () &&
           cinfo.getEdgeEdgeContacts().isEmpty ())
+      {
          return null;
+      }
+         
+      if (mStage != Stage.IMMINENT)
+         removeRedundantCollisions(cinfo);
       
-      removeRedundantCollisions(cinfo);
-      
-      if (myDebug)
+      if (myDebug) {
          printCollisions(cinfo);
+         mContRend = new ContinuousRenderable (cinfo);
+      }
          
       return cinfo;
    }
    
-   /* --- Secondary Methods --- (protected) */
+   /* --- Tertiary Methods --- (protected) */
    
    
    /**
@@ -119,42 +271,6 @@ public class ContinuousCollider {
          isExistingInverseEdgeEdgeContact (eeCt, cinfo.getEdgeEdgeContacts ()) &&
          isEdge0HeadGreaterThanEdge1Head (eeCt)  // Prevent removing both
       );
-      
-      
-      // Find earliest hitTime
-      
-//      double minHitTime = Double.POSITIVE_INFINITY;
-//      
-//      for (EdgeEdgeContact eeCt : cinfo.getEdgeEdgeContacts ())
-//         minHitTime = Math.min (eeCt.hitTime, minHitTime);
-//      
-//      for (int m=0; m<2; m++)
-//         for (PenetratingPoint pentPt : cinfo.getPenetratingPoints (m)) 
-//            minHitTime = Math.min (pentPt.hitTime, minHitTime);
-//            
-//      // Remove collisions that have a longer hitTime than the minimum
-//      
-//      ArrayList<EdgeEdgeContact> eeCts_toRemove = new ArrayList<EdgeEdgeContact>();
-//      for (EdgeEdgeContact eeCt : cinfo.getEdgeEdgeContacts ())
-//         if (eeCt.hitTime > minHitTime + myTimeElipson) {
-////            System.out.printf ("Skipping [%d-%d][%d-%d] collision because earlier collision exists.\n",
-////               eeCt.edge0.head.getIndex (), eeCt.edge0.tail.getIndex (), 
-////               eeCt.edge1.head.getIndex (), eeCt.edge1.tail.getIndex ());
-//            eeCts_toRemove.add (eeCt);
-//         }
-//      cinfo.getEdgeEdgeContacts ().removeAll (eeCts_toRemove);
-//      
-//      for (int m=0; m<2; m++) {
-//         ArrayList<PenetratingPoint> pentPts_toRemove = new ArrayList<PenetratingPoint>();
-//         for (PenetratingPoint pentPt : cinfo.getPenetratingPoints (m)) 
-//            if (pentPt.hitTime > minHitTime + myTimeElipson) {
-////               System.out.printf ("Skipping [%d]%s collision because earlier collision exists.\n",
-////                  pentPt.vertex.getIndex (), pentPt.face.vertexStr ());
-//               pentPts_toRemove.add (pentPt);
-//            }
-//         cinfo.getPenetratingPoints (m).removeAll (pentPts_toRemove);
-//      }
-      
    }
    
    protected ArrayList<PenetratingPoint> findPenetratingPoints(
@@ -183,13 +299,18 @@ public class ContinuousCollider {
             ixtFaceNodes.get (i).getElements ()[0];
          
          // Confirm collision (narrow-phase)
-         CCRV ccrv = isVertexTriangleCollision (sv, st, smi0, smi1);
+         sv.X = smi0.myMesh.getMeshToWorld ();
+         st.X = smi1.myMesh.getMeshToWorld ();
+         CCRV ccrv = isCollision (sv, st);
          if (ccrv.hitTime < 0) {   // No collision
             continue;
          }
         
+         if (mStage == Stage.IMMINENT) {
+            vtx2triCsns.addCollision (sv, st, ccrv);
+         }
          // Case 1: This is the vertex's first collision
-         if (vtx2triCsns.isEmpty (sv)) {
+         else if (vtx2triCsns.isEmpty (sv)) {
             // Append triangle to vertex's list of collisions
             vtx2triCsns.addCollision (sv, st, ccrv);
          }
@@ -227,8 +348,10 @@ public class ContinuousCollider {
             SweptTriangle st = (SweptTriangle)csn.first;
             CCRV ccrv = csn.second;
             
-            PenetratingPoint pentPt = createPenetratingPoint(
-               (SweptVertex)sv, st, ccrv, smi0, smi1);
+            PenetratingPoint pentPt = (mStage == Stage.IMMINENT) ?
+               createImminentPenetratingPoint((SweptVertex)sv, st, ccrv) :
+               createPenetratingPoint((SweptVertex)sv, st, ccrv);
+            
             pentPts.add (pentPt);
          }
       }
@@ -267,14 +390,19 @@ public class ContinuousCollider {
          SweptEdge se1 = (SweptEdge)ixtEdgeNodes1.get (i).getElements ()[0];
          
          // Confirm collision (narrow-phase)
-         CCRV ccrv = isEdgeEdgeCollision(se0, se1, smi0, smi1);
+         se0.X = smi0.myMesh.getMeshToWorld ();
+         se1.X = smi1.myMesh.getMeshToWorld ();
+         CCRV ccrv = isCollision(se0, se1);
          if (ccrv.hitTime < 0)
             continue;
 
          // Store the confirmed collision.
          
+         if (mStage == Stage.IMMINENT) {
+            e2eCsns.addCollision (se0, se1, ccrv);
+         }
          // If this is the first confirmed collision
-         if (e2eCsns.isEmpty (se0)) {
+         else if (e2eCsns.isEmpty (se0)) {
             e2eCsns.addCollision (se0, se1, ccrv);
          }
          // Otherwise, edge0 has existing collisions.
@@ -296,30 +424,6 @@ public class ContinuousCollider {
          }
       }
       
-      // If an edge of the 2nd mesh has multiple collisions, only 
-      // include the earliest collisions.
-      
-//      Boundable2BoundableCollisions inv_e2eCsns = e2eCsns.createInverseMapping ();
-//      
-//      for (Boundable se0i : inv_e2eCsns.getKeys ()) {
-//         // For given edge of opposite mesh (i.e. mesh1) (se0i), find minimum collision time. 
-//         double minHitTime = Double.POSITIVE_INFINITY;
-//         for (Pair<Boundable,CCRV> p_se1i : inv_e2eCsns.getCollisions (se0i)) {
-//            minHitTime = Math.min (minHitTime, p_se1i.second.hitTime);
-//         }
-//         
-//         // Remove collisions in original e2eCsns involving se0i that have a greater hitTime.
-//         
-//         for (Pair<Boundable,CCRV> p_se1i : inv_e2eCsns.getCollisions (se0i)) {
-//            Boundable se0 = p_se1i.first;
-//            
-//            final double final_minHitTime = minHitTime;
-//            e2eCsns.getCollisions (se0).removeIf (p_se1 -> 
-//               p_se1.second.hitTime > final_minHitTime + myTimeElipson
-//            );
-//         }
-//      }
-      
       // Create edge-edge contact for each collision 
       
       ArrayList<EdgeEdgeContact> eeCts = new ArrayList<EdgeEdgeContact>();
@@ -331,8 +435,9 @@ public class ContinuousCollider {
             SweptEdge se1 = (SweptEdge)csn.first;
             CCRV ccrv = csn.second;
             
-            EdgeEdgeContact eeCt = createEdgeEdgeContact(
-               (SweptEdge)se0, se1, ccrv, smi0, smi1);
+            EdgeEdgeContact eeCt = (mStage == Stage.IMMINENT) ?
+               createImminentEdgeEdgeContact((SweptEdge)se0, se1, ccrv) : 
+               createEdgeEdgeContact((SweptEdge)se0, se1, ccrv);
             eeCts.add (eeCt);
          }
       }
@@ -344,35 +449,37 @@ public class ContinuousCollider {
    /* --- Helper Methods --- */
    
    
-   public CCRV isVertexTriangleCollision(
-   SweptVertex sv, SweptTriangle st, SweptMeshInfo sv_smi, SweptMeshInfo st_smi) {
+   public CCRV isCollision(SweptVertex sv, SweptTriangle st) {
       
       // Ignore collision checking if vertex is connected to the triangle.
       if (MeshUtil.isHasVertex (sv.myVertex, st.myFace)) {
          return new CCRV();
       }
       
-      // Transform the vertex and triangle points into world-space
-      
-      Point3d[] svPtsW = sv.createTransformedPoints (
-         sv_smi.myMesh.getMeshToWorld ());
-      Point3d[] stPtsW = st.createTransformedPoints (
-         st_smi.myMesh.getMeshToWorld ());
-      
       // Execute narrow-phase collision detection algorithm
+   
+      CCRV ccrv = null;
       
-      CCRV ccrv = myContCol.collideVertexTrianglePnts (
-         svPtsW[1], svPtsW[0],   // Vertex 
-         stPtsW[3], stPtsW[0],   // Triangle vertex #0
-         stPtsW[4], stPtsW[1],   // Triangle vertex #1
-         stPtsW[5], stPtsW[2],   // Triangle vertex #2
-         mySpaceElipson);
+      if (mStage == Stage.IMMINENT) {
+         ccrv = isCollisionImminent(sv, st);
+      }
+      else {
+         // Transform the vertex and triangle points into world-space
+         Point3d[] svPtsW = sv.createTransformedPoints ();
+         Point3d[] stPtsW = st.createTransformedPoints ();
+         
+         ccrv = myContCol.collideVertexTrianglePnts (
+            svPtsW[1], svPtsW[0],   // Vertex 
+            stPtsW[3], stPtsW[0],   // Triangle vertex #0
+            stPtsW[4], stPtsW[1],   // Triangle vertex #1
+            stPtsW[5], stPtsW[2],   // Triangle vertex #2
+            mySpaceElipson);
+      }
 
       return ccrv;
    }
    
-   protected CCRV isEdgeEdgeCollision(
-   SweptEdge se0, SweptEdge se1, SweptMeshInfo se0_smi, SweptMeshInfo se1_smi) {
+   protected CCRV isCollision(SweptEdge se0, SweptEdge se1) {
       
       HalfEdge he0 = se0.myEdge;
       HalfEdge he1 = se1.myEdge;
@@ -384,169 +491,129 @@ public class ContinuousCollider {
       
       // Make a copy of the swept edge points before transforming them to
       // world-space.
-      Point3d[] se0PtsW = se0.createTransformedPoints (
-         se0_smi.myMesh.getMeshToWorld ());
-      Point3d[] se1PtsW = se1.createTransformedPoints (
-         se1_smi.myMesh.getMeshToWorld ());
+      Point3d[] se0PtsW = se0.createTransformedPoints ();
+      Point3d[] se1PtsW = se1.createTransformedPoints ();
       
-      // Execute narrow-phase collision detection algorithm 
-      return myContCol.collideEdgeEdgePnts (
-         se0PtsW[2], se0PtsW[0],   // Edge0 head
-         se0PtsW[3], se0PtsW[1],   // Edge0 tail
-         se1PtsW[2], se1PtsW[0],   // Edge1 head
-         se1PtsW[3], se1PtsW[1],   // Edge1 tail
-         mySpaceElipson);
+      CCRV rv = null;
+      
+      if (mStage == Stage.IMMINENT) {
+         rv = isCollisionImminent(se0, se1);
+      }
+      else {
+//         System.out.println ("e0: " + se0.myEdge.vertexStr () + ", e1: "
+//           + se1.myEdge.vertexStr ());
+//         
+//         if (se0.myEdge.tail.getIndex () == 1 && 
+//             se0.myEdge.head.getIndex () == 3) 
+//         {
+//            System.out.println ("here");
+//         }
+         
+         // Execute narrow-phase collision detection algorithm 
+         rv = myContCol.collideEdgeEdgePnts (
+            se0PtsW[se0.H0], se0PtsW[se0.H1],   // Edge0 head
+            se0PtsW[se0.T0], se0PtsW[se0.T1],   // Edge0 tail
+            se1PtsW[se1.H0], se1PtsW[se1.H1],   // Edge1 head
+            se1PtsW[se1.T0], se1PtsW[se1.T1],   // Edge1 tail
+            mySpaceElipson);
+      }
+      
+      return rv;
    }
    
    protected PenetratingPoint createPenetratingPoint(
-   SweptVertex sv, SweptTriangle st, CCRV ccrv, SweptMeshInfo sv_smi, 
-   SweptMeshInfo st_smi) {
+   SweptVertex sv, SweptTriangle st, CCRV ccrv) {
       
       // Compute vertex instantaneous positions
       
-      sv.X = sv_smi.myMesh.getMeshToWorld ();
       Point3d v_prv = sv.computeInstanteousPoint (0);
       Point3d v_hit = sv.computeInstanteousPoint (ccrv.hitTime);
       Point3d v_cur = sv.computeInstanteousPoint (1);
-      
+
       // Compute face point instantaneous positions
-      
-      st.X = st_smi.myMesh.getMeshToWorld ();
-      
+
       Point3d[] fPts = st.computeInstanteousTriangle (0);
       Point3d fPt_prv = MathUtil.projectPoint2plane (v_prv, fPts[0], fPts[1], fPts[2]);
       
       fPts = st.computeInstanteousTriangle (1);
       Point3d fPt_cur = MathUtil.projectPoint2plane (v_cur, fPts[0], fPts[1], fPts[2]);
       
-      // Penetration vectors (facePt to vtx)
-      
-      Vector3d f2v_prv = new Vector3d().sub (v_prv, fPt_prv);
-      Vector3d f2v_cur = new Vector3d().sub (v_cur, fPt_cur);
-      
       // Create PenetratingPoint
       
-      Vector3d v2f_cur = new Vector3d(f2v_cur).negate ();
+      Vector3d v2f_cur = new Vector3d().sub (fPt_cur, v_cur);
       
       PenetratingPoint pentPt = new PenetratingPoint(
          sv.myVertex, st.myFace, ccrv.bary, v_hit, v2f_cur, null);
       
-      pentPt.distance = f2v_cur.norm () * myDistScale;
-      pentPt.hitTime = ccrv.hitTime;
+      pentPt.distance = v2f_cur.norm () * myDistScale;
       
       // Compute normal (direction that vertex should bounce from face).
       
-      pentPt.normal = st.myFace.getNormal ();  // Assume 
+      Vector3d f2v_prv = new Vector3d().sub (v_prv, fPt_prv);
+      Vector3d f2v_cur = new Vector3d().sub (v_cur, fPt_cur);
+      
+      st.myFace.computeNormal ();
+      pentPt.normal = new Vector3d(st.myFace.getWorldNormal ());
       
       double nrm_dot_f2v_prv = pentPt.normal.dot (f2v_prv);
       double nrm_dot_f2v_cur = pentPt.normal.dot (f2v_cur);
       
-      // Rule: If constraint has positive rate, normal needs to be flipped.
-      if (nrm_dot_f2v_prv > nrm_dot_f2v_cur) {
+      if (nrm_dot_f2v_prv < nrm_dot_f2v_cur) {
          pentPt.normal.negate ();
+      }
+      
+      double hitTime = Math.max (ccrv.hitTime-mHitTimeBacktrack, minHitTimeBacktrack);
+      pentPt.hitTime = hitTime;
+      
+      pentPt.vPnt_justBefore_hitTime = sv.computeInstanteousPoint (hitTime);
+      pentPt.tPnts_justBefore_hitTime = st.computeInstanteousTriangle (hitTime);
+      
+      // EXP
+
+//      computeVertexTriangleCollision_normalAndDist (sv, st, 
+//         ccrv, pentPt.normal);
+      
+      if (pentPt.normal.z < 0) {
+         System.out.println ("here");
       }
       
       if (myDebug) {
          System.out.println ("Penetrating Point: " + 
             " V: " + sv.myVertex.getIndex () + 
             " T: " + st.myFace.vertexStr () + 
-            " f2v_prv: " + f2v_prv.toString ("%.5f") + 
-            " f2v_cur: " + f2v_cur.toString ("%.5f") + 
+            " FaceNrm: " + st.myFace.getWorldNormal ().toString ("%.2f") + 
             " Normal: " + pentPt.normal.toString ("%.2f") + 
-            " Dist: " + pentPt.distance + 
-            " HitTime: " + ccrv.hitTime + 
-            " \n " +
-            " FaceNrm: " + st.myFace.getWorldNormal ().toString ("%.2f") +  
-            " nrm_dot_f2v_prv: " + nrm_dot_f2v_prv +
-            " nrm_dot_f2v_cur: " + nrm_dot_f2v_cur
+            " Dist: " + String.format ("%.4f", pentPt.distance) + 
+            " HitTime: " + String.format ("%.4f", pentPt.hitTime) + 
+            " \n  " +
+            " f2v_prv: " + f2v_prv.toString ("%.8f") + 
+            " f2v_cur: " + f2v_cur.toString ("%.8f") + 
+            " nrm_dot_f2v_prv: " + String.format ("%.8f", nrm_dot_f2v_prv) + 
+            " nrm_dot_f2v_cur: " + String.format ("%.8f", nrm_dot_f2v_cur) + 
+            " \n "
          );
       }
-      
-      // Debug
-      
-//      facePts = st.computeInstanteousTriangle (0);
-//      Point3d facePt_prv = baryInto3d (facePts[0], facePts[1], facePts[2], ccrv.bary);
-//      
-//      facePts = st.computeInstanteousTriangle (0);
-//      Point3d facePt_prvCtr = baryInto3d (facePts[0], facePts[1], facePts[2], new Vector2d(1/3., 1/3.));
-//      
-//      GlobalDebug.prvTri = facePts;
-//      System.out.println ("PrvTri: " + 
-//      facePts[0].toString ("%.6f") + ", " +
-//      facePts[1].toString ("%.6f") + ", " +
-//      facePts[2].toString ("%.6f") + ", " 
-//   );
-//      
-//      facePts = st.computeInstanteousTriangle (1);
-//      GlobalDebug.curTri = facePts;
-//      System.out.println ("CurTri: " + 
-//         facePts[0].toString ("%.6f") + ", " +
-//         facePts[1].toString ("%.6f") + ", " +
-//         facePts[2].toString ("%.6f") + ", " 
-//      );
-      
-//      Vector3d disp = new Vector3d().sub (cur, prv);
-//      
-//      Vector3d prv2Face = new Vector3d();
-//      prv2Face.interpolate (ccrv.hitTime, disp);
-//      
-//      // Calculate `Point on face`
-//      Point3d nearestFacePoint = new Point3d();
-//      nearestFacePoint.add (prv, prv2Face);
-//      
-//      // Compute `Cur to Face`
-//      Vector3d disp2nearestFacePoint = new Vector3d();  
-      
-//      // If vertex is idle, need to rely on face's displacement to find
-//      // penetration distance.
-//      if (sv.isSweepIdle (mySpaceElipson)) {
-//         Point3d curFacePnt = baryInto3d (st.myPnts[0], st.myPnts[1], st.myPnts[2], ccrv.bary);
-//         disp2nearestFacePoint.sub (curFacePnt, /*idle vertex=*/cur);
-//      }
-//      else {
-//         disp2nearestFacePoint.sub(nearestFacePoint, cur);
-//      }
-//      
-//        
-//      PenetratingPoint pentPt = new PenetratingPoint(
-//        sv.myVertex, st.myFace, ccrv.bary, nearestFacePoint, 
-//        disp2nearestFacePoint, null);
-//
-//      pentPt.hitTime = ccrv.hitTime;
-//      
-//      // Compute normal
-//      
-//      pentPt.normal = st.computeInstanteousNormal (ccrv.hitTime);
-//      st_smi.myMesh.transformToWorld (pentPt.normal);
-//      
-//      boolean isVtxHitFaceFront = (pentPt.normal.dot (disp2nearestFacePoint) > 0);
-//      if (! isVtxHitFaceFront) {
-//         pentPt.normal.negate ();
-//      }
-      
+
       return pentPt;
    }
    
-   int neg = 0;
+   
    protected EdgeEdgeContact createEdgeEdgeContact(SweptEdge se0, SweptEdge se1, 
-      CCRV ccrv, SweptMeshInfo se0_smi, SweptMeshInfo se1_smi) {
+      CCRV ccrv) {
       
       EdgeEdgeContact eeCt = new EdgeEdgeContact();
       eeCt.edge0 = se0.myEdge;
       eeCt.edge1 = se1.myEdge;
       
       // Compute penetration depth
-
-      se0.X = se0_smi.myMesh.getMeshToWorld ();
-      se1.X = se1_smi.myMesh.getMeshToWorld ();
       
       Point3d e0_pt_prv = new Point3d();
       Point3d e1_pt_prv = new Point3d();
-      se0.computeClosestEdgePairPoints (se1, 0, e0_pt_prv, e1_pt_prv, mySpaceElipson);
+      se0.computeClosestEdgePairPoints (se1, 0, e0_pt_prv, e1_pt_prv, null, mySpaceElipson);
       
       Point3d e0_pt_cur = new Point3d();
       Point3d e1_pt_cur = new Point3d();
-      se0.computeClosestEdgePairPoints (se1, 1, e0_pt_cur, e1_pt_cur, mySpaceElipson);
+      se0.computeClosestEdgePairPoints (se1, 1, e0_pt_cur, e1_pt_cur, null, mySpaceElipson);
       
       Vector3d e10_pt_prv = new Vector3d();
       e10_pt_prv.sub (e1_pt_prv, e0_pt_prv); 
@@ -577,6 +644,22 @@ public class ContinuousCollider {
       eeCt.displacement = e10_pt_cur.norm () * myDistScale;
       eeCt.point1ToPoint0Normal = e01cross;
       
+      double hitTime = Math.max (ccrv.hitTime-mHitTimeBacktrack,minHitTimeBacktrack);
+      
+      eeCt.e0Pnts_justBefore_hitTime = se0.computeInstanteousEdgePoints (hitTime);
+      eeCt.e1Pnts_justBefore_hitTime = se1.computeInstanteousEdgePoints (hitTime);
+      
+      // EXP 
+      
+//      computeEdgeEdgeCollision_normalAndDist (se0, se1,
+//         ccrv, eeCt.point1ToPoint0Normal);
+      
+//      Vector3d e01 = new Vector3d();
+//      e01.sub (e0_pt_prv, e0_pt_cur);
+//      eeCt.point1ToPoint0Normal = MathUtil.vectorProjection (e01, e01cross);
+//      eeCt.point1ToPoint0Normal.normalize ();
+      
+      
       if (myDebug)
          System.out.println ("Edge-Edge Contact: " + 
             " E0: " + eeCt.edge0.vertexStr () + 
@@ -591,141 +674,15 @@ public class ContinuousCollider {
             "\n"
          );     
       
-      System.out.println ("here");
-
-//      // Compute cross product between the 2 edges 
-//
-//      Vector3d e01cross = new Vector3d();
-//      e01cross.cross (
-//         se0.computeInstanteousEdgeVec (ccrv.hitTime), 
-//         se1.computeInstanteousEdgeVec (ccrv.hitTime));
-//      e01cross.normalize ();
-//      
-//      // Direction of cross product is unreliable when edges are intersecting.
-//      // So, rely on the velocity vector of the two moving edges.
-//  
-//      Vector3d e0velo = se0.computeEdgeVelocity (ccrv.r);
-//      Vector3d e1velo = se1.computeEdgeVelocity (ccrv.s);
-//      
-//      boolean is_e01velo_sameDir = (e0velo.dot (e1velo) > 0);
-//      
-//      // Case 1: se1 is idle
-//      if (se1.isSweepIdle (mySpaceElipson)) {
-//         // Collision response direction of e0 should be opposite of its velocity.
-//         if (e01cross.dot (e0velo) > 0)
-//            e01cross.negate ();
-//      }
-//      // Case 2: se0 and se1 have opposite velocity directions, or se0 idle
-//      else if (se0.isSweepIdle (mySpaceElipson) || ! is_e01velo_sameDir) {
-//         // Collision response direction of e0 should be same as e1's velocity
-//         if (e01cross.dot (e1velo) < 0) 
-//            e01cross.negate ();
-//      }
-//      // Case 3: se0 and se1 have same velocity directions
-//      else { // (is_e01velo_sameDir) 
-//         // Collision response direction of e0 should be same as e0/e1's velocity
-//         if (e01cross.dot (e0velo) < 0) 
-//            e01cross.negate ();
-//      }
-      
-      
-      
-      
-      // DANCOLEDIT
-      // TODO: If compute collision points at t=hitTime, the distance between 
-      // them will be very close to 0. Consequently, vector between the 2 points
-      // may be zero as a result, which makes it difficult to find the 
-      // displacement between the two collision points.
-      // Try t=0 or t=1 instead of t=hitTime if the collision response direction
-      // looks wrong.
-      
-//    boolean is_se1_idle = se1.isSweepIdle (mySpaceElipson);
-//    
-//    double pnt0_hitTime = (is_se1_idle) ? 1 : ccrv.hitTime; 
-//    double pnt1_hitTime = (is_se1_idle) ? ccrv.hitTime : 1;    
-//    
-//    Vector3d edge0_dir_th = new Vector3d();
-//    Vector3d edge1_dir_th = new Vector3d();
-//    
-//    eeCt.point0 = computeClosestEdgePoint(se0, pnt0_hitTime, ccrv.r,
-//       se0_smi.myMesh.getMeshToWorld (), /*out=*/edge0_dir_th);
-//    eeCt.point1 = computeClosestEdgePoint(se1, pnt1_hitTime, ccrv.s, 
-//       se1_smi.myMesh.getMeshToWorld (), /*out=*/edge1_dir_th);
-//    
-//      // Cross-product of edge's direction vectors.
-//      eeCt.point1ToPoint0Normal.cross( edge0_dir_th, edge1_dir_th );
-//      eeCt.point1ToPoint0Normal.normalize ();
-//      
-//      // Incident vector.
-//      eeCt.w.sub( eeCt.point0, eeCt.point1 );
-//      
-//      // This will be very small (less than 1e-6).
-//      eeCt.displacement = eeCt.w.norm ();
-//      
-//      // Supposedly prevent precision problems when point0 and point1 are close,
-//      // according to EdgeEdgeContact.calculate().
-//      if (eeCt.w.dot (eeCt.point1ToPoint0Normal) < 0) {
-//         eeCt.point1ToPoint0Normal.negate();
-//      }
-//      
-//      eeCt.point1ToPoint0Normal.negate ();
-      
       eeCt.s0 = ccrv.r;
       eeCt.s1 = ccrv.s;
       
-      eeCt.hitTime = ccrv.hitTime;
+      eeCt.hitTime = hitTime;
       
       return eeCt;
    }
    
-   /**
-    * Compute point on given edge that's closest to the other edge at t=hitTime.
-    * 
-    * @param se
-    * Given edge. Contains info about edge at t=0 and t=1.
-    * 
-    * @param hitTime
-    * Time of collision. Anywhere from t=0 to t=1.
-    * 
-    * @param s
-    * Between tail to head of given edge, which point is closest to the other
-    * edge at t=hitTime? Anywhere from 0 (i.e. tail) to 1 (i.e. head).
-    * 
-    * @param worldX
-    * Matrix to transform edge into world-space.
-    * 
-    * @param out_edgeDir_th 
-    * This vector will be populated. Contains edge direction at t=hitTime.
-    */
-   protected Point3d computeClosestEdgePoint(SweptEdge se, double hitTime, 
-   double s, RigidTransform3d worldX, Vector3d out_edgeDir_th) {
-      
-      // Transform swept edge points into world-space
-      Point3d[] sePtsW = se.createTransformedPoints (worldX);
 
-      Point3d head_t1 = sePtsW[0];
-      Point3d tail_t1 = sePtsW[1];
-      Point3d head_t0 = sePtsW[2];
-      Point3d tail_t0 = sePtsW[3];
-      
-      // Point of head at t=hitTime 
-      Point3d head_th = new Point3d();
-      head_th.interpolate (head_t0, hitTime, head_t1);
-      
-      // Point of tail at t=hitTime 
-      Point3d tail_th = new Point3d();
-      tail_th.interpolate (tail_t0, hitTime, tail_t1);
-      
-      // Edge as vector at t=hitTime
-      Vector3d vec_th = new Vector3d().sub (head_th, tail_th);
-      
-      Point3d closestPt_th = new Point3d();
-      closestPt_th.interpolate (s, vec_th);
-      closestPt_th.add (tail_th);
-      
-      out_edgeDir_th.set(vec_th);
-      return closestPt_th;
-   }
    
    /**
     * Print out all the qualified collisions.
@@ -733,14 +690,29 @@ public class ContinuousCollider {
    protected void printCollisions(ContactInfo cinfo) {
       for (EdgeEdgeContact eeCt : cinfo.getEdgeEdgeContacts ())
          System.out.printf ("  Edge-Edge Collision: %s-%s. Disp: %.4f, "+
-           "HitTime: %.4f\n", eeCt.edge0.vertexStr (), eeCt.edge1.vertexStr (),
-           eeCt.displacement, eeCt.hitTime);
+           "HitTime: %.4f, Normal: %s\n", eeCt.edge0.vertexStr (), eeCt.edge1.vertexStr (),
+           eeCt.displacement, eeCt.hitTime, eeCt.point1ToPoint0Normal.toString ("%.2f"));
       
       for (int m=0; m<2; m++)
-         for (PenetratingPoint pentPt : cinfo.getPenetratingPoints (m)) 
+         for (PenetratingPoint pentPt : cinfo.getPenetratingPoints (m)) {
+            FemMeshComp fmc0 = (m==0) ? mFmc0 : mFmc1;
+            FemMeshComp fmc1 = (m==0) ? mFmc1 : mFmc0;
+            
+            int v = (fmc0 != null) ?
+               fmc0.getNodeForVertex (pentPt.vertex).getNumber () :
+               pentPt.vertex.getIndex ();
+            
+            String faceVtxStr = (fmc1 != null) ? 
+               String.format ("[%d-%d-%d]",  
+                  fmc1.getNodeForVertex (pentPt.face.getVertex (0)).getNumber (), 
+                  fmc1.getNodeForVertex (pentPt.face.getVertex (1)).getNumber (), 
+                  fmc1.getNodeForVertex (pentPt.face.getVertex (2)).getNumber ()
+               ) : pentPt.face.vertexStr () ;
+            
             System.out.printf ("  Vtx-Tri Collision: [ %d ]-%s. Disp: %.4f, "+
-              "HitTime: %.4f\n", pentPt.vertex.getIndex (),
-              pentPt.face.vertexStr (), pentPt.distance, pentPt.hitTime);
+              "HitTime: %.4f, Nrm: %s\n", v,
+              faceVtxStr, pentPt.distance, pentPt.hitTime, pentPt.normal.toString ("%.2f"));
+         }
    }
    
    /**
@@ -835,17 +807,7 @@ public class ContinuousCollider {
    protected boolean isEdge0HeadGreaterThanEdge1Head(EdgeEdgeContact eeCt) {
       return (eeCt.edge0.head.getIndex () > eeCt.edge1.head.getIndex ());
    }
-   
-   protected Point3d baryInto3d(Point3d a, Point3d b, Point3d c, Vector2d bary) {
-      Point3d pnt3d = new Point3d();
-      
-      pnt3d.scaledAdd (1-bary.x-bary.y, a);
-      pnt3d.scaledAdd (bary.x,          b);
-      pnt3d.scaledAdd (bary.y,          c);
-      
-      return pnt3d;
-   }
-   
+
    
    /* --- Data Classes --- */
    
@@ -926,4 +888,374 @@ public class ContinuousCollider {
          return invB2BCsns;
       }
    }
+   
+
+   
+   /* --- Functions for computing imminent contacts --- */
+
+   protected CCRV isCollisionImminent(SweptVertex sv, SweptTriangle st) {
+      ShellTriElement ele = (ShellTriElement)mFmc0.getFaceElement (st.myFace);
+      
+      Point3d[] svPntsW = sv.createTransformedPoints ();
+      Point3d[] stPntsW = st.createTransformedPoints ();
+      
+      Point3d closestTriPnt = MathUtil.projectPoint2plane (
+         svPntsW[sv.V0], 
+         stPntsW[st.A0], stPntsW[st.B0], stPntsW[st.C0]);
+      
+      CCRV rv = new CCRV();
+      
+      // Compute normal between the vertex and triangle (i.e. what direction
+      // should the vertex bounce towards, assuming imminent collision)?
+
+      Vector3d f2v = new Vector3d().sub (svPntsW[sv.V0], closestTriPnt);
+      
+      st.myFace.computeNormal ();
+      Vector3d nrm = new Vector3d( st.myFace.getWorldNormal ());
+      double f2v_dot_nrm = nrm.dot (f2v);
+      if (f2v_dot_nrm < 0)
+         nrm.negate ();
+      
+      if (nrm.z > 0 && m == 0) {
+         System.out.println ("here");
+      }
+      
+      // Is closestTriPt outside of triangle ?
+      
+      rv.bary = new Vector2d();
+      myContCol.computeBarycentricCoords (rv.bary, closestTriPnt, 
+         stPntsW[st.A0], stPntsW[st.B0], stPntsW[st.C0], mySpaceElipson);
+      
+      if (! MathUtil.isBaryCoordWithinTriangle (rv.bary, mySpaceElipson)) {
+         rv.hitTime = -1;
+         return rv;
+      }
+      
+      // Is point beyond cloth thickness?
+      
+//      double thicknessOverlap = myClothThickness - f2v_dot_nrm;
+      double thicknessOverlap = myClothThickness - f2v.norm ();
+      if (thicknessOverlap < 0) {   
+         rv.hitTime = -1;
+         return rv;
+      }
+      
+      rv.hitTime = 1;
+      rv.normal = nrm;
+      rv.thicknessOverlap = thicknessOverlap;
+
+      return rv; 
+   }
+   
+   protected PenetratingPoint createImminentPenetratingPoint(
+   SweptVertex sv, SweptTriangle st, CCRV ccrv)
+   {
+      // Compute their velocities
+      
+      Vector3d vtxVel = sv.myAvgVels[sv.V1];
+      Vector3d triVel = MathUtil.linearInterpolation (
+         st.myAvgVels[st.A1], st.myAvgVels[st.B1], st.myAvgVels[st.C1], 
+         ccrv.bary.x, ccrv.bary.y);
+      
+      // Compute their velocities along the normal
+      
+      Vector3d vtxVelNrm = MathUtil.vectorProjection (vtxVel, ccrv.normal);
+      Vector3d triVelNrm = MathUtil.vectorProjection (triVel, ccrv.normal);
+      
+      // Compute the single 'relative velocity', relative to vertex.
+      
+      Vector3d relVel = new Vector3d();
+      relVel.scaledAdd (0.5, vtxVelNrm);
+      relVel.scaledAdd (0.5, triVelNrm);
+      
+      // Make sure 'relative velocity' faces the normal direction
+      
+      if (relVel.dot (ccrv.normal) < 0)
+         relVel.negate ();
+      
+      // Compute impulse magnitude to undo the thickness overlap 
+      
+      double overlapImpulse = myTimestep * mySpringStiffness * ccrv.thicknessOverlap;
+      
+      // Limit velocity change to 10% of thickness overlap.
+      // Mass will be factored in MLPC step.
+      overlapImpulse = Math.min(
+         overlapImpulse,
+//         myAvgNodeMass * // Node mass will be accounted in the mass block matrix.
+            Math.abs (0.1 * ccrv.thicknessOverlap / myTimestep - relVel.norm ())
+      );
+      
+      // Create PenetratingPoint
+      
+      Point3d[] svPntsW = sv.createTransformedPoints ();
+      Point3d[] stPntsW = st.createTransformedPoints ();
+      
+      Point3d closestTriPnt = MathUtil.linearInterpolation (
+         stPntsW[st.A1], stPntsW[st.B1], stPntsW[st.C1],
+         ccrv.bary.x, ccrv.bary.y);
+      
+      Vector3d v2f = new Vector3d().sub (closestTriPnt, svPntsW[sv.V0]);
+      
+      PenetratingPoint pentPt = new PenetratingPoint(
+         sv.myVertex, st.myFace, ccrv.bary, closestTriPnt, v2f, null);
+      
+      pentPt.distance = overlapImpulse * myImminentImpulseScale;
+      pentPt.hitTime = ccrv.hitTime;
+      pentPt.normal = ccrv.normal;
+      
+      return pentPt;
+   }
+   
+   protected CCRV isCollisionImminent(SweptEdge se0, SweptEdge se1) {
+      Point3d pnt0 = new Point3d();
+      Point3d pnt1 = new Point3d();
+      
+      Vector2d rs = new Vector2d();
+      
+      se0.computeClosestEdgePairPoints (se1, 0, pnt0, pnt1, rs, mySpaceElipson);
+      
+      CCRV rv = new CCRV();
+      
+      // Compute the normal between the edges.
+      // Vector will coincide with direction that edge0 should bounce
+      // towards.
+      
+      // Vector from edge1 to edge0
+      Vector3d e01 = new Vector3d().sub (pnt1, pnt0);
+      
+      Vector3d nrm = new Vector3d();
+      nrm.cross (
+         se0.computeInstanteousEdgeVec (0), 
+         se1.computeInstanteousEdgeVec (0));
+      nrm.normalize ();
+      
+      // Tentative fix
+      double e01_dot_nrm = e01.dot (nrm);
+      if (e01_dot_nrm > 0) {
+         nrm.negate ();
+      }
+      
+//      double thicknessOverlap = myClothThickness - e01_dot_nrm;
+      double thicknessOverlap = myClothThickness - e01.norm ();
+      if (thicknessOverlap < 0) {
+         rv.hitTime = -1;
+      }
+      else {
+         rv.hitTime = 1;
+         rv.normal = nrm;
+         rv.r = rs.x;
+         rv.s = rs.y;
+         rv.thicknessOverlap = thicknessOverlap;
+      }
+      
+      return rv;
+   }
+   
+   protected EdgeEdgeContact createImminentEdgeEdgeContact(
+   SweptEdge se0, SweptEdge se1, CCRV ccrv)
+   {
+      // Compute their velocities 
+      
+      Vector3d vel0 = MathUtil.linearInterpolation (
+         se0.myAvgVels[se0.H1], se0.myAvgVels[se0.T1], ccrv.r);
+      
+      Vector3d vel1 = MathUtil.linearInterpolation (
+         se1.myAvgVels[se1.H1], se1.myAvgVels[se1.T1], ccrv.s);
+      
+      // Compute their velocities along the normal
+      
+      Vector3d velNrm0 = MathUtil.vectorProjection (vel0, ccrv.normal);
+      Vector3d velNrm1 = MathUtil.vectorProjection (vel1, ccrv.normal);
+      
+      // Compute the single 'relative velocity', relative to vertex.
+      
+      Vector3d relVel = new Vector3d();
+      relVel.scaledAdd (0.5, velNrm0);
+      relVel.scaledAdd (0.5, velNrm1);
+      
+      // Make sure 'relative velocity' faces the normal direction
+      
+      if (relVel.dot (ccrv.normal) < 0)
+         relVel.negate ();
+      
+      // Compute impulse magnitude to undo the thickness overlap 
+      
+      double overlapImpulse = myTimestep * mySpringStiffness * ccrv.thicknessOverlap;
+      
+      // Limit velocity change to 10% of thickness overlap.
+      // Mass will be factored in MLPC step.
+      overlapImpulse = Math.min(
+         overlapImpulse,
+//       myAvgNodeMass * // Node mass will be accounted in the mass block matrix.
+            Math.abs (0.1 * ccrv.thicknessOverlap / myTimestep - relVel.norm ())
+      );
+      
+      // Create EdgeEdgeContact
+      
+      EdgeEdgeContact eeCt = new EdgeEdgeContact();
+      eeCt.edge0 = se0.myEdge;
+      eeCt.edge1 = se1.myEdge;
+      
+      eeCt.displacement = overlapImpulse * myImminentImpulseScale;
+      eeCt.point0 = se0.computeInstanteousEdgePoint (0, ccrv.r);
+      eeCt.point1 = se1.computeInstanteousEdgePoint (0, ccrv.s);
+      eeCt.point1ToPoint0Normal = ccrv.normal;
+      eeCt.hitTime = ccrv.hitTime;
+      
+      return eeCt;
+   }
+   
+   
+   /////////// Impact Zone 
+   
+   public static void backtrackNode(FemNode3d node, Point3d newPos) {
+      Vector3d disp = new Vector3d().sub (newPos, node.getPosition ());
+      
+      Point3d newNodePos = (Point3d)
+         new Point3d(node.getPosition ()).add (disp);
+      node.setPosition (newNodePos);
+      
+      BackNode3d bNode = node.getBackNode ();
+      Point3d newBackNodePos = (Point3d)
+         new Point3d(bNode.getPosition ()).add (disp);
+      bNode.setPosition (newBackNodePos);
+   }
+   
+   public static boolean isNewMinHitTime(FemNode3d node, double hitTime,
+   LinkedHashMap<FemNode3d,Double> node2minHitTime) {
+      Double existingHitTime = node2minHitTime.get (node);
+      if (existingHitTime == null || hitTime < existingHitTime) {
+         node2minHitTime.put (node, hitTime);
+         return true;
+      }
+      else {
+         return false;
+      }
+   }
+   
+   ///////////// Vertex-Triangle Normal and Distance
+   
+   public double computeVertexTriangleCollision_normalAndDist(
+   SweptVertex sv, SweptTriangle st, CCRV ccrv, Vector3d out_normal) {
+      // signed_vf_distance
+      
+      Vector3d x = sv.createTransformedPoint (sv.V0);
+      Vector3d y0 = st.createTransformedPoint (st.A0).sub (x);
+      Vector3d y1 = st.createTransformedPoint (st.B0).sub (x);
+      Vector3d y2 = st.createTransformedPoint (st.C0).sub (x);
+      
+      Vector3d y10 = new Vector3d().sub (y1, y0).normalize ();
+      Vector3d y20 = new Vector3d().sub (y2, y0).normalize ();
+      
+      out_normal.cross (y10, y20);
+      out_normal.normalize ();
+      
+      double dist = new Point3d().sub (x, y0).dot (out_normal);
+      
+      // Make sure normal is in correct direction
+      
+      Vector3d d0 = sv.computeDisplacement (0);
+      Vector3d d1 = st.computeDisplacement (0);
+      Vector3d d2 = st.computeDisplacement (1);
+      Vector3d d3 = st.computeDisplacement (2);
+      
+      double wt1 = ccrv.bary.x;
+      double wt2 = ccrv.bary.y; 
+      double wt3 = 1-wt1-wt2;
+      
+      _ensureCollisionNormalSigned (out_normal, d0, d1, d2, d3, wt1, wt2, wt3);
+      
+      return Math.abs (dist);
+//      return dist;
+   }
+   
+   ///////////// Edge-Edge Normal and Distance
+   
+   public double computeEdgeEdgeCollision_normalAndDist(SweptEdge se0,
+   SweptEdge se1, CCRV ccrv, Vector3d out_normal) {
+      // signed_ee_distance
+      
+      Vector3d x0 = se0.createTransformedPoint (se0.H0);
+      Vector3d x1 = se0.createTransformedPoint (se0.T0).sub (x0);
+      Vector3d y0 = se1.createTransformedPoint (se1.H0).sub (x0);
+      Vector3d y1 = se1.createTransformedPoint (se1.T0).sub (x0);
+      
+      Vector3d x10 = new Vector3d().sub (x1, x0).normalize ();
+      Vector3d y10 = new Vector3d().sub (y1, y0).normalize ();
+      
+      out_normal.cross (x10, y10);
+      
+      // TODO elipson
+      if (out_normal.normSquared () < 1e-6) {
+         // Parallel line case 
+         Vector3d e0 = new Vector3d().sub (x1, x0);
+         Vector3d e1 = new Vector3d().sub (y1, y0);
+         
+         double p0min = x0.dot (e1);
+         double p0max = x1.dot (e0);
+         double p1min = y0.dot (e0);
+         double p1max = y1.dot (e0);
+         
+         if (p1max < p1min) {
+            // Swap 
+            double tmp = p1max;
+            p1max = p1min;
+            p1min = tmp;
+         }
+         
+         double a = Math.max (p0min, p1min);
+         double b = Math.min (p0max, p1max);
+         double c = 0.5*(a+b);
+         
+         Vector3d y0_x0 = new Vector3d().sub (y0, x0);
+         
+         Vector3d d = new Vector3d().sub (y0, x0);
+         d.scaledAdd ( y0_x0.dot (e0), e0);
+         
+         out_normal.set (d);
+         out_normal.scale (-1);
+         out_normal.normalize ();
+      }
+      
+      out_normal.normalize ();
+      
+      Vector3d x0_y0 = new Vector3d();
+      double dist = x0_y0.dot (out_normal);
+      
+      // Make sure normal is in correct direction 
+      
+      Vector3d d0 = se0.computeDisplacement (0);
+      Vector3d d1 = se0.computeDisplacement (1);
+      Vector3d d2 = se1.computeDisplacement (0);
+      Vector3d d3 = se1.computeDisplacement (1);
+      
+      double wt1 = ccrv.r;
+      double wt2 = 1-ccrv.s; 
+      double wt3 = ccrv.s;
+      
+      _ensureCollisionNormalSigned (out_normal, d0, d1, d2, d3, wt1, wt2, wt3);
+      
+      return Math.abs (dist);
+//      return dist;
+   }
+   
+   ////////////// Helper Functions
+   
+   protected void _ensureCollisionNormalSigned(Vector3d normal, Vector3d d0,
+   Vector3d d1, Vector3d d2, Vector3d d3, double wt1, double wt2, double wt3) {
+
+      Vector3d v1 = new Vector3d(d1).sub (d0);
+      Vector3d v2 = new Vector3d(d2).sub (d0);
+      Vector3d v3 = new Vector3d(d3).sub (d0);
+      
+      Vector3d wtSum = new Vector3d();
+      wtSum.scaledAdd (wt1, v1);
+      wtSum.scaledAdd (wt2, v2);
+      wtSum.scaledAdd (wt3, v3);
+      
+      if (normal.dot (wtSum) > 0) {
+         normal.negate ();
+      }
+   }
+   
 }

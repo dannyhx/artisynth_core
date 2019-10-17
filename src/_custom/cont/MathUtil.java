@@ -373,12 +373,41 @@ public class MathUtil {
       Vector3d q21 = new Vector3d().sub (q2, q1);
       
       Vector3d nrm = q10.cross (q21);
+      nrm.normalize ();
       
       double nrmScale = new Point3d(p).sub (q0).dot (nrm);
       
-      Point3d j = (Point3d)new Point3d(p).scaledAdd (nrmScale, nrm);
+      Point3d j = (Point3d)new Point3d(p).scaledAdd (-nrmScale, nrm);
       
       return j;
+   }
+   
+   
+   /**
+    * Project vector A onto vector B.
+    */
+   protected static Vector3d vectorProjection(Vector3d A, Vector3d B) {
+      Vector3d normalizedB = new Vector3d();
+      normalizedB.normalize (B);
+      
+      double bScale = A.dot (B);
+      
+      Vector3d projA = new Vector3d();
+      projA.scaledAdd (bScale, B);
+      
+      return projA;
+   }
+   
+   protected static boolean isBaryCoordWithinTriangle(
+   Vector2d bary, double elipson) {
+      if (bary.x < -elipson || bary.y < -elipson ||
+          bary.x + bary.y > 1 + elipson) 
+      {
+         return false;
+      }
+      else {
+         return true;
+      }
    }
    
    /////////////
@@ -428,5 +457,44 @@ public class MathUtil {
       avg.add (m1);
       avg.scale (0.5);
       return avg;
+   }
+   
+   ////////////////
+   // Interpolation 
+   ////////////////
+   
+   public static Vector3d linearInterpolation(Vector3d A, Vector3d B,
+   double bScale) {
+      Vector3d C = new Vector3d();
+      C.scaledAdd (1-bScale, A);
+      C.scaledAdd (bScale,   B);
+      return C;
+   }
+   
+   public static Vector3d linearInterpolation(Vector3d A, Vector3d B, Vector3d C,
+   double aScale, double bScale) {
+      Vector3d D = new Vector3d();
+      D.scaledAdd (aScale, A);
+      D.scaledAdd (bScale, B);
+      D.scaledAdd (1-aScale-bScale, C);
+      return D;
+   }
+   
+   public static Point3d linearInterpolation(Point3d A, Point3d B, Point3d C,
+   double aScale, double bScale) {
+      Point3d D = new Point3d();
+      D.scaledAdd (aScale, A);
+      D.scaledAdd (bScale, B);
+      D.scaledAdd (1-aScale-bScale, C);
+      return D;
+   }
+
+   public static void main(String[] args) {
+      Vector3d A = new Vector3d(-0.23,-0.88,2);
+      Vector3d B = new Vector3d(-1,0,0);
+      
+      Vector3d C = vectorProjection (A, B);
+      
+      System.out.println (C);
    }
 }

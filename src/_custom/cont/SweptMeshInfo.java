@@ -2,9 +2,11 @@ package _custom.cont;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 
 import artisynth.core.femmodels.FemMeshComp;
 import maspack.geometry.AABBTree;
+import maspack.geometry.BVNode;
 import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
 import maspack.geometry.PolygonalMesh;
@@ -37,18 +39,19 @@ public class SweptMeshInfo {
    public AABBTree myEdgeTree;
    public AABBTree myTriangleTree;
 
-   public SweptMeshInfo (PolygonalMesh mesh, FemMeshComp femMeshComp) {
-      build(mesh, femMeshComp);
+   
+   
+   public SweptMeshInfo (PolygonalMesh mesh) {
+      build(mesh);
    }
    
-   public void build(PolygonalMesh mesh, FemMeshComp femMeshComp) {
+   public void build(PolygonalMesh mesh) {
       if (!mesh.isTriangular()) {
          throw new IllegalArgumentException (
             "Mesh is not triangular");
       }
       
       myMesh = mesh;
-      myFemMeshComp = femMeshComp;
       
       /* --- Vertices --- */
       
@@ -119,7 +122,7 @@ public class SweptMeshInfo {
       myTriangleTree.build (sweptTriangles, sweptTriangles.length);
    }
    
-   public void savePrevPositions() {
+   public void copyCurrent2PreviousPositions() {
       int numv = myMesh.numVertices();
       for (int i=0; i<numv; i++) {
          prevPositions[i].set (myMesh.getVertex(i).getPosition());
@@ -148,4 +151,53 @@ public class SweptMeshInfo {
       myEdgeTree.update();
       myTriangleTree.update();
    }
+   
+   
+   
+   
+   /* --- Functions for Continuous Collision Response --- */
+   
+   public void saveCurrentPositions() {
+      for (BoundablePointArray bnd : getSweptBoundables()) {
+         bnd.saveCurrentPositions ();
+      }
+   }
+   
+   public void loadCurrentPositions() {
+      for (BoundablePointArray bnd : getSweptBoundables()) {
+         bnd.loadCurrentPositions ();
+      }
+   }
+   
+   public void copyPrevious2CurrentPositions() {
+      for (BoundablePointArray bnd : getSweptBoundables()) {
+         bnd.copyPrevious2CurrentPositions ();
+      }
+   }
+   
+   public void computeAvgVelocities(double t) {
+      for (BoundablePointArray bnd : getSweptBoundables()) {
+         bnd.computeAvgVelocity (t);
+      }
+   }
+   
+   /* --- Helper Functions --- */
+   
+   public ArrayList<BoundablePointArray> getSweptBoundables() {
+      ArrayList<BVNode> bvNodes = new ArrayList<BVNode>();
+      bvNodes.addAll ( myVertexTree.getLeafNodes () );
+      bvNodes.addAll ( myEdgeTree.getLeafNodes () );
+      bvNodes.addAll ( myTriangleTree.getLeafNodes () );
+      
+      ArrayList<BoundablePointArray> bnds = 
+         new ArrayList<BoundablePointArray>( bvNodes.size () );
+      
+      for (BVNode node : bvNodes) {
+         bnds.add( (BoundablePointArray)node.getElements ()[0] );
+      }
+      
+      return bnds;
+   }
+   
+   
 }

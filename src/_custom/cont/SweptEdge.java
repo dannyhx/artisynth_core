@@ -2,7 +2,9 @@ package _custom.cont;
 
 import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
+import maspack.matrix.Vector2d;
 import maspack.matrix.Vector3d;
+import maspack.util.DataBuffer;
 import _custom.cont.BoundablePointArray;
 import maspack.geometry.*;
 
@@ -14,8 +16,8 @@ public class SweptEdge extends BoundablePointArray {
    public final int T0 = 3;
    
    HalfEdge myEdge;
-   protected RigidTransform3d X;
 
+   
    public SweptEdge (HalfEdge edge, Point3d[] oldPositions) {
       super (4);
       myEdge = edge.getPrimary();
@@ -80,22 +82,19 @@ public class SweptEdge extends BoundablePointArray {
       return edgePt;
    }
    
-   public Vector3d computeEdgeVelocity(double s) {
-      Point3d srtEdgePt = computeInstanteousEdgePoint (0, s);
-      Point3d endEdgePt = computeInstanteousEdgePoint (1, s);
-      
-      Vector3d velo = new Vector3d();
-      velo.sub (endEdgePt, srtEdgePt);
-      
-      return velo;
+   public Point3d[] computeInstanteousEdgePoints(double t) {
+      Point3d[] ePnts = new Point3d[2];
+      ePnts[0] = computeInstanteousHead (t);
+      ePnts[1] = computeInstanteousTail (t);
+      return ePnts;
    }
    
    public double computeClosestEdgePairPoints(SweptEdge se1, double t, 
-   Point3d out_e0, Point3d out_e1, double epsilon) {
+   Point3d out_e0, Point3d out_e1, Vector2d rs, double epsilon) {
       // Borrowed from ContinuousCollider.minimumDistanceBetweenSegments
       
-      Point3d[] pts0 = this.myPnts;
-      Point3d[] pts1 = se1.myPnts;
+      Point3d[] pts0 = this.createTransformedPoints ();
+      Point3d[] pts1 = se1.createTransformedPoints ();
       
       Vector3d ab0 = new Vector3d().sub (pts0[T0], pts0[H0]);
       Vector3d cd0 = new Vector3d().sub (pts1[T0], pts1[H0]);
@@ -186,8 +185,15 @@ public class SweptEdge extends BoundablePointArray {
       out_e0.set( this.computeInstanteousEdgePoint (t, s0) );
       out_e1.set( se1.computeInstanteousEdgePoint  (t, s1) );
       
+      if (rs != null) {
+         rs.x = s0;
+         rs.y = s1;
+      }
+      
       return r.norm();   // mindist
    }
+   
+
    
    public static void main(String[] args) {
       HalfEdge he0 = new HalfEdge();
@@ -216,7 +222,7 @@ public class SweptEdge extends BoundablePointArray {
       
       Point3d cp0 = new Point3d();
       Point3d cp1 = new Point3d();
-      double minDist = se0.computeClosestEdgePairPoints (se1, 1, cp0, cp1, 1e-6);
+      double minDist = se0.computeClosestEdgePairPoints (se1, 1, cp0, cp1, null, 1e-6);
       
       System.out.printf ("MinDist: %.4f, CP0: %s, CP1: %s", 
          minDist, 
@@ -225,4 +231,40 @@ public class SweptEdge extends BoundablePointArray {
       );
       
    }
+   
+   
+   
+   /* --- Functions for Continuous Collision Response --- */
+   
+   public void saveCurrentPositions() {
+      myPnts1Backup = new Point3d[myPnts.length/2];
+      
+      myPnts1Backup[H1] = new Point3d( myPnts[H1] );
+      myPnts1Backup[T1] = new Point3d( myPnts[T1] );
+   }
+   
+   public void loadCurrentPositions() {
+      myPnts[H1].set( myPnts1Backup[H1] );
+      myPnts[T1].set( myPnts1Backup[T1] );
+   }
+   
+   public void copyPrevious2CurrentPositions() {
+      myPnts[H1].set ( myPnts[H0] );
+      myPnts[T1].set ( myPnts[T0] );
+   }
+   
+   public Vector3d[] computeAvgVelocity(double t) {
+      myAvgVels = new Vector3d[myPnts.length/2];
+      
+      myAvgVels[H1] = new Vector3d();
+      myAvgVels[H1].sub (myPnts[H1], myPnts[H0]);
+      myAvgVels[H1].scale (1/t);
+      
+      myAvgVels[T1] = new Vector3d();
+      myAvgVels[T1].sub (myPnts[T1], myPnts[T0]);
+      myAvgVels[T1].scale (1/t);
+      
+      return myAvgVels;
+   }
+   
 }

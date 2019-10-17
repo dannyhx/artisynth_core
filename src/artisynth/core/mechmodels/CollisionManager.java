@@ -131,8 +131,9 @@ import artisynth.core.util.ScanToken;
 public class CollisionManager extends RenderableCompositeBase
    implements ScalableUnits, Constrainer, HasNumericState {
 
-   // DANCOLEDIT - mIsPrevMeshSyncedToCurWorld
-   public boolean mIsPrevMeshSyncedToCurWorld = false;
+   // DANCOLEDIT
+   protected ContinuousCollider myContCldr = null;
+   public ContinuousCollider getContinuousCollider() { return myContCldr; }
    
    // Current assumptions:
    //
@@ -212,7 +213,7 @@ public class CollisionManager extends RenderableCompositeBase
       /**
        * Experimental collider for continuous collision detection.
        */
-      CONTINUOUS
+      CONTINUOUS,
    };
 
    static ColliderType myDefaultColliderType = ColliderType.TRI_INTERSECTION;
@@ -2161,9 +2162,7 @@ public class CollisionManager extends RenderableCompositeBase
          return behavior;
       }
    }
-   
-   public LinkedHashMap<CollidableBody,SweptMeshInfo> myBody2SweptMeshInfo;
-   public ContinuousCollider myContCldr;
+  
 
    ContactInfo computeContactInfo (
       CollidableBody c0, CollidableBody c1, CollisionBehavior behav) {
@@ -2232,39 +2231,8 @@ public class CollisionManager extends RenderableCompositeBase
             if (myContCldr == null) {
                myContCldr = new ContinuousCollider ();
             }
-            
-            if (myBody2SweptMeshInfo == null) {
-               myBody2SweptMeshInfo = 
-                  new LinkedHashMap<CollidableBody,SweptMeshInfo> ();
-            }
-            
-            for (CollidableBody body : new CollidableBody[] {c0,c1} ) {
-               SweptMeshInfo smi = myBody2SweptMeshInfo.get (body);
-               
-               if (smi == null) {
-                  FemMeshComp fmc = (body instanceof FemMeshComp) ?
-                     (FemMeshComp)body : null;
-                     
-                  smi = new SweptMeshInfo(body.getCollisionMesh (), fmc);
-                  myBody2SweptMeshInfo.put (body, smi);
-               }
-               
-               smi.updatePrevPositionsX0 ();
-               smi.updateBVTrees ();
-               
-               if (c0 == c1) 
-                  break;
-            }
-            
-            boolean isDynamic0 = isBodyDynamic(c0);
-            boolean isDynamic1 = isBodyDynamic(c1);
-            
-            System.out.printf ("Computing contact between %s-%s\n", 
-               c0.getName (), c1.getName ());
-            
-            cinfo = myContCldr.getContacts (
-               myBody2SweptMeshInfo.get (c0), myBody2SweptMeshInfo.get (c1),
-               isDynamic0, isDynamic1);
+     
+            cinfo = myContCldr.getContacts (c0, c1);
 
             break;
          }
@@ -2273,31 +2241,8 @@ public class CollisionManager extends RenderableCompositeBase
                "Unimplemented collider type " + colliderType);
          }
       }
-      
-      System.out.println ("---Contact Type: " + colliderType);
-      
+
       return cinfo;    
-   }
-   
-   protected boolean isBodyDynamic(CollidableBody body) {
-      if (body instanceof RigidBody) {
-         RigidBody rb = (RigidBody)body;
-         return rb.isDynamic ();
-      }
-      else if (body instanceof FemMeshComp) {
-         FemMeshComp femMeshComp = (FemMeshComp)body; 
-         FemModel3d femModel = (FemModel3d)femMeshComp.getParent ().getParent (); 
-         return femModel.getDynamicsEnabled ();
-      }
-      else {
-         throw new UnsupportedOperationException("Unsupported body instance.");
-      }
-   }
-   
-   public void rebuildSweptMeshInfo(CollidableBody body, PolygonalMesh surfaceMesh) {
-      // Copy surfaceMeshVertices to body's vertices
-      SweptMeshInfo smi = myBody2SweptMeshInfo.get (body);
-      smi.build (surfaceMesh, null);
    }
    
    void checkForContact (

@@ -1,13 +1,15 @@
 package _custom.cont;
 
+import maspack.matrix.Point3d;
 import maspack.matrix.Vector2d;
+import maspack.matrix.Vector3d;
 
 /**
  * Contains computed collision info.
  */
 public class CCRV {
    /** Time when collision occurred. Between t=0 and t=1. 
-    *  -1 indicates no collision. */
+    *  -1 indicates no (imminent) collision. */
    public double hitTime;
    
    /* --- Vertex-triangle collision --- */
@@ -26,6 +28,13 @@ public class CCRV {
    
    /** Fraction along line segment from tail to head of edge1 where collision occurred. */
    public double s;
+   
+   /* --- Vertex-triangle imminent collision --- */
+   
+   public Vector3d normal;
+   public double thicknessOverlap;
+   
+   
    
    public CCRV() {
       this.hitTime = -1;
