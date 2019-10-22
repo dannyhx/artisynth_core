@@ -38,6 +38,8 @@ public class SweptMeshInfo {
    public AABBTree myVertexTree;
    public AABBTree myEdgeTree;
    public AABBTree myTriangleTree;
+   
+   public static double myMargin = 0.6e-2;    // Half of cloth thickness
 
    
    
@@ -104,21 +106,21 @@ public class SweptMeshInfo {
       
       /* --- Assemble AABB trees --- */
       
-      double margin = 1e-6*RenderableUtils.getRadius(mesh);
+//      double margin = 1e-6*RenderableUtils.getRadius(mesh);
       
       myVertexTree = new AABBTree();
       myVertexTree.setMaxLeafElements(1);
-      myVertexTree.setMargin (margin);
+      myVertexTree.setMargin (myMargin);
       myVertexTree.build (sweptVertices, sweptVertices.length);
 
       myEdgeTree = new AABBTree();
       myEdgeTree.setMaxLeafElements(1);
-      myEdgeTree.setMargin (margin);
+      myEdgeTree.setMargin (myMargin);
       myEdgeTree.build (sweptEdges, sweptEdges.length);
 
       myTriangleTree = new AABBTree();
       myTriangleTree.setMaxLeafElements(1);
-      myTriangleTree.setMargin (margin);
+      myTriangleTree.setMargin (myMargin);
       myTriangleTree.build (sweptTriangles, sweptTriangles.length);
    }
    

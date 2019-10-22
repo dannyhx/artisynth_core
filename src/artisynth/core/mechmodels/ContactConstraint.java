@@ -16,6 +16,7 @@ import maspack.matrix.SparseBlockMatrix;
 import maspack.matrix.Vector3d;
 import maspack.util.DataBuffer;
 import maspack.util.NumberFormat;
+import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.mechmodels.MechSystem.FrictionInfo;
 
 /**
@@ -45,6 +46,7 @@ public class ContactConstraint {
    
    // DANCOLEDIT
    public int m = 0;
+   public boolean isImminentContact = false;;
 
    public double getForce() {
       return myLambda;

@@ -854,9 +854,6 @@ public class CollisionHandler extends ConstrainerBase
                ContinuousCollider.backtrackNode (node, eeCt.e1Pnts_justBefore_hitTime[1]);
          }
 
-         FemMeshComp fmc0 = (FemMeshComp)collidable0;
-         FemMeshComp fmc1 = (FemMeshComp)collidable1;
-         
          return maxpen;
       }
       
@@ -874,8 +871,8 @@ public class CollisionHandler extends ConstrainerBase
                ContactPoint cpnt0 = new ContactPoint (cpp.vertex);
                ContactPoint cpnt1 = new ContactPoint (cpp.position, cpp.face, cpp.coords);
                
-               System.out.printf ("Creating masters: %s-%s\n", col0.getName (), 
-                  col1.getName ());
+//               System.out.printf ("Creating masters: %s-%s\n", col0.getName (), 
+//                  col1.getName ());
                
                if (col0 instanceof RigidBody && col1 instanceof RigidBody) {
                   // Similar to TRI_INTERSECTION (Rigid)
@@ -895,6 +892,18 @@ public class CollisionHandler extends ConstrainerBase
                maxpen = Math.max (cpp.distance, maxpen);
                c.setDistance (-cpp.distance);
   
+               FemMeshComp fmc0 = (FemMeshComp)col0;
+               FemMeshComp fmc1 = (FemMeshComp)col1;
+               
+               int[] nodeIdxs0 = new int[] {
+                 fmc0.getNodeForVertex (cpnt0.myVtxs[0]).getNumber ()
+               };
+               int[] nodeIdxs1 = new int[] {
+                 fmc1.getNodeForVertex (cpnt1.myVtxs[0]).getNumber (),
+                 fmc1.getNodeForVertex (cpnt1.myVtxs[1]).getNumber (),
+                 fmc1.getNodeForVertex (cpnt1.myVtxs[2]).getNumber ()
+               };
+               
                myUnilaterals.add (c);
             }
          }
@@ -917,6 +926,26 @@ public class CollisionHandler extends ConstrainerBase
                // TODO 
                maxpen = Math.max (eec.displacement, maxpen);
                c.setDistance (-eec.displacement);
+
+               FemMeshComp fmc0 = (FemMeshComp)collidable0;
+               FemMeshComp fmc1 = (FemMeshComp)collidable1;
+               
+               int[] nodeIdxs0 = new int[] {
+                 fmc0.getNodeForVertex (cpnt0.myVtxs[0]).getNumber (),
+                 fmc0.getNodeForVertex (cpnt0.myVtxs[1]).getNumber ()
+               };
+               int[] nodeIdxs1 = new int[] {
+                 fmc1.getNodeForVertex (cpnt1.myVtxs[0]).getNumber (),
+                 fmc1.getNodeForVertex (cpnt1.myVtxs[1]).getNumber ()
+               };
+               
+//               System.out.printf ("Edge-Edge: %s%s, Wts:[%.2f,%.2f][%.2f,%.2f]\n", 
+//                  Arrays.toString (nodeIdxs0),
+//                  Arrays.toString (nodeIdxs1),
+//                  cpnt0.myWgts[0], cpnt0.myWgts[1], 
+//                  cpnt1.myWgts[0], cpnt1.myWgts[1] 
+//               );
+               
                myUnilaterals.add (c);
             }
          }
@@ -989,13 +1018,15 @@ public class CollisionHandler extends ConstrainerBase
                   
                   cc_back.myMasters.add ( cm_back );
                }
-   
+
                unilateralsToAdd.add (cc_back);
             }
             
             myUnilaterals.addAll (unilateralsToAdd);
          } // End of unilateral to backnode copying 
       }
+      
+      System.out.println ("Num of unilaterals: " + myUnilaterals.size ());
 
       removeInactiveContacts ();
       
@@ -1355,16 +1386,14 @@ public class CollisionHandler extends ConstrainerBase
          ContactConstraint c = myUnilaterals.get(i);
          
          // DANCOLEDIT: addUnilateralConstraint - print
-         System.out.printf ("addUnilateralConstraint() Pnt0: [%s], Pnt1: [%s], "
-            +"Nrm: [%s], Dist: [%.4f], Lam: [%.3f], Temp: [%b], " 
-            +"\n",
-            c.myCpnt0.myPoint.toString ("%.6f"),
-            (c.myCpnt1 != null) ? c.myCpnt1.myPoint.toString ("%.6f") : "null",
-            c.myNormal.toString ("%.2f"),
-            c.myDistance, 
-            c.myLambda, 
-            c.myActive
-         );
+//         System.out.printf ("addUnilateralConstraint() Pnt0: [%s], Pnt1: [%s], "
+//            +"Nrm: [%s], Dist: [%.4f] " 
+//            +"\n",
+//            c.myCpnt0.myPoint.toString ("%.6f"),
+//            (c.myCpnt1 != null) ? c.myCpnt1.myPoint.toString ("%.6f") : "null",
+//            c.myNormal.toString ("%.2f"),
+//            c.myDistance           
+//         );
          
          c.addConstraintBlocks (NT, bj++);
          if (dbuf != null) {
@@ -1375,10 +1404,6 @@ public class CollisionHandler extends ConstrainerBase
       return numu;
    }
    
-   // DANCOLEDIT public function 
-   public ArrayList<ContactConstraint> getUnilaterals() {
-      return myUnilaterals;
-   }
 
    @Override
    public int getUnilateralInfo (ConstraintInfo[] ninfo, int idx) {

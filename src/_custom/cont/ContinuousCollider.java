@@ -16,6 +16,7 @@ import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellTriElement;
 import artisynth.core.mechmodels.CollidableBody;
+import artisynth.core.mechmodels.ContactConstraint;
 import artisynth.core.mechmodels.RigidBody;
 import maspack.collision.ContactInfo;
 import maspack.collision.EdgeEdgeContact;
@@ -39,11 +40,10 @@ public class ContinuousCollider {
    public static double mySpaceElipson = 1e-10;
    public static double myDistScale = 1.0;
    
-   public static double myClothThickness = 1e-2;
+   public static double myClothThickness = 1e-2;   // Should correspond to penetrationTol
    public static double mySpringStiffness = 1e3;
    public static double myTimestep = 0.01;
-   public static double myImminentImpulseScale = 0.25;
-   public static double myAvgNodeMass = 0.0000880;
+   public static double myImminentImpulseScale = 1.00;   // 0.25
    
    public LinkedHashMap<CollidableBody,SweptMeshInfo> myBody2SweptMeshInfo;
    protected ContinuousCollisions myContCol;
@@ -58,6 +58,14 @@ public class ContinuousCollider {
 
    public static int myMaxNumActualIters = 10;
    public static double myDistScaleDX = 0.5;
+   
+   /**
+    * Maintains a reference to the unilaterals that were used to undo
+    * the penetration points. These unilaterals are adjusted during remeshing
+    * before they're applied to the subsequent constraint backward Euler 
+    * solve.
+    */
+   public static ArrayList<ContactConstraint> myUnilaterals = null;
    
    public static ContinuousRenderable mContRend;
    int m;
@@ -180,6 +188,9 @@ public class ContinuousCollider {
       }
    }
    
+   /**
+    * Ensure surface mesh is synced with the nodal positions.
+    */
    protected void refreshSurfaceMeshes(CollidableBody body) {
       if (body instanceof FemMeshComp) {
          FemMeshComp femMeshComp = (FemMeshComp)body; 
@@ -222,8 +233,9 @@ public class ContinuousCollider {
          return null;
       }
          
-      if (mStage != Stage.IMMINENT)
-         removeRedundantCollisions(cinfo);
+      // This step is important for imminent collisions in particular, to 
+      // severely reduce the number of constraints.
+      removeRedundantCollisions(cinfo);
       
       if (myDebug) {
          printCollisions(cinfo);
@@ -500,15 +512,6 @@ public class ContinuousCollider {
          rv = isCollisionImminent(se0, se1);
       }
       else {
-//         System.out.println ("e0: " + se0.myEdge.vertexStr () + ", e1: "
-//           + se1.myEdge.vertexStr ());
-//         
-//         if (se0.myEdge.tail.getIndex () == 1 && 
-//             se0.myEdge.head.getIndex () == 3) 
-//         {
-//            System.out.println ("here");
-//         }
-         
          // Execute narrow-phase collision detection algorithm 
          rv = myContCol.collideEdgeEdgePnts (
             se0PtsW[se0.H0], se0PtsW[se0.H1],   // Edge0 head
@@ -572,10 +575,6 @@ public class ContinuousCollider {
 
 //      computeVertexTriangleCollision_normalAndDist (sv, st, 
 //         ccrv, pentPt.normal);
-      
-      if (pentPt.normal.z < 0) {
-         System.out.println ("here");
-      }
       
       if (myDebug) {
          System.out.println ("Penetrating Point: " + 
@@ -894,8 +893,7 @@ public class ContinuousCollider {
    /* --- Functions for computing imminent contacts --- */
 
    protected CCRV isCollisionImminent(SweptVertex sv, SweptTriangle st) {
-      ShellTriElement ele = (ShellTriElement)mFmc0.getFaceElement (st.myFace);
-      
+
       Point3d[] svPntsW = sv.createTransformedPoints ();
       Point3d[] stPntsW = st.createTransformedPoints ();
       
@@ -913,12 +911,8 @@ public class ContinuousCollider {
       st.myFace.computeNormal ();
       Vector3d nrm = new Vector3d( st.myFace.getWorldNormal ());
       double f2v_dot_nrm = nrm.dot (f2v);
-      if (f2v_dot_nrm < 0)
+      if (f2v_dot_nrm < 0)   
          nrm.negate ();
-      
-      if (nrm.z > 0 && m == 0) {
-         System.out.println ("here");
-      }
       
       // Is closestTriPt outside of triangle ?
       
@@ -933,16 +927,24 @@ public class ContinuousCollider {
       
       // Is point beyond cloth thickness?
       
-//      double thicknessOverlap = myClothThickness - f2v_dot_nrm;
-      double thicknessOverlap = myClothThickness - f2v.norm ();
-      if (thicknessOverlap < 0) {   
+      Vector3d sizedNrm = MathUtil.vectorProjection (f2v, nrm);
+      
+//      double thicknessPenetration = myClothThickness - f2v_dot_nrm;
+      double thicknessPenetration = myClothThickness - sizedNrm.norm ();
+      if (thicknessPenetration < 0) {   // Negative means no penetration   
          rv.hitTime = -1;
          return rv;
       }
       
-      rv.hitTime = 1;
+      // For imminent collisions, the hitTime doesn't actually exist.
+      // We'll put the distance between the imminent features here.
+      // When redundant collisions are being filtered out, collisions with the
+      // earliest hitTimes are prioritized. For imminent collisions, we'll
+      // prioritize imminent collisions that are closer to each other.
+      rv.hitTime = sizedNrm.norm ();   
+      
       rv.normal = nrm;
-      rv.thicknessOverlap = thicknessOverlap;
+      rv.thicknessPenetration = thicknessPenetration;
 
       return rv; 
    }
@@ -963,6 +965,7 @@ public class ContinuousCollider {
       Vector3d triVelNrm = MathUtil.vectorProjection (triVel, ccrv.normal);
       
       // Compute the single 'relative velocity', relative to vertex.
+      // Points in the direction of the dominate velocity.
       
       Vector3d relVel = new Vector3d();
       relVel.scaledAdd (0.5, vtxVelNrm);
@@ -975,15 +978,17 @@ public class ContinuousCollider {
       
       // Compute impulse magnitude to undo the thickness overlap 
       
-      double overlapImpulse = myTimestep * mySpringStiffness * ccrv.thicknessOverlap;
+//      double overlapImpulse = myTimestep * mySpringStiffness * ccrv.thicknessPenetration;
+//      
+//      // Limit velocity change to 10% of thickness overlap.
+//      // Mass will be factored in MLPC step.
+//      overlapImpulse = Math.min(
+//         overlapImpulse,
+////         myAvgNodeMass * // Node mass will be accounted in the mass block matrix.
+//            Math.abs (0.1 * ccrv.thicknessPenetration / myTimestep - relVel.norm ())
+//      );
       
-      // Limit velocity change to 10% of thickness overlap.
-      // Mass will be factored in MLPC step.
-      overlapImpulse = Math.min(
-         overlapImpulse,
-//         myAvgNodeMass * // Node mass will be accounted in the mass block matrix.
-            Math.abs (0.1 * ccrv.thicknessOverlap / myTimestep - relVel.norm ())
-      );
+      double overlapImpulse = ccrv.thicknessPenetration;  
       
       // Create PenetratingPoint
       
@@ -1035,17 +1040,32 @@ public class ContinuousCollider {
          nrm.negate ();
       }
       
+      // HACK
+      if (isZeroOrOne (rs.x) || isZeroOrOne (rs.y)) {
+         nrm = new Vector3d();
+         nrm.sub (pnt0, pnt1);
+         nrm.normalize ();
+      }
+      // HACK
+      
+      Vector3d sizedNrm = MathUtil.vectorProjection (e01, nrm);
+      
 //      double thicknessOverlap = myClothThickness - e01_dot_nrm;
-      double thicknessOverlap = myClothThickness - e01.norm ();
-      if (thicknessOverlap < 0) {
+      double thicknessPenetration = myClothThickness - sizedNrm.norm ();
+      if (thicknessPenetration < 0) {
          rv.hitTime = -1;
       }
       else {
-         rv.hitTime = 1;
+         // For imminent collisions, the hitTime doesn't actually exist.
+         // We'll put the distance between the imminent features here.
+         // When redundant collisions are being filtered out, collisions with the
+         // earliest hitTimes are prioritized. For imminent collisions, we'll
+         // prioritize imminent collisions that are closer to each other.
+         rv.hitTime = sizedNrm.norm();   
          rv.normal = nrm;
          rv.r = rs.x;
          rv.s = rs.y;
-         rv.thicknessOverlap = thicknessOverlap;
+         rv.thicknessPenetration = thicknessPenetration;
       }
       
       return rv;
@@ -1080,15 +1100,17 @@ public class ContinuousCollider {
       
       // Compute impulse magnitude to undo the thickness overlap 
       
-      double overlapImpulse = myTimestep * mySpringStiffness * ccrv.thicknessOverlap;
+//      double overlapImpulse = myTimestep * mySpringStiffness * ccrv.thicknessPenetration;
+//      
+//      // Limit velocity change to 10% of thickness overlap.
+//      // Mass will be factored in MLPC step.
+//      overlapImpulse = Math.min(
+//         overlapImpulse,
+////       myAvgNodeMass * // Node mass will be accounted in the mass block matrix.
+//            Math.abs (0.1 * ccrv.thicknessPenetration / myTimestep - relVel.norm ())
+//      );
       
-      // Limit velocity change to 10% of thickness overlap.
-      // Mass will be factored in MLPC step.
-      overlapImpulse = Math.min(
-         overlapImpulse,
-//       myAvgNodeMass * // Node mass will be accounted in the mass block matrix.
-            Math.abs (0.1 * ccrv.thicknessOverlap / myTimestep - relVel.norm ())
-      );
+      double overlapImpulse = ccrv.thicknessPenetration;  
       
       // Create EdgeEdgeContact
       
@@ -1101,6 +1123,8 @@ public class ContinuousCollider {
       eeCt.point1 = se1.computeInstanteousEdgePoint (0, ccrv.s);
       eeCt.point1ToPoint0Normal = ccrv.normal;
       eeCt.hitTime = ccrv.hitTime;
+      eeCt.s0 = ccrv.r;
+      eeCt.s1 = ccrv.s;
       
       return eeCt;
    }
@@ -1258,4 +1282,7 @@ public class ContinuousCollider {
       }
    }
    
+   public boolean isZeroOrOne(double x) {
+      return (Math.abs (x) < myTimeElipson || Math.abs (1-x) < myTimeElipson); 
+   }
 }

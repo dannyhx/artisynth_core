@@ -1479,7 +1479,7 @@ public class MechSystemSolver {
       setBilateralOffsets (h, -a0); // -a0);
 
       updateUnilateralConstraints ();
-
+      
       if (myNsize > 0 && myParametricVelSize > 0) {
          myNT.mulTranspose (
             myBn, myUpar, 0,myNsize, velSize, myParametricVelSize);
@@ -1488,6 +1488,7 @@ public class MechSystemSolver {
       else {
          myBn.setZero();
       }
+
       // a0 is assumed to be negative, which moves myNdot over to the rhs
       setUnilateralOffsets (h, -a0); // -a0);
 
@@ -2519,32 +2520,46 @@ public class MechSystemSolver {
       // Compute the repulsive forces (i.e. deter imminent collisions)
       // using x0 positions. Add the impulses to x1.
 
-//      impulseScale = 1.00;
-//      ContinuousCollider.myDistScale = 1.00;
-//      
-//      // Save x1
-//      mySys.getActivePosState (x1);
-//      
-////      // Use x0 (state before physics step)
-////      mySys.setActivePosState (x0);
-//      
-//      ContinuousCollider.mStage = Stage.IMMINENT;
-//      if (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
-//         updateMassMatrix (-1);
-//         
-//         VectorNd imminentImpulse = new VectorNd(x1.size ());
-//         if (computePosCorrections (pos, imminentImpulse, t)) {
-//            // Do not used the resultant x0+impulse. Instead, use x1+impulse.
-//            x1.add (imminentImpulse);
-//         }
-//      }
-//      mySys.setActivePosState (x1);
+      impulseScale = 0.025;
+      ContinuousCollider.myDistScale = 1;
+      
+      // Save x1
+      mySys.getActivePosState (x1);
+      
+      // Use x0 (state before physics step, which is collision-free)
+      mySys.setActivePosState (x0);
+      
+      ArrayList<ContactConstraint> imminentCC = new ArrayList<ContactConstraint> ();
+      
+      ContinuousCollider.mStage = Stage.IMMINENT;
+      if (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
+         updateMassMatrix (-1);
+         
+         VectorNd imminentImpulse = new VectorNd(x1.size ());
+         if (computePosCorrections (pos, imminentImpulse, t)) {
+            // Do not used the resultant x0+impulse. Instead, use x1+impulse.
+            x1.add (imminentImpulse);
+            
+            if (ContinuousCollider.myDebug)
+               printNonZeroImpulse(imminentImpulse);
+            
+            colMgrBuf.clear ();
+            colMgr.getState (colMgrBuf);
+            
+            // Keep constraints in play. Need to flip the impact velocities.
+            imminentCC.addAll(
+               getCollisionManager ().collisionHandlers ().get (0).myUnilaterals);
+         }
+      }
+      mySys.setActivePosState (x1);
       
       
       // --- Handle actual collisions --- //
       
       System.out.println ("---Handle actual collisions");
 
+      ArrayList<ContactConstraint> actualCC = new ArrayList<ContactConstraint> ();
+      
       int numCollisionIters = 0;
       int itersUntilHalfImpulse = 5;
       mySys.getActivePosState (x1);
@@ -2572,8 +2587,11 @@ public class MechSystemSolver {
          if (numCollisionIters == 0) {
             colMgrBuf.clear ();
             colMgr.getState (colMgrBuf);
+            
+            actualCC.addAll (
+               getCollisionManager ().collisionHandlers ().get (0).myUnilaterals);
          }
-         
+
          if (numCollisionIters > itersUntilHalfImpulse) {
             itersUntilHalfImpulse += itersUntilHalfImpulse*2.1;
             ContinuousCollider.myDistScale *= ContinuousCollider.myDistScaleDX;
@@ -2594,6 +2612,7 @@ public class MechSystemSolver {
          }
          
          if (numCollisionIters > 50) {
+            System.out.println ("Exceeded Iters");
             break;
          }
       } 
@@ -2614,9 +2633,42 @@ public class MechSystemSolver {
       
       // Did we detected and resolved a collision?
       if (isContinuous && numCollisionIters > 0) {
-         colMgr.setState (colMgrBuf);   // Keep contact constraints in-play
+//         colMgr.setState (colMgrBuf);   // Keep contact constraints in-play
+         
+         // Keep an accessible reference to the unilaterals, which will 
+         // be adjusted by the remesher.
+//         ContinuousCollider.myUnilaterals = 
+//            colMgr.collisionHandlers ().get (0).getUnilaterals ();
+      }
+      else if (isContinuous && numCollisionIters == 0) {
+//         ContinuousCollider.myUnilaterals = null;
       }
       
+      if (isContinuous && (imminentCC.size () > 0 || actualCC.size () > 0)) {
+         colMgr.setState (colMgrBuf);
+         
+         ArrayList<ContactConstraint> masterCC = 
+            getCollisionManager ().collisionHandlers ().get (0).myUnilaterals;
+      
+         masterCC.clear ();
+         masterCC.addAll (imminentCC);
+         masterCC.addAll (actualCC);
+      }
+   }
+   
+   public void printNonZeroImpulse(VectorNd impulse) {
+      for (int n=0; n<impulse.size (); n+=6) {
+         Vector3d nodeImp = new Vector3d();
+         nodeImp.set (impulse, n);
+         
+         Vector3d bNodeImp = new Vector3d();
+         bNodeImp.set (impulse, n+3);
+         
+         if (nodeImp.norm () > 1e-6) {
+            System.out.printf ("Impulse for node %d: [%s][%s]\n", 
+               n/6, nodeImp.toString ("%.4f"), bNodeImp.toString ("%.4f"));
+         }
+      }
    }
 
    protected boolean computePosCorrections (

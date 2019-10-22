@@ -32,7 +32,7 @@ public class CCRV {
    /* --- Vertex-triangle imminent collision --- */
    
    public Vector3d normal;
-   public double thicknessOverlap;
+   public double thicknessPenetration;
    
    
    
