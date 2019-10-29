@@ -1482,11 +1482,20 @@ public class CollisionHandler extends ConstrainerBase
       }
       for (int i=0; i<myUnilaterals.size(); i++) {
          ContactConstraint c = myUnilaterals.get(i);
-         // DANCOLEDIT: here - addFrictionConstraints
-         if (Math.abs(c.getForce())*mu < ftol) {
-            continue;
+         // DANCOLEDIT: Shells and friction case
+         if (getMethod() != Method.CONTOUR_REGION) {
+            numf = c.add1DFrictionConstraints (DT, finfo, mu, numf);
+            for (FrictionInfo f : finfo) {
+               f.flags = 0;   // XXX Unilateral flag. Allows friction to
+                              // be dependent on theta rather lambda.
+            }
+         } 
+         else {
+            if (Math.abs(c.getForce())*mu < ftol) { 
+               continue;
+            }
+            numf = c.add2DFrictionConstraints (DT, finfo, mu, numf);
          }
-         numf = c.add2DFrictionConstraints (DT, finfo, mu, numf);
       }
       return numf;
    }

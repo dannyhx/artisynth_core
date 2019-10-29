@@ -454,6 +454,14 @@ public abstract class BVTree implements IsRenderable {
 
       intersectTree (nodes1, nodes2, bvt, X21);
    }
+   
+   // DANCOLEDIT 
+   public void intersectTreeWorldIdentity (
+      ArrayList<BVNode> nodes1, ArrayList<BVNode> nodes2,
+      BVTree bvt) {  
+
+      intersectTree (nodes1, nodes2, bvt, RigidTransform3d.IDENTITY);
+   }
 
    protected void recursivelyIntersectTree (
       ArrayList<BVNode> nodes1, ArrayList<BVNode> nodes2,

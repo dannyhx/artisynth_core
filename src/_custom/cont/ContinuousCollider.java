@@ -33,6 +33,15 @@ import maspack.matrix.Vector3d;
 import maspack.util.DataBuffer;
 import maspack.util.Pair;
 
+/**
+ * TODO
+ * Use faster collision detection model:
+ * https://onlinelibrary.wiley.com/doi/full/10.1111/cgf.13095
+ * 
+ * Artisynth AABB tree runs faster if bvhWorld set to Identity, which is 
+ * ok for FEM models.
+ *      - Currently using intersectTreeWorldIdentity() 
+ */
 public class ContinuousCollider {
 
    public static boolean myDebug = true;
@@ -41,9 +50,8 @@ public class ContinuousCollider {
    public static double myDistScale = 1.0;
    
    public static double myClothThickness = 1e-2;   // Should correspond to penetrationTol
-   public static double mySpringStiffness = 1e3;
-   public static double myTimestep = 0.01;
    public static double myImminentImpulseScale = 1.00;   // 0.25
+   public static double myTimestep = 0.01;
    
    public LinkedHashMap<CollidableBody,SweptMeshInfo> myBody2SweptMeshInfo;
    protected ContinuousCollisions myContCol;
@@ -58,6 +66,8 @@ public class ContinuousCollider {
 
    public static int myMaxNumActualIters = 10;
    public static double myDistScaleDX = 0.5;
+   public static boolean myEnableActualZoneDetection = true;
+   public static boolean myEnableImminentPosCorrection = true;
    
    /**
     * Maintains a reference to the unilaterals that were used to undo
@@ -113,7 +123,7 @@ public class ContinuousCollider {
          smi.updatePrevPositionsX0 ();
          
          if (mStage == Stage.IMMINENT) {
-            smi.computeAvgVelocities (myTimestep);
+//            smi.computeAvgVelocities (myTimestep);
             smi.saveCurrentPositions ();
             smi.copyPrevious2CurrentPositions ();
          }
@@ -296,7 +306,7 @@ public class ContinuousCollider {
       smi0.myVertexTree.setBvhToWorld ( smi0.myMesh.getMeshToWorld () );
       smi1.myTriangleTree.setBvhToWorld ( smi1.myMesh.getMeshToWorld () );
 
-      smi0.myVertexTree.intersectTree (ixtVertexNodes, ixtFaceNodes, 
+      smi0.myVertexTree.intersectTreeWorldIdentity (ixtVertexNodes, ixtFaceNodes, 
          smi1.myTriangleTree);
       
       Boundable2BoundableCollisions vtx2triCsns = 
@@ -390,8 +400,13 @@ public class ContinuousCollider {
       smi0.myEdgeTree.setBvhToWorld ( smi0.myMesh.getMeshToWorld () );
       smi1.myEdgeTree.setBvhToWorld ( smi1.myMesh.getMeshToWorld () );
       
-      smi0.myEdgeTree.intersectTree (ixtEdgeNodes0, ixtEdgeNodes1, 
+      double startMs = System.currentTimeMillis ();
+      System.out.printf ("Finding potential edge-edge intersections...");
+      smi0.myEdgeTree.intersectTreeWorldIdentity (ixtEdgeNodes0, ixtEdgeNodes1, 
          smi1.myEdgeTree);
+      double endMs = System.currentTimeMillis ();
+      System.out.printf ("Count: [%d], Time: [%.2f sec]\n", 
+         ixtEdgeNodes0.size (), (endMs-startMs)/1000);
       
       Boundable2BoundableCollisions e2eCsns = new Boundable2BoundableCollisions();
       
@@ -632,6 +647,8 @@ public class ContinuousCollider {
       double cross_dot_e10_cur = e01cross.dot (e10_pt_cur);
       
       // Rule
+      // TODO Might need to modify to be similar to VT rule 
+      // if problems occur.
       if (cross_dot_e10_prv > 0)
          e01cross.negate ();
       
@@ -954,27 +971,27 @@ public class ContinuousCollider {
    {
       // Compute their velocities
       
-      Vector3d vtxVel = sv.myAvgVels[sv.V1];
-      Vector3d triVel = MathUtil.linearInterpolation (
-         st.myAvgVels[st.A1], st.myAvgVels[st.B1], st.myAvgVels[st.C1], 
-         ccrv.bary.x, ccrv.bary.y);
-      
-      // Compute their velocities along the normal
-      
-      Vector3d vtxVelNrm = MathUtil.vectorProjection (vtxVel, ccrv.normal);
-      Vector3d triVelNrm = MathUtil.vectorProjection (triVel, ccrv.normal);
-      
-      // Compute the single 'relative velocity', relative to vertex.
-      // Points in the direction of the dominate velocity.
-      
-      Vector3d relVel = new Vector3d();
-      relVel.scaledAdd (0.5, vtxVelNrm);
-      relVel.scaledAdd (0.5, triVelNrm);
-      
-      // Make sure 'relative velocity' faces the normal direction
-      
-      if (relVel.dot (ccrv.normal) < 0)
-         relVel.negate ();
+//      Vector3d vtxVel = sv.myAvgVels[sv.V1];
+//      Vector3d triVel = MathUtil.linearInterpolation (
+//         st.myAvgVels[st.A1], st.myAvgVels[st.B1], st.myAvgVels[st.C1], 
+//         ccrv.bary.x, ccrv.bary.y);
+//      
+//      // Compute their velocities along the normal
+//      
+//      Vector3d vtxVelNrm = MathUtil.vectorProjection (vtxVel, ccrv.normal);
+//      Vector3d triVelNrm = MathUtil.vectorProjection (triVel, ccrv.normal);
+//      
+//      // Compute the single 'relative velocity', relative to vertex.
+//      // Points in the direction of the dominate velocity.
+//      
+//      Vector3d relVel = new Vector3d();
+//      relVel.scaledAdd (0.5, vtxVelNrm);
+//      relVel.scaledAdd (0.5, triVelNrm);
+//      
+//      // Make sure 'relative velocity' faces the normal direction
+//      
+//      if (relVel.dot (ccrv.normal) < 0)
+//         relVel.negate ();
       
       // Compute impulse magnitude to undo the thickness overlap 
       
@@ -1076,27 +1093,27 @@ public class ContinuousCollider {
    {
       // Compute their velocities 
       
-      Vector3d vel0 = MathUtil.linearInterpolation (
-         se0.myAvgVels[se0.H1], se0.myAvgVels[se0.T1], ccrv.r);
-      
-      Vector3d vel1 = MathUtil.linearInterpolation (
-         se1.myAvgVels[se1.H1], se1.myAvgVels[se1.T1], ccrv.s);
-      
-      // Compute their velocities along the normal
-      
-      Vector3d velNrm0 = MathUtil.vectorProjection (vel0, ccrv.normal);
-      Vector3d velNrm1 = MathUtil.vectorProjection (vel1, ccrv.normal);
-      
-      // Compute the single 'relative velocity', relative to vertex.
-      
-      Vector3d relVel = new Vector3d();
-      relVel.scaledAdd (0.5, velNrm0);
-      relVel.scaledAdd (0.5, velNrm1);
-      
-      // Make sure 'relative velocity' faces the normal direction
-      
-      if (relVel.dot (ccrv.normal) < 0)
-         relVel.negate ();
+//      Vector3d vel0 = MathUtil.linearInterpolation (
+//         se0.myAvgVels[se0.H1], se0.myAvgVels[se0.T1], ccrv.r);
+//      
+//      Vector3d vel1 = MathUtil.linearInterpolation (
+//         se1.myAvgVels[se1.H1], se1.myAvgVels[se1.T1], ccrv.s);
+//      
+//      // Compute their velocities along the normal
+//      
+//      Vector3d velNrm0 = MathUtil.vectorProjection (vel0, ccrv.normal);
+//      Vector3d velNrm1 = MathUtil.vectorProjection (vel1, ccrv.normal);
+//      
+//      // Compute the single 'relative velocity', relative to vertex.
+//      
+//      Vector3d relVel = new Vector3d();
+//      relVel.scaledAdd (0.5, velNrm0);
+//      relVel.scaledAdd (0.5, velNrm1);
+//      
+//      // Make sure 'relative velocity' faces the normal direction
+//      
+//      if (relVel.dot (ccrv.normal) < 0)
+//         relVel.negate ();
       
       // Compute impulse magnitude to undo the thickness overlap 
       

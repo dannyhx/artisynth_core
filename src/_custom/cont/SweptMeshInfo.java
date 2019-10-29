@@ -177,11 +177,11 @@ public class SweptMeshInfo {
       }
    }
    
-   public void computeAvgVelocities(double t) {
-      for (BoundablePointArray bnd : getSweptBoundables()) {
-         bnd.computeAvgVelocity (t);
-      }
-   }
+//   public void computeAvgVelocities(double t) {
+//      for (BoundablePointArray bnd : getSweptBoundables()) {
+//         bnd.computeAvgVelocity (t);
+//      }
+//   }
    
    /* --- Helper Functions --- */
    

@@ -208,6 +208,7 @@ public class ContactConstraint {
          finfo[numf].contactIdx0 = mySolveIndex;
          finfo[numf].contactIdx1 = -1;
          finfo[numf].flags = FrictionInfo.BILATERAL;
+         finfo[numf].flags = 0;
          for (int i=0; i<myMasters.size(); i++) {
             ContactMaster cm = myMasters.get(i);
             int bi = cm.getSolveIndex();

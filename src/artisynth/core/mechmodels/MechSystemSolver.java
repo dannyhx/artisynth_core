@@ -2509,7 +2509,6 @@ public class MechSystemSolver {
       // Is continuous 
       boolean isContinuous = colMgr.getColliderType () == ColliderType.CONTINUOUS;
       
-      
       // --- Handle imminent collisions --- //
       
       // State after physics step.
@@ -2527,32 +2526,51 @@ public class MechSystemSolver {
       mySys.getActivePosState (x1);
       
       // Use x0 (state before physics step, which is collision-free)
-      mySys.setActivePosState (x0);
+      if (x0.size () != 0)
+         mySys.setActivePosState (x0);
       
       ArrayList<ContactConstraint> imminentCC = new ArrayList<ContactConstraint> ();
       
       ContinuousCollider.mStage = Stage.IMMINENT;
       if (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
-         updateMassMatrix (-1);
-         
-         VectorNd imminentImpulse = new VectorNd(x1.size ());
-         if (computePosCorrections (pos, imminentImpulse, t)) {
-            // Do not used the resultant x0+impulse. Instead, use x1+impulse.
-            x1.add (imminentImpulse);
+         if (! ContinuousCollider.myEnableImminentPosCorrection && 
+             ! ContinuousCollider.myEnableActualZoneDetection)
+         {
+            System.out.println ("Skipping imminent position correction.");
+         }
+         else {
+            updateMassMatrix (-1);
             
-            if (ContinuousCollider.myDebug)
-               printNonZeroImpulse(imminentImpulse);
-            
-            colMgrBuf.clear ();
-            colMgr.getState (colMgrBuf);
-            
-            // Keep constraints in play. Need to flip the impact velocities.
-            imminentCC.addAll(
-               getCollisionManager ().collisionHandlers ().get (0).myUnilaterals);
+            VectorNd imminentImpulse = new VectorNd(x1.size ());
+            if (computePosCorrections (pos, imminentImpulse, t)) {
+               // Do not used the resultant x0+impulse. Instead, use x1+impulse.
+               x1.add (imminentImpulse);
+
+               if (ContinuousCollider.myDebug)
+                  printNonZeroImpulse(imminentImpulse);
+               
+               if (ContinuousCollider.myEnableActualZoneDetection) {
+                  colMgrBuf.clear ();
+                  colMgr.getState (colMgrBuf);
+               
+                  // Keep constraints saved. Need to flip the impact velocities.
+                  // These saved constraints will be concatenated with the 
+                  // CCD constraints.
+                  imminentCC.addAll(
+                     getCollisionManager ().collisionHandlers ().get (0).myUnilaterals);
+               }
+            }
          }
       }
-      mySys.setActivePosState (x1);
       
+      mySys.setActivePosState (x1);
+
+      if (! ContinuousCollider.myEnableActualZoneDetection) {
+         // Collision Manager with its imminent constraints are still 
+         // in-play.
+         System.out.println ("Skipping continuous collision detection.");
+         return;
+      }
       
       // --- Handle actual collisions --- //
       
@@ -2646,7 +2664,7 @@ public class MechSystemSolver {
       
       if (isContinuous && (imminentCC.size () > 0 || actualCC.size () > 0)) {
          colMgr.setState (colMgrBuf);
-         
+ 
          ArrayList<ContactConstraint> masterCC = 
             getCollisionManager ().collisionHandlers ().get (0).myUnilaterals;
       

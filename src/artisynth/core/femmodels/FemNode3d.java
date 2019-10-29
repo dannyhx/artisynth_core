@@ -99,7 +99,7 @@ public class FemNode3d extends FemNode implements Boundable {
    protected Point3d myRest;
    protected Vector3d myInternalForce;
 
-   private LinkedList<FemElement3dBase> myElementDeps;
+   protected LinkedList<FemElement3dBase> myElementDeps;
    protected int myShellElemCnt;
    protected LinkedList<FemNodeNeighbor> myNodeNeighbors;
    private LinkedList<FemNodeNeighbor> myIndirectNeighbors;
@@ -1449,7 +1449,7 @@ public class FemNode3d extends FemNode implements Boundable {
 
    public void setBackVelocity (Vector3d vel) {
       if (myBackNode == null) {
-         allocateBackNode();
+         allocateBackNode(); 
       }
       myBackNode.myVel.set (vel);
    }

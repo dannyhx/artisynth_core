@@ -92,22 +92,22 @@ public class SweptTriangle extends BoundablePointArray {
       myPnts[C1].set ( myPnts[C0] );
    }
    
-   public Vector3d[] computeAvgVelocity(double t) {
-      myAvgVels = new Vector3d[myPnts.length/2];
-      
-      myAvgVels[A1] = new Vector3d();
-      myAvgVels[A1].sub (myPnts[A1], myPnts[A0]);
-      myAvgVels[A1].scale (1/t);
-      
-      myAvgVels[B1] = new Vector3d();
-      myAvgVels[B1].sub (myPnts[B1], myPnts[B0]);
-      myAvgVels[B1].scale (1/t);
-      
-      myAvgVels[C1] = new Vector3d();
-      myAvgVels[C1].sub (myPnts[C1], myPnts[C0]);
-      myAvgVels[C1].scale (1/t);
-      
-      return myAvgVels;
-   }
+//   public Vector3d[] computeAvgVelocity(double t) {
+//      myAvgVels = new Vector3d[myPnts.length/2];
+//      
+//      myAvgVels[A1] = new Vector3d();
+//      myAvgVels[A1].sub (myPnts[A1], myPnts[A0]);
+//      myAvgVels[A1].scale (1/t);
+//      
+//      myAvgVels[B1] = new Vector3d();
+//      myAvgVels[B1].sub (myPnts[B1], myPnts[B0]);
+//      myAvgVels[B1].scale (1/t);
+//      
+//      myAvgVels[C1] = new Vector3d();
+//      myAvgVels[C1].sub (myPnts[C1], myPnts[C0]);
+//      myAvgVels[C1].scale (1/t);
+//      
+//      return myAvgVels;
+//   }
    
 }

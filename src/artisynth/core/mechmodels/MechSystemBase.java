@@ -474,7 +474,7 @@ public abstract class MechSystemBase extends RenderableModelBase
             "On entry, DT should be empty with zero size");
       }
       updateForceComponentList();
-      DT.addRows (myDynamicSizes, myDynamicSizes.length);
+      DT.addRows (myDynamicSizes, myDynamicSizes.length-1);
       int idx = 0;
       for (int i=0; i<myConstrainers.size(); i++) {
          idx = myConstrainers.get(i).addFrictionConstraints (DT, finfo, idx);
@@ -581,7 +581,7 @@ public abstract class MechSystemBase extends RenderableModelBase
             }
          }
          myNumParametric = myParametricComponents.size();
-         
+
          if (myParametricsInSystemMatrix) {
             myDynamicSizes = new int[myNumActive+myNumAttached+myNumParametric];
          }
