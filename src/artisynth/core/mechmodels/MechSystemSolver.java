@@ -10,14 +10,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 
-import _custom.cont.CCRV;
+import _custom.cont.ContactConstraintAgg;
 import _custom.cont.ContinuousCollider;
-import _custom.cont.ContinuousCollisions;
-import _custom.cont.SweptMeshInfo;
-import _custom.cont.SweptTriangle;
-import _custom.cont.SweptVertex;
 import _custom.cont.ContinuousCollider.Stage;
 import artisynth.core.mechmodels.CollisionManager.ColliderType;
 import artisynth.core.mechmodels.MechSystem.ConstraintInfo;
@@ -25,21 +20,13 @@ import artisynth.core.mechmodels.MechSystem.FrictionInfo;
 import artisynth.core.modelbase.ModelComponent;
 import artisynth.core.modelbase.StepAdjustment;
 import artisynth.core.util.ArtisynthIO;
-import maspack.collision.ContactInfo;
-import maspack.collision.EdgeEdgeContact;
-import maspack.collision.PenetratingPoint;
 import maspack.function.Function1x1;
-import maspack.geometry.BVNode;
-import maspack.geometry.Boundable;
-import maspack.geometry.Vertex3d;
 import maspack.matrix.Matrix;
 import maspack.matrix.Matrix3dBase;
 import maspack.matrix.Matrix3x1;
 import maspack.matrix.Matrix6d;
 import maspack.matrix.MatrixBlock;
 import maspack.matrix.MatrixNd;
-import maspack.matrix.Point3d;
-import maspack.matrix.RigidTransform3d;
 import maspack.matrix.RotationMatrix3d;
 import maspack.matrix.SparseBlockMatrix;
 import maspack.matrix.SparseNumberedBlockMatrix;
@@ -66,7 +53,7 @@ public class MechSystemSolver {
 
    public boolean profileKKTSolveTime = false;
    public boolean profileWholeSolve = false;
-   public boolean profileConstrainedBE = false;
+   public boolean profileConstrainedBE = true;
    // always updating friction causes inverseMassMatrix updates
    public boolean alwaysUpdateFriction = true;
    
@@ -2492,7 +2479,6 @@ public class MechSystemSolver {
       return null;
    }
    
-   
    // State before physics step.
    VectorNd x0 = new VectorNd();
    double impulseScale = 1.00;
@@ -2500,6 +2486,10 @@ public class MechSystemSolver {
    protected void applyPosCorrection (
       VectorNd pos, VectorNd vel,
       double t, StepAdjustment stepAdjust) {
+      
+      // pos := newly computed positions (x at t+1).
+      // vel := newly computed velocities. This is just a buffer space to 
+      //        work with for the impulses.
       
       System.out.println (">>>> applyPosCorrection()");
 
@@ -2509,43 +2499,39 @@ public class MechSystemSolver {
       // Is continuous 
       boolean isContinuous = colMgr.getColliderType () == ColliderType.CONTINUOUS;
       
-      // --- Handle imminent collisions --- //
-      
       // State after physics step.
       VectorNd x1 = new VectorNd();
       
-      System.out.println ("---Handle imminent collisions");
+      // --- Handle imminent collisions --- //
       
-      // Compute the repulsive forces (i.e. deter imminent collisions)
-      // using x0 positions. Add the impulses to x1.
-
       impulseScale = 0.025;
       ContinuousCollider.myDistScale = 1;
+     
+      ContactConstraintAgg imminentCCAgg = new ContactConstraintAgg();
       
-      // Save x1
-      mySys.getActivePosState (x1);
+      if (ContinuousCollider.myEnableProximityDetection) {
       
-      // Use x0 (state before physics step, which is collision-free)
-      if (x0.size () != 0)
-         mySys.setActivePosState (x0);
-      
-      ArrayList<ContactConstraint> imminentCC = new ArrayList<ContactConstraint> ();
-      
-      ContinuousCollider.mStage = Stage.IMMINENT;
-      if (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
-         if (! ContinuousCollider.myEnableImminentPosCorrection && 
-             ! ContinuousCollider.myEnableActualZoneDetection)
-         {
-            System.out.println ("Skipping imminent position correction.");
-         }
-         else {
+         System.out.println ("---Handle imminent collisions");
+         
+         // Compute the repulsive forces (i.e. deter imminent collisions)
+         // using x0 positions. Add the impulses to x1.
+   
+         // Save x1
+         mySys.getActivePosState (x1);
+         
+         // Use x0 (state before physics step, which is collision-free)
+         if (x0.size () != 0)
+            mySys.setActivePosState (x0);
+         
+         ContinuousCollider.mStage = Stage.IMMINENT;
+         if (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
             updateMassMatrix (-1);
             
             VectorNd imminentImpulse = new VectorNd(x1.size ());
             if (computePosCorrections (pos, imminentImpulse, t)) {
                // Do not used the resultant x0+impulse. Instead, use x1+impulse.
                x1.add (imminentImpulse);
-
+               
                if (ContinuousCollider.myDebug)
                   printNonZeroImpulse(imminentImpulse);
                
@@ -2556,19 +2542,24 @@ public class MechSystemSolver {
                   // Keep constraints saved. Need to flip the impact velocities.
                   // These saved constraints will be concatenated with the 
                   // CCD constraints.
-                  imminentCC.addAll(
-                     getCollisionManager ().collisionHandlers ().get (0).myUnilaterals);
+                  imminentCCAgg.set(
+                     getCollisionManager ().collisionHandlers (), true);
                }
             }
          }
-      }
-      
-      mySys.setActivePosState (x1);
+         
+         mySys.setActivePosState (x1);
+          
+      } // End of proximity
 
       if (! ContinuousCollider.myEnableActualZoneDetection) {
          // Collision Manager with its imminent constraints are still 
          // in-play.
          System.out.println ("Skipping continuous collision detection.");
+         
+         ContinuousCollider.myCCAgg = new ContactConstraintAgg( 
+            getCollisionManager ().collisionHandlers (), false);
+
          return;
       }
       
@@ -2576,7 +2567,7 @@ public class MechSystemSolver {
       
       System.out.println ("---Handle actual collisions");
 
-      ArrayList<ContactConstraint> actualCC = new ArrayList<ContactConstraint> ();
+      ContactConstraintAgg actualCCAgg = new ContactConstraintAgg();;
       
       int numCollisionIters = 0;
       int itersUntilHalfImpulse = 5;
@@ -2586,17 +2577,13 @@ public class MechSystemSolver {
          System.out.printf ("\n\nLoop: %d at t=%.2f\n", numCollisionIters, t);
          updateMassMatrix (-1);
          
+         // Note that pos := x1 + imminentImpulse
+         
          if (computePosCorrections (pos, vel, t)) {
             mySys.setActivePosState (pos);
             
-            for (int i=0; i < vel.size (); i+=3) {
-               if (vel.get (i+0) > 1e-10 || vel.get (i+1) > 1e-10  || 
-                   vel.get (i+2) > 1e-10 ) {
-                  System.out.printf ("Impulse for %d: %.5f,%.5f,%.5f", i/3, 
-                     vel.get (i+0), vel.get (i+1), vel.get (i+2));
-                  System.out.println ();
-               }
-            }
+            if (ContinuousCollider.myDebug)
+               printNonZeroImpulse(vel);
          }
          else {
             System.out.println ("No position correction.");
@@ -2606,8 +2593,8 @@ public class MechSystemSolver {
             colMgrBuf.clear ();
             colMgr.getState (colMgrBuf);
             
-            actualCC.addAll (
-               getCollisionManager ().collisionHandlers ().get (0).myUnilaterals);
+            actualCCAgg.set(
+               getCollisionManager ().collisionHandlers (), true);
          }
 
          if (numCollisionIters > itersUntilHalfImpulse) {
@@ -2649,29 +2636,35 @@ public class MechSystemSolver {
          ContinuousCollider.mHitTimeBacktrack = 0;
       }
       
-      // Did we detected and resolved a collision?
-      if (isContinuous && numCollisionIters > 0) {
-//         colMgr.setState (colMgrBuf);   // Keep contact constraints in-play
-         
-         // Keep an accessible reference to the unilaterals, which will 
-         // be adjusted by the remesher.
-//         ContinuousCollider.myUnilaterals = 
-//            colMgr.collisionHandlers ().get (0).getUnilaterals ();
-      }
-      else if (isContinuous && numCollisionIters == 0) {
-//         ContinuousCollider.myUnilaterals = null;
-      }
+//      // Did we detected and resolved a collision?
+//      if (isContinuous && numCollisionIters > 0) {
+////         colMgr.setState (colMgrBuf);   // Keep contact constraints in-play
+//         
+//         // Keep an accessible reference to the unilaterals, which will 
+//         // be adjusted by the remesher.
+////         ContinuousCollider.myUnilaterals = 
+////            colMgr.collisionHandlers ().get (0).getUnilaterals ();
+//      }
+//      else if (isContinuous && numCollisionIters == 0) {
+////         ContinuousCollider.myUnilaterals = null;
+//      }
       
-      if (isContinuous && (imminentCC.size () > 0 || actualCC.size () > 0)) {
+      if (isContinuous && (
+            imminentCCAgg.isHasConstraints () || 
+            actualCCAgg.isHasConstraints())) 
+      {
          colMgr.setState (colMgrBuf);
  
-         ArrayList<ContactConstraint> masterCC = 
-            getCollisionManager ().collisionHandlers ().get (0).myUnilaterals;
-      
-         masterCC.clear ();
-         masterCC.addAll (imminentCC);
-         masterCC.addAll (actualCC);
+         ContactConstraintAgg canonCCAgg = new ContactConstraintAgg(
+            getCollisionManager ().collisionHandlers (), false);
+
+         canonCCAgg.clearConstraints ();
+         canonCCAgg.addConstraints (imminentCCAgg);
+         canonCCAgg.addConstraints (actualCCAgg);
+         
+         ContinuousCollider.myCCAgg = canonCCAgg;
       }
+
    }
    
    public void printNonZeroImpulse(VectorNd impulse) {
@@ -3013,6 +3006,7 @@ public class MechSystemSolver {
       
       // DANCOLEDIT: Commented out updateConstraints in physics step
       mySys.updateConstraints (t1, null, MechSystem.UPDATE_CONTACTS);
+      
       if (profileConstrainedBE) {
          timer.stop();
          System.out.println ("  updateConstraints=" + timer.result(1));
@@ -3032,12 +3026,6 @@ public class MechSystemSolver {
       mySys.getActiveForces (myF);
       myF.add (myMassForces);
       myB.scaledAdd (h, myF, myB);
-
-      // DANCOLEDIT - print KKT
-//      System.out.printf ("myUtmp: %s ,\nmyFparC: %s ,\nmyB: %s ,\nmyF: %s ,\nmyU: %s ,\n",
-//         myUtmp.toString ("%.2f"), myFparC.toString ("%.2f"), myB.toString ("%.2f"),
-//         myF.toString ("%.2f"), myU.toString ("%.2f")
-//      );
       
       // solve constrained system for velocities at t1; store in uTmp
       KKTFactorAndSolve (myUtmp, myFparC, myB, /*tmp=*/myF, myU, h);

@@ -253,18 +253,18 @@ public class SweptEdge extends BoundablePointArray {
       myPnts[T1].set ( myPnts[T0] );
    }
    
-//   public Vector3d[] computeAvgVelocity(double t) {
-//      myAvgVels = new Vector3d[myPnts.length/2];
-//      
-//      myAvgVels[H1] = new Vector3d();
-//      myAvgVels[H1].sub (myPnts[H1], myPnts[H0]);
-//      myAvgVels[H1].scale (1/t);
-//      
-//      myAvgVels[T1] = new Vector3d();
-//      myAvgVels[T1].sub (myPnts[T1], myPnts[T0]);
-//      myAvgVels[T1].scale (1/t);
-//      
-//      return myAvgVels;
-//   }
+   public Vector3d[] computeAvgVelocity(double t) {
+      myAvgVels = new Vector3d[myPnts.length/2];
+      
+      myAvgVels[H1] = new Vector3d();
+      myAvgVels[H1].sub (myPnts[H1], myPnts[H0]);
+      myAvgVels[H1].scale (1/t);
+      
+      myAvgVels[T1] = new Vector3d();
+      myAvgVels[T1].sub (myPnts[T1], myPnts[T0]);
+      myAvgVels[T1].scale (1/t);
+      
+      return myAvgVels;
+   }
    
 }

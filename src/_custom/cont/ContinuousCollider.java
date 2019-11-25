@@ -5,32 +5,24 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.Set;
 
-import _custom.cont.ContinuousCollider.Stage;
 import artisynth.core.femmodels.BackNode3d;
-import artisynth.core.femmodels.FemElement3d;
 import artisynth.core.femmodels.FemMeshComp;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
-import artisynth.core.femmodels.ShellTriElement;
 import artisynth.core.mechmodels.CollidableBody;
-import artisynth.core.mechmodels.ContactConstraint;
 import artisynth.core.mechmodels.RigidBody;
 import maspack.collision.ContactInfo;
 import maspack.collision.EdgeEdgeContact;
 import maspack.collision.PenetratingPoint;
 import maspack.geometry.BVNode;
 import maspack.geometry.Boundable;
-import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
-import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector2d;
 import maspack.matrix.Vector3d;
-import maspack.util.DataBuffer;
 import maspack.util.Pair;
 
 /**
@@ -66,8 +58,8 @@ public class ContinuousCollider {
 
    public static int myMaxNumActualIters = 10;
    public static double myDistScaleDX = 0.5;
+   public static boolean myEnableProximityDetection = true;
    public static boolean myEnableActualZoneDetection = true;
-   public static boolean myEnableImminentPosCorrection = true;
    
    /**
     * Maintains a reference to the unilaterals that were used to undo
@@ -75,7 +67,7 @@ public class ContinuousCollider {
     * before they're applied to the subsequent constraint backward Euler 
     * solve.
     */
-   public static ArrayList<ContactConstraint> myUnilaterals = null;
+   public static ContactConstraintAgg myCCAgg = null;
    
    public static ContinuousRenderable mContRend;
    int m;
@@ -170,7 +162,7 @@ public class ContinuousCollider {
    public void rebuildSweptMeshInfo(FemMeshComp comp) {
       FemModel3d femModel = (FemModel3d)comp.getParent ().getParent (); 
 
-      SweptMeshInfo smi = myBody2SweptMeshInfo.get (comp);
+      SweptMeshInfo smi = myBody2SweptMeshInfo.get (comp);      
       smi.build (femModel.getSurfaceMesh ());
       
       // Note that we have to use getSurfaceMesh() instead of 
@@ -1302,4 +1294,6 @@ public class ContinuousCollider {
    public boolean isZeroOrOne(double x) {
       return (Math.abs (x) < myTimeElipson || Math.abs (1-x) < myTimeElipson); 
    }
+   
+
 }

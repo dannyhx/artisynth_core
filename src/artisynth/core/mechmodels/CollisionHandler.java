@@ -60,7 +60,7 @@ public class CollisionHandler extends ConstrainerBase
 
    LinkedHashMap<ContactPoint,ContactConstraint> myBilaterals0;
    LinkedHashMap<ContactPoint,ContactConstraint> myBilaterals1;
-   ArrayList<ContactConstraint> myUnilaterals;
+   public ArrayList<ContactConstraint> myUnilaterals;
    // myPrevUnilaterals stores previous unilaterals so we have access
    // to force values in rendering code
    ArrayList<ContactConstraint> myPrevUnilaterals;
@@ -892,17 +892,17 @@ public class CollisionHandler extends ConstrainerBase
                maxpen = Math.max (cpp.distance, maxpen);
                c.setDistance (-cpp.distance);
   
-               FemMeshComp fmc0 = (FemMeshComp)col0;
-               FemMeshComp fmc1 = (FemMeshComp)col1;
-               
-               int[] nodeIdxs0 = new int[] {
-                 fmc0.getNodeForVertex (cpnt0.myVtxs[0]).getNumber ()
-               };
-               int[] nodeIdxs1 = new int[] {
-                 fmc1.getNodeForVertex (cpnt1.myVtxs[0]).getNumber (),
-                 fmc1.getNodeForVertex (cpnt1.myVtxs[1]).getNumber (),
-                 fmc1.getNodeForVertex (cpnt1.myVtxs[2]).getNumber ()
-               };
+//               FemMeshComp fmc0 = (FemMeshComp)col0;
+//               FemMeshComp fmc1 = (FemMeshComp)col1;
+//               
+//               int[] nodeIdxs0 = new int[] {
+//                 fmc0.getNodeForVertex (cpnt0.myVtxs[0]).getNumber ()
+//               };
+//               int[] nodeIdxs1 = new int[] {
+//                 fmc1.getNodeForVertex (cpnt1.myVtxs[0]).getNumber (),
+//                 fmc1.getNodeForVertex (cpnt1.myVtxs[1]).getNumber (),
+//                 fmc1.getNodeForVertex (cpnt1.myVtxs[2]).getNumber ()
+//               };
                
                myUnilaterals.add (c);
             }
@@ -927,17 +927,17 @@ public class CollisionHandler extends ConstrainerBase
                maxpen = Math.max (eec.displacement, maxpen);
                c.setDistance (-eec.displacement);
 
-               FemMeshComp fmc0 = (FemMeshComp)collidable0;
-               FemMeshComp fmc1 = (FemMeshComp)collidable1;
-               
-               int[] nodeIdxs0 = new int[] {
-                 fmc0.getNodeForVertex (cpnt0.myVtxs[0]).getNumber (),
-                 fmc0.getNodeForVertex (cpnt0.myVtxs[1]).getNumber ()
-               };
-               int[] nodeIdxs1 = new int[] {
-                 fmc1.getNodeForVertex (cpnt1.myVtxs[0]).getNumber (),
-                 fmc1.getNodeForVertex (cpnt1.myVtxs[1]).getNumber ()
-               };
+//               FemMeshComp fmc0 = (FemMeshComp)collidable0;
+//               FemMeshComp fmc1 = (FemMeshComp)collidable1;
+//               
+//               int[] nodeIdxs0 = new int[] {
+//                 fmc0.getNodeForVertex (cpnt0.myVtxs[0]).getNumber (),
+//                 fmc0.getNodeForVertex (cpnt0.myVtxs[1]).getNumber ()
+//               };
+//               int[] nodeIdxs1 = new int[] {
+//                 fmc1.getNodeForVertex (cpnt1.myVtxs[0]).getNumber (),
+//                 fmc1.getNodeForVertex (cpnt1.myVtxs[1]).getNumber ()
+//               };
                
 //               System.out.printf ("Edge-Edge: %s%s, Wts:[%.2f,%.2f][%.2f,%.2f]\n", 
 //                  Arrays.toString (nodeIdxs0),
@@ -973,6 +973,11 @@ public class CollisionHandler extends ConstrainerBase
                // Duplicate unilateral's ContactPoints. Position will be
                // adjusted later.
                
+               // TODO
+               // Using the same vertex of the front node is fine. Impulses
+               // are calculated based on the normal, weights, and points
+               // instead.
+               
                cc_back.myCpnt0 = new ContactPoint();
                cc_back.myCpnt0.set (
                   cc.myCpnt0.getPoint (), cc.myCpnt0.myVtxs, cc.myCpnt0.myWgts);
@@ -986,13 +991,16 @@ public class CollisionHandler extends ConstrainerBase
                // However, all masters are grouped into a single array.
                
                for (ContactMaster cm : cc.getMasters ()) {
-                  // If master is a rigidBody point
+                  // If master is a rigidBody point, just add it the 
+                  // backnode constraint's list of masters.
                   if (! isShellMaster (cm)) {  
                      cc_back.myMasters.add (cm);
                      continue;
                   }
                   
-                  // Otherwise, master is a femNode
+                  // Otherwise, master is a femNode. Simply make a 
+                  // backNode version of the master and add it to the list of
+                  // masters.
                   
                   CollidableDynamicComponent cmComp = cm.myComp;
                   FemNode3d cmNode = (FemNode3d)cmComp;
@@ -1025,6 +1033,30 @@ public class CollisionHandler extends ConstrainerBase
             myUnilaterals.addAll (unilateralsToAdd);
          } // End of unilateral to backnode copying 
       }
+      
+      // --- DAN-EXPERIMENTAL-BILATERAL
+      
+//      for (ContactConstraint uc : myUnilaterals) {
+//         ContactConstraint bc = new ContactConstraint();
+//         bc.setContactPoints (uc.myCpnt0, uc.myCpnt1);
+//         bc.getMasters ().addAll(uc.getMasters ());
+//         bc.setNormal (uc.myNormal);
+//         bc.myContactArea = -1;
+//         bc.setDistance (uc.myDistance);
+//         bc.setActive (true);
+//         
+//         LinkedHashMap<ContactPoint,ContactConstraint> bilaterals = null;
+//         if (uc.m == 0)
+//            bilaterals = myBilaterals0;
+//         else 
+//            bilaterals = myBilaterals1;
+//        
+//         bilaterals.put (bc.myCpnt0, bc);
+//      }
+//
+//      myUnilaterals.clear ();
+      
+      // --- DAN-EXPERIMENTAL-BILATERAL
       
       System.out.println ("Num of unilaterals: " + myUnilaterals.size ());
 

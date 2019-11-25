@@ -9,6 +9,7 @@ import maspack.matrix.Matrix2d;
 import maspack.matrix.Matrix2x3;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
+import maspack.matrix.Point2d;
 import maspack.matrix.Point3d;
 import maspack.matrix.SymmetricMatrix3d;
 import maspack.matrix.Vector;
@@ -349,6 +350,44 @@ public class MathUtil {
          a.x*b.x, a.x*b.y, a.x*b.z,
          a.y*b.x, a.y*b.y, a.y*b.z,
          a.z*b.x, a.z*b.y, a.z*b.z );
+   }
+   
+   public static Point2d to2d(Point3d pnt) {
+      return new Point2d( pnt.x, pnt.y );
+   }
+   
+   public static Point3d to3d(Point2d pnt) {
+      return new Point3d( pnt.x, pnt.y, 0 );
+   }
+   
+   public static Point2d getClosestPtToLineSegment2d(Point2d P, Point2d A,
+   Point2d B) 
+   {
+      Vector2d PA = P.sub (A);
+      Vector2d BA = B.sub (A);
+      
+      double BA2 = BA.normSquared ();
+      double dot = PA.dot (BA);
+      
+      double t = dot / BA2;
+      
+      Point2d C = new Point2d(
+         A.x + BA.x*t, 
+         A.y + BA.y*t);
+      
+      Vector2d CA = new Vector2d(C).sub (A);
+      
+      // Is closest line point beyond the segment head?
+      if (BA.dot (CA) > 0 && BA.norm () < CA.norm()) {
+         return B;
+      }
+      
+      // Is closest line point below the segment tail?
+      if (BA.dot (CA) < 0) {
+         return A;
+      }
+      
+      return C;
    }
    
    public static Vector3d vecFromPtToLine(Point3d p, Point3d l0, Point3d l1) {

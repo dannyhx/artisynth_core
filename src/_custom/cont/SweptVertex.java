@@ -61,13 +61,13 @@ public class SweptVertex extends BoundablePointArray {
       myPnts[V1].set ( myPnts[V0] );
    }
    
-//   public Vector3d[] computeAvgVelocity(double t) {
-//      myAvgVels = new Vector3d[myPnts.length/2];
-//      myAvgVels[V1] = new Vector3d();
-//      
-//      myAvgVels[V1].sub (myPnts[V1], myPnts[V0]);
-//      myAvgVels[V1].scale (1/t);
-//      
-//      return myAvgVels;
-//   }
+   public Vector3d[] computeAvgVelocity(double t) {
+      myAvgVels = new Vector3d[myPnts.length/2];
+      myAvgVels[V1] = new Vector3d();
+      
+      myAvgVels[V1].sub (myPnts[V1], myPnts[V0]);
+      myAvgVels[V1].scale (1/t);
+      
+      return myAvgVels;
+   }
 }

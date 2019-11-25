@@ -48,6 +48,10 @@ public class BackNode3d extends DynamicComponentBase
       myPosValidP = false;
    }
 
+   public FemNode3d getFrontNode() {
+      return myNode;
+   }
+   
    public Point3d getPosition() {
       if (!myPosValidP) {
          setPositionToRest();

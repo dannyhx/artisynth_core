@@ -15,7 +15,7 @@ public class BoundablePointArray implements Boundable {
    /* --- Stored Meta Data for Continuous Collision --- */
 
    protected Point3d[] myPnts1Backup;
-//   protected Vector3d[] myAvgVels;
+   protected Vector3d[] myAvgVels;
    
    
    
@@ -103,7 +103,7 @@ public class BoundablePointArray implements Boundable {
       throw new RuntimeException("Function needs to be overriden.");
    }
    
-//   public Vector3d[] computeAvgVelocity(double t) {
-//      throw new RuntimeException("Function needs to be overriden.");
-//   }
+   public Vector3d[] computeAvgVelocity(double t) {
+      throw new RuntimeException("Function needs to be overriden.");
+   }
 }
