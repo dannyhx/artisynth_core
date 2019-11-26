@@ -2536,6 +2536,8 @@ public class MechSystemSolver {
                   printNonZeroImpulse(imminentImpulse);
                
                if (ContinuousCollider.myEnableActualZoneDetection) {
+                  // Useful when CCD detects nothing; restore imminent
+                  // CCs.
                   colMgrBuf.clear ();
                   colMgr.getState (colMgrBuf);
                
@@ -2567,7 +2569,7 @@ public class MechSystemSolver {
       
       System.out.println ("---Handle actual collisions");
 
-      ContactConstraintAgg actualCCAgg = new ContactConstraintAgg();;
+      ContactConstraintAgg actualCCAgg = new ContactConstraintAgg();
       
       int numCollisionIters = 0;
       int itersUntilHalfImpulse = 5;
