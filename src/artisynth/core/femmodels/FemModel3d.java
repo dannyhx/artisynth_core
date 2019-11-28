@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1293,6 +1295,77 @@ PointAttachable, ConnectableBody {
       return nearest;
    }
 
+   private static class NodePointDistance implements Comparator<FemNode3d> {
+
+      Point3d myPoint;
+
+      NodePointDistance (Point3d pnt) {
+         myPoint = pnt;
+      }
+
+      public int compare (FemNode3d n0, FemNode3d n1) {
+         double d0 = n0.distance (myPoint);
+         double d1 = n1.distance (myPoint);
+         if (d0 < d1) {
+            return -1;
+         }
+         else if (d0 == d1) {
+            return 0;
+         }
+         else {
+            return 1;
+         }
+      }
+   }
+
+   /**
+    * Finds and returns a list of all the nodes of an FEM that are within a
+    * specified maximum distance of a specified point. The nodes are sorted
+    * from neartest to farthest. If no node is within the maximum distance, the
+    * returned list is empty.
+    * 
+    * @param pnt Point for which the nearest nodes should be located
+    * @param maxDist Maximum distance that the nodes must be from the
+    * point
+    * @return List of the nearest points
+    */
+   public ArrayList<FemNode3d> findNearestNodes (Point3d pnt, double maxDist) {
+      ArrayList<FemNode3d> nodes = new ArrayList<>();
+
+      BVTree bvtree = getBVTree();
+      ArrayList<BVNode> bvnodes = new ArrayList<BVNode>();
+      bvtree.intersectSphere(bvnodes, pnt, maxDist);
+      HashSet<FemNode3d> checked = new HashSet<>();
+      for (BVNode n : bvnodes) {
+         Boundable[] elements = n.getElements();
+         for (int i = 0; i < elements.length; i++) {
+            if (elements[i] instanceof FemElement3dBase) {
+               FemElement3dBase e = (FemElement3dBase)elements[i];
+               for (int k = 0; k < e.numNodes(); k++) {
+                  FemNode3d node = e.myNodes[k];
+                  if (!checked.contains(node)) {
+                     if (node.distance (pnt) <= maxDist) {
+                        nodes.add (node);
+                     }
+                     checked.add (node);
+                  }
+               }
+            }
+            else if (elements[i] instanceof FemNode3d) {
+               FemNode3d node = (FemNode3d)elements[i];
+               if (!checked.contains(node)) {
+                  if (node.distance (pnt) <= maxDist) {
+                     nodes.add (node);
+                  }
+                  checked.add (node);
+               }
+            }
+         }
+      }
+      Collections.sort (nodes, new NodePointDistance (pnt));
+      return nodes;
+   }
+
    /* --- Mesh Component Methods --- */
 
    public FemMeshComp addMesh(MeshBase mesh) {
@@ -1801,6 +1874,12 @@ PointAttachable, ConnectableBody {
             for (FieldComponent field : myFieldList) {
                field.clearCacheIfNecessary();
             }
+            if (e.getComponent() == myElements &&
+                getIncompressible() == IncompMethod.ELEMENT) {
+               // state changes because this changes the incompressibility 
+               // constraint
+               e.setStateChanged (true);
+            }
          }
          else if (e.getComponent() == myMeshList) {
             // adding a mesh may change if stress/strain values have
@@ -1969,13 +2048,13 @@ PointAttachable, ConnectableBody {
             for (int k = 0; k < e.numPressureVals(); k++) {
                e.myLagrangePressures[k] = 0;
             }
-            e.clearState();
+            //e.clearState();
          }
          for (ShellElement3d e : myShellElements) {
             e.invalidateRestData();
             // e.getRestVolume();
             e.setInverted(false);
-            e.clearState();
+            //e.clearState();
          }         
          for (FemNode3d n : myNodes) {
             n.zeroStressStrain();
@@ -3204,7 +3283,6 @@ PointAttachable, ConnectableBody {
 
          // XXX only uses non-linear stress
          dpnt.setAveragePressure(pressure);
-         dt.clearState();
 
          // sum stress/stiffness contributions to each node
          for (int i = 0; i < e.myNodes.length; i++) {
@@ -3455,8 +3533,6 @@ PointAttachable, ConnectableBody {
             ks = addAuxStressAndTangent (sigma, D, auxmats, dpnt, pt, dt, ks);
          }
 
-         dt.clearState();
-            
          for (int i = 0; i < e.myNodes.length; i++) {
             FemNode3d nodei = (FemNode3d) e.myNodes[i];
             int bi = nodei.getSolveIndex();
@@ -3633,8 +3709,6 @@ PointAttachable, ConnectableBody {
             ks = addAuxStressAndTangent (sigma, D, auxmats, dpnt, pt, dt, ks);
          }
 
-         dt.clearState();
-            
          for (int i = 0; i < e.myNodes.length; i++) {
             FemNode3d nodei = (FemNode3d) e.myNodes[i];
             int bi = nodei.getSolveIndex();
@@ -4825,23 +4899,23 @@ PointAttachable, ConnectableBody {
    }
 
    public void getState(DataBuffer data) {
-      ArrayList<FemElement3dBase> elist = getAllElements();
-      for (int i = 0; i < elist.size(); i++) {
-         IntegrationData3d[] idata = elist.get(i).getIntegrationData();
-         for (int k = 0; k < idata.length; k++) {
-            idata[k].getState(data);
-         }          
-      }
+//      ArrayList<FemElement3dBase> elist = getAllElements();
+//      for (int i = 0; i < elist.size(); i++) {
+//         IntegrationData3d[] idata = elist.get(i).getIntegrationData();
+//         for (int k = 0; k < idata.length; k++) {
+//            idata[k].getState(data);
+//         }          
+//      }
    }
    
    public void setState(DataBuffer data) {
-      ArrayList<FemElement3dBase> elist = getAllElements();
-      for (int i = 0; i < elist.size(); i++) {
-         IntegrationData3d[] idata = elist.get(i).getIntegrationData();
-         for (int k = 0; k < idata.length; k++) {
-            idata[k].setState (data);
-         }
-      }
+//      ArrayList<FemElement3dBase> elist = getAllElements();
+//      for (int i = 0; i < elist.size(); i++) {
+//         IntegrationData3d[] idata = elist.get(i).getIntegrationData();
+//         for (int k = 0; k < idata.length; k++) {
+//            idata[k].setState (data);
+//         }
+//      }
    }
 
    /* --- Render Methods --- */
@@ -5046,10 +5120,11 @@ PointAttachable, ConnectableBody {
 
       if (copyMap == null) {
          copyMap = new HashMap<ModelComponent,ModelComponent>();
-         flags = CopyableComponent.COPY_REFERENCES;
+         flags |= CopyableComponent.COPY_REFERENCES;
       }
 
       FemModel3d fem = (FemModel3d)super.copy(flags, copyMap);
+      copyMap.put (this, fem);
 
       // fem.myFrame was created in super.copy(), but we redo this
       // so as to create an exact copy of the orginal frame
@@ -5079,6 +5154,13 @@ PointAttachable, ConnectableBody {
          fem.myElements.addNumbered(newe, e.getNumber());
          fem.myElements.setRenderProps(myElements.getRenderProps());
       }
+      for (ShellElement3d e : myShellElements) {
+         ShellElement3d newe = e.copy(flags, copyMap);
+         newe.setName(e.getName());
+         copyMap.put(e, newe);
+         fem.myShellElements.addNumbered(newe, e.getNumber());
+         fem.myShellElements.setRenderProps(myShellElements.getRenderProps());
+      }
       for (FemMarker m : myMarkers) {
          FemMarker newm = m.copy(flags, copyMap);
          newm.setName(m.getName());
@@ -5097,10 +5179,10 @@ PointAttachable, ConnectableBody {
          int[] props = ArraySupport.copy(ent.getValue());
          fem.ansysElemProps.put(newe, props);
       }
-
       for (int i=0; i<myMeshList.size(); i++) {
          FemMeshComp mc = myMeshList.get(i);
          FemMeshComp newFmc = mc.copy(flags, copyMap);
+         newFmc.setName (mc.getName());
          if (i == 0) {
             fem.myMeshList.addFixed (newFmc);
          }
@@ -5149,7 +5231,9 @@ PointAttachable, ConnectableBody {
       for (int i = 0; i < MAX_NODAL_INCOMP_NODES; i++) {
          fem.myNodalConstraints[i] = new Vector3d();
       }
-
+      if ((flags & CopyableComponent.REST_POSITION) != 0) {
+         fem.updateSlavePos();
+      }
       return fem;
    }
 

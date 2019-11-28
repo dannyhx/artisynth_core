@@ -9,6 +9,8 @@ package artisynth.core.modelbase;
 import java.util.*;
 
 import maspack.util.*;
+import maspack.util.ParameterizedClass;
+import maspack.util.ClassAliases;
 import maspack.properties.*;
 
 import java.io.*;
@@ -808,18 +810,87 @@ public class ComponentUtils {
       }
       return farthest;
    }
+   
+   /**
+    * Recursively finds all subcomponents of {@code comp} which are invalid
+    * according to {@link ClassAliases#isClassValid}, along with their hard
+    * dependencies, marks them to be non-writable, and returns a list of them.
+    * 
+    * @param comp component whose subcomponents should be checked
+    * @return non-core invalid components and their hard dependencies
+    */
+   public static LinkedList<ModelComponent> markInvalidSubcomps (
+      ModelComponent comp) {
 
-   public static void saveComponent (
-      File file, ModelComponent comp, NumberFormat fmt, ModelComponent ancestor)
-      throws IOException {
-      IndentingPrintWriter pw = new IndentingPrintWriter (file);
-      pw.println (ClassAliases.getAliasOrName (comp.getClass()));
-      comp.write (pw, fmt, ancestor);
-      pw.close();
+      LinkedList<ModelComponent> nccomps = findInvalidSubcomps (comp);
+      for (ModelComponent c : nccomps) {
+         c.setWritable (false);
+      }
+      return nccomps;
    }
 
-   public static ModelComponent loadComponent (
-      File file, CompositeComponent ancestor, Class<?> expectedType)
+   /**
+    * Sets all components in a list to be writable. This undoes the effect of
+    * {@link #markInvalidSubcomps}.
+    * 
+    * @param nccomps list of invalid components and their hard dependencies
+    * previously returned by {@link #markInvalidSubcomps}.
+    */
+   public static void unmarkInvalidSubcomps (
+      LinkedList<ModelComponent> nccomps) {
+      
+      for (ModelComponent c : nccomps) {
+         c.setWritable (true);
+      }
+   }
+
+   /**
+    * Recursively finds all subcomponents of {@code comp} which are invalid
+    * according to {@link ClassAliases#isClassValid}. The resulting list of
+    * invalid components is then extended to include all of their hard
+    * dependencies.
+    * 
+    * @param comp component whose subcomponents should be checked
+    * @return non-core invalid components and their hard dependencies
+    */
+   protected static <C> LinkedList<ModelComponent> findInvalidSubcomps (
+      ModelComponent comp) {
+
+      LinkedList<ModelComponent> incomp = new LinkedList<>();
+      if (ClassAliases.getClassFilter() != null) {
+         findInvalidSubcomps (incomp, comp);
+         if (incomp.size() > 0) {
+            LinkedList<ModelComponent> update = new LinkedList<ModelComponent>();
+            incomp = findDependentComponents (update, incomp);
+         }
+      }
+      return incomp;
+   }
+
+   /**
+    * Recursively checks any subcomponents of {@code comp} to find those which
+    * are invalid according to {@link ClassAliases#isClassValid}.
+    *
+    * @param incomp list to append invalid components to
+    * @param comp component whose subcomponents should be checked
+    */
+   protected static void findInvalidSubcomps (
+      LinkedList<ModelComponent> incomp, ModelComponent comp) {
+
+      if (comp instanceof CompositeComponent) {
+         CompositeComponent ccomp = (CompositeComponent)comp;
+         for (int i=0; i<ccomp.numComponents(); i++) {
+            ModelComponent c = ccomp.get(i);
+            if (!ClassAliases.isClassValid (c)) {
+               incomp.add (c);
+            }
+            findInvalidSubcomps (incomp, c);
+         }
+      }
+   }
+
+   public static <T extends ModelComponent> T loadComponent (
+      File file, CompositeComponent ancestor, Class<T> expectedType)
       throws IOException {
       ReaderTokenizer rtok = ArtisynthIO.newReaderTokenizer (file);
       rtok.nextToken();
@@ -835,23 +906,39 @@ public class ComponentUtils {
          throw new IOException ("file contains an instance of " + cls
          + " instead of " + expectedType);
       }
-      ModelComponent comp;
+      T comp;
       try {
-         comp = (ModelComponent)cls.newInstance();
+         comp = (T)cls.newInstance();
       }
       catch (Exception e) {
          throw new IOException ("cannot create instance of " + cls);
       }
+      if (ancestor == null && comp instanceof CompositeComponent) {
+         ancestor = (CompositeComponent)comp;
+      }
       ScanWriteUtils.scanfull (rtok, comp, ancestor);
-//      if (ModelComponentBase.useNewScan) {
-//         ArrayDeque<ScanToken> tokens = new ArrayDeque<ScanToken>();
-//         comp.scan (rtok, tokens);
-//         comp.postscan (tokens, ancestor);         
-//      }
-//      else {
-//         comp.scan (rtok, ancestor);
-//      }
       return comp;
+   }
+
+   public static <T extends ModelComponent> T loadComponent (
+      String fileName, CompositeComponent ancestor, Class<T> expectedType)
+      throws IOException {
+      return loadComponent (new File(fileName), ancestor, expectedType);
+   }
+
+   public static <T extends ModelComponent> T loadComponent (
+      String fileName, Class<T> expectedType) throws IOException {
+      return loadComponent (new File(fileName), null, expectedType);
+   }
+
+   public static ModelComponent loadComponent (
+      String fileName, CompositeComponent ancestor) throws IOException {
+      return loadComponent (new File(fileName), ancestor, ModelComponent.class);
+   }
+
+   public static ModelComponent loadComponent (String fileName)
+      throws IOException {
+      return loadComponent (new File(fileName), null, ModelComponent.class);
    }
 
    /**
@@ -1408,7 +1495,7 @@ public class ComponentUtils {
       }
    }
 
-   public static void recursivelyBuildDependencyMap (
+   protected static void recursivelyBuildDependencyMap (
       HashMap<ModelComponent,Dependencies> map,
       ModelComponent c) {
 
@@ -1446,7 +1533,7 @@ public class ComponentUtils {
       }
    }
 
-   public static HashMap<ModelComponent,Dependencies>
+   protected static HashMap<ModelComponent,Dependencies>
       buildDependencyMap (
       CompositeComponent comp) {
       HashMap<ModelComponent,Dependencies> map =

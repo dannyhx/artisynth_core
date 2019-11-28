@@ -151,17 +151,6 @@ public class AjlCollisionTest extends RootModel {
       mech.removeRenderable (editMesh);
    }   
  
-   PolygonalMesh readMesh (String fileName) {
-      PolygonalMesh mesh = null;
-      try {
-         mesh = new PolygonalMesh (fileName);
-      }
-      catch (Exception e) {
-         e.printStackTrace(); 
-      }
-      return mesh;
-   } 
-
    private void setupBodies (
       MechModel mech, PolygonalMesh mesh0, PolygonalMesh mesh1) {
 
@@ -487,7 +476,7 @@ public class AjlCollisionTest extends RootModel {
       if (true) {
          String dataDir = 
             PathFinder.expand (
-               "$ARTISYNTH_HOME/src/maspack/geometry/sampleData/");
+               "${srcdir PolygonalMesh}/sampleData/");
          
          try {
             mesh0 = new PolygonalMesh (dataDir+"molar1.2.obj");
@@ -502,7 +491,7 @@ public class AjlCollisionTest extends RootModel {
       if (false) {
          String dataDir = 
             PathFinder.expand (
-               "$ARTISYNTH_HOME/src/maspack/geometry/sampleData/");
+               "${srcdir PolygonalMesh}/sampleData/");
          
          try {
             mesh0 = new PolygonalMesh (dataDir+"molar1.2.obj");

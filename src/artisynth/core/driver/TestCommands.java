@@ -26,86 +26,6 @@ public class TestCommands {
 
    Main myMain;
 
-   // any pattern matching zero or more "[" followed by size=[ x y ], followed by zero or more "]"
-   static Pattern sizeLine = Pattern.compile ("\\s*(\\[\\s*)*size=\\[\\s*[0-9]+\\s+[0-9]+\\s*\\]\\s*(\\]\\s*)*");
-   static Pattern locationLine = Pattern.compile ("\\s*(\\[\\s*)*location=\\[\\s*[0-9]+\\s+[0-9]+\\s*\\]\\s*(\\]\\s*)*");
-   
-   // allows lines of the form "size=[ xxx yyy ]" to match regardless of the
-   // numbers, because the UI can make control panel size hard to repeat
-   // exactly
-   private boolean isSizeLine (String line) {
-      return sizeLine.matcher (line).matches ();
-   }
-   
-   // allows lines of the form "location=[ xxx yyy ]" to match regardless of the
-   // numbers, because the UI can make control panel location hard to repeat
-   // exactly
-   private boolean isLocationLine (String line) {
-      return locationLine.matcher (line).matches ();
-   }
-
-   private void closeQuietly(Reader reader) {
-      if (reader != null) {
-         try {
-            reader.close();
-         } catch (Exception e) {
-         }
-      }
-   }
-
-   private boolean linesMatch (String line0, String line1) {
-      if (line0.equals(line1)) {
-         return true;
-      }
-      else if (isSizeLine (line0) && isSizeLine (line1)) {
-         return true;
-      } 
-      else if  (isLocationLine (line0) && isLocationLine (line1)) {
-         return true;
-      }
-      else {
-         return false;
-      }
-   }
-
-   private String compareFiles (
-      String saveFileName, String checkFileName, boolean showDifferingLines) 
-      throws IOException {
-
-      LineNumberReader reader0 =
-         new LineNumberReader (
-            new BufferedReader (new FileReader (saveFileName)));
-      LineNumberReader reader1 =
-         new LineNumberReader (
-            new BufferedReader (new FileReader (checkFileName)));
-
-      String line0, line1;
-      while ((line0 = reader0.readLine()) != null) {
-         line1 = reader1.readLine();
-         if (line1 == null) {
-            reader0.close();
-            reader1.close();
-            return (
-               "check file '"+checkFileName+
-               "' ends prematurely, line "+reader1.getLineNumber());
-         }
-         else if (!linesMatch(line0, line1)) {
-            reader0.close();
-            reader1.close();
-            String msg =
-               "save and check files '"+saveFileName+"' and '"+checkFileName+
-               "' differ at line "+reader0.getLineNumber();
-            if (showDifferingLines) {
-               msg += ":\n"+line0+"\nvs.\n"+line1;
-            }
-            return msg;
-         }
-      }
-      closeQuietly(reader0);
-      closeQuietly(reader1);
-      return null;
-   }
-
    private void delay (int msec) {
       try {
          Thread.sleep (1000);
@@ -143,7 +63,7 @@ public class TestCommands {
          File checkFile = new File (checkFileName);
          
          System.out.println ("saving model to "+saveFileName+" ...");
-         myMain.saveModelFile (saveFile, fmtStr);
+         myMain.saveModelFile (saveFile, fmtStr, false, false);
 
          if (tsim > 0) {
             MechModel mech = findMechModel (rootModel);
@@ -161,11 +81,12 @@ public class TestCommands {
          myMain.loadModelFile (saveFile);
          rootModel = myMain.getRootModel();
          System.out.println ("saving model to "+checkFileName+" ...");
-         myMain.saveModelFile (checkFile, fmtStr);
+         myMain.saveModelFile (checkFile, fmtStr, false, false);
 
          System.out.println (
             "comparing files "+saveFileName+ " and " +checkFileName+" ...");
-         String compareError = compareFiles (saveFileName, checkFileName, true);
+         String compareError = ComponentTestUtils.compareArtFiles (
+            saveFileName, checkFileName, true);
          if (compareError != null) {
             System.out.println ("FAILED");
             return compareError;
@@ -262,6 +183,7 @@ public class TestCommands {
          file.delete();
       }
       catch (Exception e) {
+         e.printStackTrace(); 
          throw new TestException (
             "I/O error occurred in binary save/load: " + e);
       }

@@ -24,8 +24,8 @@ import java.io.Reader;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.URLClassLoader;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -63,10 +63,12 @@ import artisynth.core.mechmodels.CollisionManager;
 import artisynth.core.mechmodels.CollisionManager.ColliderType;
 import artisynth.core.mechmodels.Frame;
 import artisynth.core.mechmodels.FrameMarker;
+import artisynth.core.mechmodels.HasSurfaceMesh;
 import artisynth.core.mechmodels.MechSystem;
 import artisynth.core.mechmodels.MechSystemBase;
 import artisynth.core.mechmodels.MechSystemSolver;
 import artisynth.core.mechmodels.MechSystemSolver.PosStabilization;
+import artisynth.core.mechmodels.Point;
 import artisynth.core.mechmodels.RigidBody;
 import artisynth.core.modelbase.ComponentChangeEvent;
 import artisynth.core.modelbase.ComponentChangeListener;
@@ -79,17 +81,18 @@ import artisynth.core.modelbase.ModelComponentBase;
 import artisynth.core.modelbase.OrientedTransformableGeometry;
 import artisynth.core.modelbase.PropertyChangeEvent;
 import artisynth.core.modelbase.ScanWriteUtils;
-import artisynth.core.modelbase.StructureChangeEvent;
 import artisynth.core.modelbase.TransformableGeometry;
 import artisynth.core.moviemaker.MovieMaker;
 import artisynth.core.probes.NumericProbeBase;
 import artisynth.core.probes.Probe;
 import artisynth.core.probes.WayPoint;
+import artisynth.core.probes.WayPointProbe;
 import artisynth.core.util.AliasTable;
 import artisynth.core.util.ArtisynthIO;
 import artisynth.core.util.ArtisynthPath;
-import artisynth.core.util.ClassAliases;
+import maspack.util.ClassAliases;
 import artisynth.core.util.MatlabInterface;
+import artisynth.core.workspace.AddMarkerTool;
 import artisynth.core.workspace.DriverInterface;
 import artisynth.core.workspace.PullController;
 import artisynth.core.workspace.RenderProbe;
@@ -116,7 +119,6 @@ import maspack.render.RotatableScaler3d;
 import maspack.render.Rotator3d;
 import maspack.render.Translator3d;
 import maspack.render.Transrotator3d;
-import maspack.render.GL.GLMouseAdapter;
 import maspack.render.GL.GLSupport;
 import maspack.render.GL.GLSupport.GLVersionInfo;
 import maspack.render.GL.GLViewer;
@@ -134,18 +136,16 @@ import maspack.widgets.PropertyWindow;
 import maspack.widgets.RenderPropsDialog;
 import maspack.widgets.ViewerKeyListener;
 import maspack.widgets.ViewerToolBar;
-import maspack.widgets.MouseBindings;
-import maspack.widgets.MouseBindings.MouseAction;
 
 /**
  * the main class for artisynth
  * 
  */
 public class Main implements DriverInterface, ComponentChangeListener {
+
    /**
     * private data members for the driver interface 
     */
-
    protected File myModelDir;
    protected File myProbeDir;
 
@@ -215,7 +215,8 @@ public class Main implements DriverInterface, ComponentChangeListener {
       ConstrainedTranslate,
       Transrotate,
       Pull,
-      AddComponent
+      AddComponent, 
+      AddMarker
    }
 
    /** 
@@ -246,6 +247,25 @@ public class Main implements DriverInterface, ComponentChangeListener {
       new LinkedList<ModelComponent>();
 
 
+   /**
+    * Filter to determine classes which belong to artisynth_core.
+    */
+   private static class CoreFilter implements ClassAliases.ClassFilter {
+      
+      public boolean isValid (Class<?> cls) {
+         if (cls.getPackage() != null) {
+            String packName = cls.getPackage().getName();
+            return (packName.startsWith ("artisynth.core") ||
+                    packName.startsWith ("maspack") ||
+                    packName.startsWith ("java") ||
+                    packName.startsWith ("javax"));
+         }
+         else {
+            return true;
+         }
+      }
+   }
+   
 //   public enum ViewerMode {
 //      FrontView, TopView, SideView, BottomView, RightView, BackView
 //   }
@@ -257,6 +277,8 @@ public class Main implements DriverInterface, ComponentChangeListener {
 
    private File myProbeFile = null;
    private File myModelFile = null;
+   private boolean mySaveWayPointData = false;
+   private boolean mySaveCoreOnly = false;
 
    public static void setRunningUnderMatlab (boolean underMatlab) {
       myRunningUnderMatlab = underMatlab;
@@ -614,6 +636,8 @@ public class Main implements DriverInterface, ComponentChangeListener {
    public Main (String windowName, int width, int height, GLVersion glVersion) {
       myMain = this;
       
+      setClassAliases();
+
       // check if GL3 version is supported
       if (width > 0 && glVersion == GLVersion.GL3) {
          GLVersionInfo vinfo = GLSupport.getMaxGLVersionSupported();
@@ -702,6 +726,7 @@ public class Main implements DriverInterface, ComponentChangeListener {
          myFrame.getGLPanel().setSize (width, height);
 
          myPullController = new PullController (mySelectionManager);
+         myAddMarkerHandler = new AddMarkerTool (mySelectionManager);
       }
       createWorkspace();
    }
@@ -1214,6 +1239,8 @@ public class Main implements DriverInterface, ComponentChangeListener {
       myWorkspace.cancelRenderRequests();
       myModelName = null;
       myModelFile = null;
+      mySaveWayPointData = false;
+      mySaveCoreOnly = false;
       RootModel rootModel = getRootModel();
       if (rootModel != null) {
          rootModel.detach (this);
@@ -1221,6 +1248,9 @@ public class Main implements DriverInterface, ComponentChangeListener {
          rootModel.setMainViewer (null); // just for completeness
          rootModel.removeController (myPullController); // 
          rootModel.dispose();
+      }
+      if (myAddMarkerHandler != null) {
+         myAddMarkerHandler.setDefaultHandler ();  // reset handler to default
       }
       mySelectionManager.clearSelections();
       myUndoManager.clearCommands();
@@ -1966,6 +1996,30 @@ public class Main implements DriverInterface, ComponentChangeListener {
       }
       return idx;
    }
+
+   private void setClassAliases() {
+      ClassAliases.addPackageAliases (
+         "artisynth.core", ".*", ModelComponent.class);
+
+      ClassAliases.addAlias (
+         "Tet", "artisynth.core.femmodels.TetElement");
+      ClassAliases.addAlias (
+         "Hex", "artisynth.core.femmodels.HexElement");
+      ClassAliases.addAlias (
+         "Wedge", "artisynth.core.femmodels.WedgeElement");
+      ClassAliases.addAlias (
+         "Pyramid", "artisynth.core.femmodels.PyramidElement");
+      ClassAliases.addAlias (
+         "Quadtet", "artisynth.core.femmodels.QuadtetElement");
+      ClassAliases.addAlias (
+         "Quadhex", "artisynth.core.femmodels.QuadhexElement");
+      ClassAliases.addAlias (
+         "Quadwedge", "artisynth.core.femmodels.QuadwedgeElement");
+      ClassAliases.addAlias (
+         "Quadpyramid", "artisynth.core.femmodels.QuadpyramidElement");
+
+      ClassAliases.addAlias ("VectorGrid", "maspack.geometry.VectorGrid");     
+   }
    
    /**
     * the main entry point
@@ -2534,7 +2588,23 @@ public class Main implements DriverInterface, ComponentChangeListener {
    public File getModelFile() {
       return myModelFile;
    }
-   
+
+   public boolean getSaveWayPointData() {
+      return mySaveWayPointData;
+   }
+
+   public void setSaveWayPointData (boolean save) {
+      mySaveWayPointData = save;
+   }
+
+   public boolean getSaveCoreOnly() {
+      return mySaveCoreOnly;
+   }
+
+   public void setSaveCoreOnly (boolean save) {
+      mySaveCoreOnly = save;
+   }
+
    public boolean loadModelFile (File file) throws IOException {
       // If we are not in the AWT event thread, switch to that thread
       // and build the model there. We do this because the model building
@@ -2580,7 +2650,16 @@ public class Main implements DriverInterface, ComponentChangeListener {
       System.out.println ("File size: " + file.length());
       //System.out.println ("queue size=" + ModelComponentBase.scanQueueSize());
       rtok.close();
-
+      
+//      WayPoint way0 = get(0);
+//      if (way0.isValid()) {
+//         // waypoint contains scanned state information. Need to add
+//         // augmentation information to this state.
+//         CompositeState scannedState = way0.getState();
+//         way0.setState (myRootModel);
+//         way0.getState().set (scannedState);
+//      }
+      
       String modelName = newRoot.getName();
       if (modelName == null) { // use file name with extension stripped off
          modelName = file.getName();
@@ -2596,7 +2675,8 @@ public class Main implements DriverInterface, ComponentChangeListener {
    public void reloadModel() throws IOException {
       if (myModelFile != null) {
          loadModelFile (myModelFile);
-      } else {
+      }
+      else if (lastModelInfo != null) {
          RootModel root = getRootModel();
          if (root != null) {
             Class<?> rootClass = root.getClass();
@@ -2612,6 +2692,10 @@ public class Main implements DriverInterface, ComponentChangeListener {
       }
    }
 
+   boolean modelIsLoaded() {
+      return myModelFile != null || lastModelInfo != null;
+   }
+
    public String getModelSaveFormat () {
       return myModelSaveFormat;
    }
@@ -2622,20 +2706,161 @@ public class Main implements DriverInterface, ComponentChangeListener {
       myModelSaveFormat = fmtStr;
    }
 
-   public void saveModelFile (File file) throws IOException {
-      saveModelFile (file, myModelSaveFormat);
+   public int saveModelFile (File file) throws IOException {
+      return saveModelFile (file, myModelSaveFormat, false, false);
    }
 
-   public void saveModelFile (File file, String fmtStr) throws IOException {
+   /**
+    * Saves the current root model to a file. If {@code saveWayPointData} is
+    * {@code true}, then waypoint data is saved as well (otherwise, waypoints
+    * are still saved but <i>without</i> their data).  If {@code
+    * coreCompsOnly} is {@code true}, then only components which are part
+    * of {@code artisynth_core} are saved (with the root model itself being
+    * saved simply as an instance of {@code RootModel}).  Such models can then
+    * be loaded by any ArtiSynth installation, without requiring access to the
+    * original application code.
+
+    * @param file file to which the model should be saved
+    * @param fmtStr format for floating point data. If {@code null},
+    * then the default format returned by {@link #getModelSaveFormat} is
+    * used instead.
+    * @param saveWayPointData save waypoint data along with any waypoints
+    * @param coreCompsOnly save only components which are part of
+    * {@code artisynth_core}
+    * @return if {@code coreCompsOnly} is {@code true}, returns the
+    * number of components which were not saved; otherwise, returns 0.
+    * @throws IOException if an I/O error is encountered
+    */
+   public int saveModelFile (
+      File file, String fmtStr, 
+      boolean saveWayPointData, boolean coreCompsOnly) throws IOException {
+      
       RootModel root = getRootModel();
       if (root != null) {
-         IndentingPrintWriter pw = ArtisynthIO.newIndentingPrintWriter (file);
-         if (!root.getClass().isAssignableFrom (RootModel.class)) {
-            pw.println (ClassAliases.getAliasOrName (root.getClass()));
-         }
-         root.write (pw, new NumberFormat (fmtStr), root);
-         pw.close();
+         return saveRootModel (
+            file, fmtStr, root, saveWayPointData, coreCompsOnly);
       }
+      else {
+         return 0;
+      }
+   }
+
+   public int saveRootModel (
+      File file, String fmtStr, RootModel root,
+      boolean saveWayPointData, boolean coreCompsOnly) throws IOException {
+      
+      int numRemoved = 0;
+      LinkedList<ModelComponent> incomp = null;
+      if (saveWayPointData) {
+         root.getWayPoints().setWriteFlags (WayPointProbe.WRITE_ALL_STATES);
+      }
+      if (coreCompsOnly) {
+         ClassAliases.setClassFilter (new CoreFilter());
+         if (!ClassAliases.isClassValid(root)) {
+            root.setWritable (false);
+         }
+         incomp = ComponentUtils.markInvalidSubcomps (root);
+         numRemoved = incomp.size();
+      }
+      IndentingPrintWriter pw = new IndentingPrintWriter (file);
+      try {
+         if (fmtStr == null) {
+            fmtStr = getModelSaveFormat();
+         }
+         NumberFormat fmt = new NumberFormat(fmtStr);
+         if (coreCompsOnly) {
+            pw.print ("RootModel ");
+            RootModel.write (root, pw, fmt);
+         }
+         else {
+            pw.print (ScanWriteUtils.getClassTag (root));
+            pw.print (" ");             
+            root.write (pw, fmt, root);
+         }
+      }
+      catch (IOException e) {
+         throw e;
+      }
+      finally {
+         pw.close();
+         if (coreCompsOnly) {
+            ComponentUtils.unmarkInvalidSubcomps (incomp);
+            ClassAliases.setClassFilter (null);
+         }          
+         if (saveWayPointData) {
+            root.getWayPoints().setWriteFlags (0);
+         }
+      }
+      myModelFile = file;
+      mySaveWayPointData = saveWayPointData;
+      mySaveCoreOnly = coreCompsOnly;
+      return numRemoved;
+   }
+
+   /**
+    * Saves a component (and its subcomponents, if any) to a file.
+    *
+    * <p>If {@code coreCompsOnly} is {@code true}, then only subcomponents
+    * which are part of {@code artisynth_core} are saved. The resulting file
+    * can then be loaded by any ArtiSynth installation, without requiring
+    * access to the original application code. If {@code coreCompsOnly} is
+    * {@code true} and the {@code comp} itself is not part of {@code
+    * artisynth_core}, then no action is taken and the method returns -1.
+    *
+    * @param file file to which the component should be saved
+    * @param fmtStr format for floating point data.If {@code null},
+    * then the default format returned by {@link #getModelSaveFormat} is
+    * used instead.
+    * @param comp component to save
+    * @param coreCompsOnly save only subcomponents which are part of {@code
+    * artisynth_core}
+    * @return if {@code coreCompsOnly} is {@code true}, returns
+    * the number of subcomponents which were not saved, or -1 if
+    * {@code comp} itself was not saved; otherwise, returns 0.
+    * @throws IOException if an I/O error is encountered
+    */
+   public int saveComponent (
+      File file, String fmtStr, ModelComponent comp, 
+      boolean coreCompsOnly, ModelComponent ancestor)
+      throws IOException {
+
+      if (comp instanceof RootModel) {
+         return saveRootModel (
+            file, fmtStr, (RootModel)comp, false, coreCompsOnly);
+      }
+      IndentingPrintWriter pw = null;
+      int numRemoved = 0;
+      LinkedList<ModelComponent> incomp = null;
+      if (coreCompsOnly) {
+         ClassAliases.setClassFilter (new CoreFilter());
+         if (!ClassAliases.isClassValid(comp)) {
+            ClassAliases.setClassFilter (null);
+            return -1;
+         }
+         incomp = ComponentUtils.markInvalidSubcomps (comp);
+         numRemoved = incomp.size();
+      }
+      try {
+         pw = new IndentingPrintWriter (file);
+         if (fmtStr == null) {
+            fmtStr = getModelSaveFormat();
+         }
+         ScanWriteUtils.writeComponent (
+            pw, new NumberFormat(fmtStr), comp, ancestor);
+      }
+      catch (IOException e) {
+         throw e;
+      }
+      finally {
+         if (coreCompsOnly) {
+            ComponentUtils.unmarkInvalidSubcomps (incomp);
+            ClassAliases.setClassFilter (null);
+         }    
+         if (pw != null) {
+            pw.close();
+         }
+      }
+      return numRemoved;
    }
 
    /**
@@ -2708,6 +2933,70 @@ public class Main implements DriverInterface, ComponentChangeListener {
       }
    }
 
+   protected void setWayPointsFile (File file) throws IOException {
+      if (getRootModel() != null) {
+         WayPointProbe wayPoints = getRootModel().getWayPoints();
+         String workspace = new String (ArtisynthPath.getWorkingDirPath());
+
+         String absfile = file.getCanonicalPath();
+         
+         if (absfile.startsWith (workspace)) {
+            absfile = new String (absfile.substring (workspace.length() + 1));
+         }
+         System.out.println ("absfile=" + absfile);
+         wayPoints.setAttachedFileName (absfile);
+      }
+   }
+
+   /**
+    * Save the waypoints, in binary form, to the specified file. Unless an
+    * exception is thrown, the file is then stored as default waypoints file.
+    *
+    * @param file file to which waypoints should be saved
+    */
+   public void saveWayPoints (File file) throws IOException {
+      if (getRootModel() != null) {
+         WayPointProbe wayPoints = getRootModel().getWayPoints();
+         String oldFileName = wayPoints.getAttachedFileName();
+         setWayPointsFile (file);
+         try {
+            wayPoints.save();
+         }
+         catch (IOException e) {
+            wayPoints.setAttachedFileName (oldFileName);
+            throw e;
+         }
+      }
+   }
+
+   /**
+    * Loads waypoints from the specified file. Unless an exception is thrown,
+    * the file is then stored as default waypoints file.  The new waypoint data
+    * overlays any existing waypoints but does not delete them. To completely
+    * replace the existing waypoints, one should call {@link #clearWayPoints}
+    * first.
+    *
+    * @param file file from which additional waypoints should be loaded
+    */
+   public void loadWayPoints (File file) throws IOException {
+      if (getRootModel() != null) {
+         WayPointProbe wayPoints = getRootModel().getWayPoints();
+         String oldFileName = wayPoints.getAttachedFileName();
+         setWayPointsFile (file);
+         try {
+            wayPoints.load();
+         }
+         catch (IOException e) {
+            wayPoints.setAttachedFileName (oldFileName);
+            throw e;
+         }
+         if (myTimeline != null) {
+            myTimeline.refreshWayPoints(getRootModel());
+         }
+         myMain.rerender();
+      }
+   }
+
    public void dispose() {
       if (!disposed) {
          clearRootModel();
@@ -2767,21 +3056,6 @@ public class Main implements DriverInterface, ComponentChangeListener {
    public void removeSelected (LinkedList<ModelComponent> items) {
       mySelectionManager.removeSelected (items);
    }
-
-//   private boolean changeAffectsWaypoints (
-//      RootModel root, ComponentChangeEvent e) {
-//
-//      // XXX there ought to be a cleaner way to do this ...
-//      ModelComponent comp = e.getComponent();
-//      if (comp == root.getWayPoints() ||
-//          (e instanceof StructureChangeEvent &&
-//           !((StructureChangeEvent)e).stateIsChanged())) {
-//         return false;
-//      }
-//      else {
-//         return true;
-//      }
-//   }         
 
    private boolean stateInvalidated (
       RootModel root, ComponentChangeEvent e) {
@@ -2906,6 +3180,12 @@ public class Main implements DriverInterface, ComponentChangeListener {
       return myPullController;
    }
 
+   private AddMarkerTool myAddMarkerHandler;
+   
+   AddMarkerTool getAddMarkerHandler() {
+      return myAddMarkerHandler;
+   }
+
    Cursor getDefaultCursor() {
       return Cursor.getDefaultCursor();
    }
@@ -2956,6 +3236,19 @@ public class Main implements DriverInterface, ComponentChangeListener {
             mySelectionManager.removeSelectionListener (myPullController);
             //myViewerManager.removeRenderable (myPullController);
             myViewerManager.removeMouseListener (myPullController);
+         }
+         if (selectionMode == SelectionMode.AddMarker) {
+            // switching into a marker selection ...
+            myViewerManager.setSelectOnPress (true);
+            myViewerManager.addMouseListener (myAddMarkerHandler);
+            mySelectionManager.clearSelections();
+            mySelectionManager.addSelectionListener (myAddMarkerHandler);
+         }
+         else if (mySelectionMode == SelectionMode.AddMarker) {
+            // switching out of a marker selection ...
+            myViewerManager.setSelectOnPress (false);
+            mySelectionManager.removeSelectionListener (myAddMarkerHandler);
+            myViewerManager.removeMouseListener (myAddMarkerHandler);
          }
          if (selectionMode == SelectionMode.EllipticSelect) {
             myViewerManager.setEllipticSelection (true);
@@ -3233,6 +3526,7 @@ public class Main implements DriverInterface, ComponentChangeListener {
 
       if (mySelectionMode != SelectionMode.Select &&
           mySelectionMode != SelectionMode.EllipticSelect &&
+          mySelectionMode != SelectionMode.AddMarker &&
           mySelectionMode != SelectionMode.Pull) {
          Point3d pmin = new Point3d (inf, inf, inf);
          Point3d pmax = new Point3d (-inf, -inf, -inf);
@@ -3295,9 +3589,30 @@ public class Main implements DriverInterface, ComponentChangeListener {
                      Frame frame = frameMarker.getFrame();
 
                      if (frame instanceof RigidBody) {
-                        mesh = ((RigidBody)frame).getMesh();
+                        mesh = ((RigidBody)frame).getSurfaceMesh();
                      }
                      break;
+                  }
+               }
+               
+               if (mesh == null) {
+                  // no framemarkers, look for anything else attached to a mesh
+                  for (ModelComponent sel : mySelectionManager.getCurrentSelection()) {
+                     
+                     // look for a HasSurfaceMesh parent
+                     ModelComponent parent = sel.getParent ();
+                     while (parent != null && !(parent instanceof HasSurfaceMesh)) {
+                        parent = parent.getParent ();
+                     }
+                     
+                     if (parent != null) {
+                        HasSurfaceMesh sm = (HasSurfaceMesh)parent;
+                        mesh = sm.getSurfaceMesh ();
+                        
+                        if (sel instanceof Point) {
+                           constrainedTranslator3d.setLocation (((Point)sel).getPosition ());
+                        }                  
+                     }
                   }
                }
 
