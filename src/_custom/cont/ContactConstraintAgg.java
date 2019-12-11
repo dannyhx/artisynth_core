@@ -29,6 +29,14 @@ public class ContactConstraintAgg {
       }
    }
    
+   public int numConstraints() {
+      int cnt = 0;
+      for (CollisionHandler colHdlr : myColHdlrs) {
+         cnt += colHdlr.myUnilaterals.size ();
+      }
+      return cnt;
+   }
+   
    /**
     * Merge the unilateral constraints from newCCAgg into this.
     */

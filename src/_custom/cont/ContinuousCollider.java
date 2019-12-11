@@ -36,7 +36,7 @@ import maspack.util.Pair;
  */
 public class ContinuousCollider {
 
-   public static boolean myDebug = true;
+   public static boolean myDebug = false;
    public static double myTimeElipson = 1e-8;
    public static double mySpaceElipson = 1e-10;
    public static double myDistScale = 1.0;
@@ -137,8 +137,9 @@ public class ContinuousCollider {
       refreshSurfaceMeshes(body0);
       refreshSurfaceMeshes(body1);
       
-      System.out.printf ("Computing contact between %s-%s\n", 
-         body0.getName (), body1.getName ());
+      if (myDebug)
+         System.out.printf ("Computing contact between %s-%s\n", 
+            body0.getName (), body1.getName ());
       
       ContactInfo cinfo = getContacts (smi0, smi1, isDynamic0, isDynamic1);
       
@@ -210,10 +211,14 @@ public class ContinuousCollider {
       
       ContactInfo cinfo = new ContactInfo(smi0.myMesh, smi1.myMesh);
       
-      System.out.println ("Computing penetration points for m=0"); m=0;
+      if (myDebug)
+         System.out.println ("Computing penetration points for m=0"); 
+      m=0;
       ArrayList<PenetratingPoint> pentPts0 = findPenetratingPoints(smi0, smi1);
       
-      System.out.println ("Computing penetration points for m=1"); m=1;
+      if (myDebug)
+         System.out.println ("Computing penetration points for m=1"); 
+      m=1;
       ArrayList<PenetratingPoint> pentPts1 = (smi0 != smi1) ? 
          findPenetratingPoints(smi1, smi0) : new ArrayList<PenetratingPoint>();
        
@@ -223,7 +228,8 @@ public class ContinuousCollider {
       cinfo.setPenetratingPoints (pentPts0, 0);
       cinfo.setPenetratingPoints (pentPts1, 1);    
 
-      System.out.println ("Computing edge-edge contacts for m=0 vs m=1");
+      if (myDebug)
+         System.out.println ("Computing edge-edge contacts for m=0 vs m=1");
       ArrayList<EdgeEdgeContact> eeCts = findEdgeEdgeContacts (smi0, smi1);
 //      eeCts = new ArrayList<EdgeEdgeContact>();
       cinfo.setEdgeEdgeContacts (eeCts);
@@ -393,12 +399,14 @@ public class ContinuousCollider {
       smi1.myEdgeTree.setBvhToWorld ( smi1.myMesh.getMeshToWorld () );
       
       double startMs = System.currentTimeMillis ();
-      System.out.printf ("Finding potential edge-edge intersections...");
+      if (myDebug)
+         System.out.printf ("Finding potential edge-edge intersections...");
       smi0.myEdgeTree.intersectTreeWorldIdentity (ixtEdgeNodes0, ixtEdgeNodes1, 
          smi1.myEdgeTree);
       double endMs = System.currentTimeMillis ();
-      System.out.printf ("Count: [%d], Time: [%.2f sec]\n", 
-         ixtEdgeNodes0.size (), (endMs-startMs)/1000);
+      if (myDebug)
+         System.out.printf ("Count: [%d], Time: [%.2f sec]\n", 
+            ixtEdgeNodes0.size (), (endMs-startMs)/1000);
       
       Boundable2BoundableCollisions e2eCsns = new Boundable2BoundableCollisions();
       
@@ -572,7 +580,8 @@ public class ContinuousCollider {
          pentPt.normal.negate ();
       }
       
-      double hitTime = Math.max (ccrv.hitTime-mHitTimeBacktrack, minHitTimeBacktrack);
+      // NEW: Edit 0 to minHitTimeBacktrack is 2nd arg
+      double hitTime = Math.max (ccrv.hitTime-mHitTimeBacktrack, 0);
       pentPt.hitTime = hitTime;
       
       pentPt.vPnt_justBefore_hitTime = sv.computeInstanteousPoint (hitTime);
@@ -652,7 +661,8 @@ public class ContinuousCollider {
       eeCt.displacement = e10_pt_cur.norm () * myDistScale;
       eeCt.point1ToPoint0Normal = e01cross;
       
-      double hitTime = Math.max (ccrv.hitTime-mHitTimeBacktrack,minHitTimeBacktrack);
+      // NEW: Edit 0 to minHitTimeBacktrack is 2nd arg
+      double hitTime = Math.max (ccrv.hitTime-mHitTimeBacktrack, 0);
       
       eeCt.e0Pnts_justBefore_hitTime = se0.computeInstanteousEdgePoints (hitTime);
       eeCt.e1Pnts_justBefore_hitTime = se1.computeInstanteousEdgePoints (hitTime);
@@ -1017,6 +1027,9 @@ public class ContinuousCollider {
       pentPt.hitTime = ccrv.hitTime;
       pentPt.normal = ccrv.normal;
       
+      // NEW 
+      pentPt.distance *= -1;
+      
       return pentPt;
    }
    
@@ -1050,6 +1063,7 @@ public class ContinuousCollider {
       }
       
       // HACK
+      // Special boundary case. If two 
       if (isZeroOrOne (rs.x) || isZeroOrOne (rs.y)) {
          nrm = new Vector3d();
          nrm.sub (pnt0, pnt1);
@@ -1135,6 +1149,9 @@ public class ContinuousCollider {
       eeCt.s0 = ccrv.r;
       eeCt.s1 = ccrv.s;
       
+      // NEW 
+      eeCt.displacement *= -1;
+      
       return eeCt;
    }
    
@@ -1142,6 +1159,7 @@ public class ContinuousCollider {
    /////////// Impact Zone 
    
    public static void backtrackNode(FemNode3d node, Point3d newPos) {
+      // Displace towards newPos (e.g. pentPt.vPnt_justBefore_hitTime)
       Vector3d disp = new Vector3d().sub (newPos, node.getPosition ());
       
       Point3d newNodePos = (Point3d)

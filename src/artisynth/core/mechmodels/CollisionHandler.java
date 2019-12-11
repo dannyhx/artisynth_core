@@ -798,8 +798,88 @@ public class CollisionHandler extends ConstrainerBase
       return maxpen;
    }
    
+   // DANCOLEDIT2
+   double computeVertexPenetrationBilateralConstraints (
+      ContactInfo info, CollidableBody collidable0, CollidableBody collidable1) {
+      double maxpen = 0;
+      clearContactActivity();
+      
+      boolean hashUsingFace = hashContactUsingFace (collidable0, collidable1);
+      
+      if (info != null) {
+         
+         /* --- Vertex-Face collision --- */
+         
+         for (int m=0; m<2; m++) {
+            CollidableBody col0 = (m==0) ? collidable0 : collidable1;
+            CollidableBody col1 = (m==0) ? collidable1 : collidable0; 
+            
+            for (PenetratingPoint cpp : info.getPenetratingPoints(m)) { 
+               ContactPoint cpnt0 = new ContactPoint (cpp.vertex);
+               ContactPoint cpnt1 = new ContactPoint (cpp.position, cpp.face, cpp.coords);
+               
+               ContactConstraint cons;
+               if (m == 0) {   // 0 -> 1 collision
+                  // If any existing constraint has a greater distance,
+                  // then no new constraint is generated.
+                  cons = getContact(myBilaterals0, cpnt0, cpnt1, hashUsingFace, cpp.distance);
+               }
+               else {
+                  cons = getContact(myBilaterals1, cpnt0, cpnt1, hashUsingFace, cpp.distance);
+//                  cons = null;
+               }
+               
+               if (cons != null) {
+                  cons.m = m;
+                  cons.setActive (true);
+                  
+//                  System.out.printf ("Normal: %s, PentPtDist: %.4f\n", 
+//                     cpp.getNormal ().toString ("%.2f"), 
+//                     cpp.distance);
+                  cons.setNormal(cpp.getNormal ());
+                  cons.assignMasters (col0, col1);
+                  cons.myContactArea = -1.0;
+                  maxpen = Math.max (cpp.distance, maxpen);
+                  cons.setDistance (-cpp.distance);
+               }
+            }
+         }
+         
+         /* --- Edge-Edge collision --- */
+         
+         for (EdgeEdgeContact eec : info.getEdgeEdgeContacts ()) {
+            ContactPoint cpnt0 = new ContactPoint (eec.point0, eec.edge0, eec.s0);
+            ContactPoint cpnt1 = new ContactPoint (eec.point1, eec.edge1, eec.s1);
+            
+            ContactConstraint cons = getContact(myBilaterals0, cpnt0, cpnt1, 
+               false, eec.displacement);
+            
+            if (cons != null) {
+               cons.m = 0;
+               cons.setActive (true);
+               
+               cons.myNormal.set(eec.point1ToPoint0Normal);
+
+               cons.assignMasters (collidable0, collidable1);
+               cons.myContactArea = -1.0;
+
+               maxpen = Math.max (eec.displacement, maxpen);
+               cons.setDistance (-eec.displacement);
+            }
+         }
+         
+      }
+      
+      return maxpen;
+   }
+   
    double computeVertexPenetrationUnilateralConstraints (
       ContactInfo info, CollidableBody collidable0, CollidableBody collidable1) {
+      
+      if (false)
+         return computeVertexPenetrationBilateralConstraints(info, collidable0, 
+            collidable1); 
+      
       double maxpen = 0;
       clearContactActivity();
       
@@ -807,10 +887,10 @@ public class CollisionHandler extends ConstrainerBase
       myPrevUnilaterals.addAll(myUnilaterals);
       myUnilaterals.clear();
       
-      LinkedHashMap<FemNode3d,Double> node2minHitTime =
-         new LinkedHashMap<FemNode3d,Double>();
-      
       if (ContinuousCollider.mStage == Stage.ZONE) {
+         LinkedHashMap<FemNode3d,Double> node2minHitTime =
+         new LinkedHashMap<FemNode3d,Double>();
+         
          for (int m=0; m<2; m++) {
             CollidableBody col0 = (m==0) ? collidable0 : collidable1;
             CollidableBody col1 = (m==0) ? collidable1 : collidable0;
@@ -1034,6 +1114,12 @@ public class CollisionHandler extends ConstrainerBase
          } // End of unilateral to backnode copying 
       }
       
+      for (ContactConstraint cc : myUnilaterals) {
+         // Imminent: Tell `getUnilateralInfo()` that it doesn't have to account
+         // for the penetration tolerance.
+         cc.myStage = ContinuousCollider.mStage;
+      }
+      
       // --- DAN-EXPERIMENTAL-BILATERAL
       
 //      for (ContactConstraint uc : myUnilaterals) {
@@ -1058,7 +1144,8 @@ public class CollisionHandler extends ConstrainerBase
       
       // --- DAN-EXPERIMENTAL-BILATERAL
       
-      System.out.println ("Num of unilaterals: " + myUnilaterals.size ());
+      if (ContinuousCollider.myDebug)
+         System.out.println ("Num of unilaterals: " + myUnilaterals.size ());
 
       removeInactiveContacts ();
       
@@ -1329,7 +1416,7 @@ public class CollisionHandler extends ConstrainerBase
          c.setSolveIndex (idx);
          ConstraintInfo gi = ginfo[idx++];
          if (c.getDistance() < -myBehavior.myPenetrationTol) {
-            gi.dist = (c.getDistance() + myBehavior.myPenetrationTol);
+            gi.dist = (c.getDistance() + myBehavior.myPenetrationTol);   
          }
          else {
             gi.dist = 0;
@@ -1347,7 +1434,7 @@ public class CollisionHandler extends ConstrainerBase
          c.setSolveIndex (idx);
          ConstraintInfo gi = ginfo[idx++];
          if (c.getDistance() < -myBehavior.myPenetrationTol) {
-            gi.dist = (c.getDistance() + myBehavior.myPenetrationTol);
+            gi.dist = (c.getDistance() + myBehavior.myPenetrationTol);    
          }
          else {
             gi.dist = 0;
@@ -1449,9 +1536,11 @@ public class CollisionHandler extends ConstrainerBase
          ContactConstraint c = myUnilaterals.get(i);
          c.setSolveIndex (idx);
          ConstraintInfo ni = ninfo[idx++];
-         // DANCOLEDIT: < -myBehavior.myPenetrationTol required in the case
-         // where c.getDistance() is zero.
          if (c.getDistance() < -myBehavior.myPenetrationTol) {
+            // Not only undo penetration, but also respect the thickness.
+            // c.getDistance() => negative
+            // myPenetrationTol => negative 
+            // Sum the negatives
             ni.dist = (c.getDistance() + myBehavior.myPenetrationTol);
          }
          else {
