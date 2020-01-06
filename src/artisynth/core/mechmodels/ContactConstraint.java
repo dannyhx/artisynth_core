@@ -32,6 +32,10 @@ public class ContactConstraint {
                          // will be required to resolve the contact
    //CollisionHandler myHandler; // handler to which the constraint belongs
    // DANCOLEDIT: public contactpoints
+   
+   // Convenient to have for impact zones
+   public CollisionHandler myCsnHldr;
+   
    public ContactPoint myCpnt0; // first point associated with the contact
    public ContactPoint myCpnt1; // second point associated with the contact
    double myLambda;      // most recent force used to enforce the constraint

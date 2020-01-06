@@ -76,7 +76,8 @@ public class MovieMaker {
       // "ffmpeg -y -f image2 -r $FPS -i frame%05d.$FMT -c:v libx264 -r $FPS $OUT.mov";
    //      "ffmpeg  -i frame%05d.$FMT -r $FPS -vcodec libx264 -vpre medium " +
    //      "-crf 18 -aq 100 -ar 22050 $OUT.mov";
-      "ffmpeg -y -f image2 -r $FPS -i frame%05d.$FMT -pix_fmt yuv420p -crf 20 -preset veryslow -vcodec libx264 $OUT.mov";
+   // DANNY: crf was 20. Use 0 for lossless.
+      "ffmpeg -y -f image2 -r $FPS -i frame%05d.$FMT -pix_fmt yuv420p -crf 0 -preset veryslow -vcodec libx264 $OUT.mov";
    // ffmpeg command for use on SuSE Linux at UBC CS: No preset, no high
    // quality vcodec, but at least it works:
    // ffmpeg -i frame%05d.$FMT -r $FPS -aq 100 -ar 22050 foo.mov

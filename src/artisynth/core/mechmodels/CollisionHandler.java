@@ -887,56 +887,6 @@ public class CollisionHandler extends ConstrainerBase
       myPrevUnilaterals.addAll(myUnilaterals);
       myUnilaterals.clear();
       
-      if (ContinuousCollider.mStage == Stage.ZONE) {
-         LinkedHashMap<FemNode3d,Double> node2minHitTime =
-         new LinkedHashMap<FemNode3d,Double>();
-         
-         for (int m=0; m<2; m++) {
-            CollidableBody col0 = (m==0) ? collidable0 : collidable1;
-            CollidableBody col1 = (m==0) ? collidable1 : collidable0;
-            
-            FemMeshComp fmc0 = (FemMeshComp)col0;
-            FemMeshComp fmc1 = (FemMeshComp)col1;
-            
-            for (PenetratingPoint pentPt : info.getPenetratingPoints (m)) {
-               FemNode3d node = fmc0.getNodeForVertex (pentPt.vertex);
-               if (ContinuousCollider.isNewMinHitTime (node, pentPt.hitTime, node2minHitTime))
-                  ContinuousCollider.backtrackNode (node, pentPt.vPnt_justBefore_hitTime);
-               
-               for (int v=0; v<3; v++) {
-                  node = fmc1.getNodeForVertex (pentPt.face.getVertex (v));
-                  if (ContinuousCollider.isNewMinHitTime (node, pentPt.hitTime, node2minHitTime))
-                     ContinuousCollider.backtrackNode (node, pentPt.tPnts_justBefore_hitTime[v]);
-               }
-            }
-         }
-         
-         for (EdgeEdgeContact eeCt : info.getEdgeEdgeContacts ()) {
-            FemMeshComp fmc0 = (FemMeshComp)collidable0;
-            FemMeshComp fmc1 = (FemMeshComp)collidable1;
-            
-            // Edge0
-            FemNode3d node = fmc0.getNodeForVertex (eeCt.edge0.head);
-            if (ContinuousCollider.isNewMinHitTime (node, eeCt.hitTime, node2minHitTime))
-               ContinuousCollider.backtrackNode (node, eeCt.e0Pnts_justBefore_hitTime[0]);
-            
-            node = fmc0.getNodeForVertex (eeCt.edge0.tail);
-            if (ContinuousCollider.isNewMinHitTime (node, eeCt.hitTime, node2minHitTime))
-               ContinuousCollider.backtrackNode (node, eeCt.e0Pnts_justBefore_hitTime[1]);
-            
-            // Edge1
-            node = fmc1.getNodeForVertex (eeCt.edge1.head);
-            if (ContinuousCollider.isNewMinHitTime (node, eeCt.hitTime, node2minHitTime))
-               ContinuousCollider.backtrackNode (node, eeCt.e1Pnts_justBefore_hitTime[0]);
-            
-            node = fmc1.getNodeForVertex (eeCt.edge1.tail);
-            if (ContinuousCollider.isNewMinHitTime (node, eeCt.hitTime, node2minHitTime))
-               ContinuousCollider.backtrackNode (node, eeCt.e1Pnts_justBefore_hitTime[1]);
-         }
-
-         return maxpen;
-      }
-      
       // DANCOLEDIT - computeVertexPenetrationUnilateralConstraints()
       
       if (info != null) {

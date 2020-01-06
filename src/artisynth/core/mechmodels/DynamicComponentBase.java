@@ -20,6 +20,9 @@ public abstract class DynamicComponentBase extends RenderableComponentBase
    protected LinkedList<DynamicAttachment> myMasterAttachments;
    protected ArrayList<Constrainer> myConstrainers;
 
+   // Convenient 
+   public boolean wasDynamic;
+   
    protected boolean myDynamicP;
    // Activity myActivity;
    protected int mySolveIdx = -1;

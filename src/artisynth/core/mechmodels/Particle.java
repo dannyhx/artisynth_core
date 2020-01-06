@@ -20,6 +20,8 @@ import java.util.Map;
 public class Particle extends Point implements PointAttachable {
    protected double myMass;
    protected double myEffectiveMass;
+   
+
 
    public static PropertyList myProps =
       new PropertyList (Particle.class, Point.class);

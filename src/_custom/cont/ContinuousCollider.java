@@ -39,8 +39,7 @@ public class ContinuousCollider {
    public static boolean myDebug = false;
    public static double myTimeElipson = 1e-8;
    public static double mySpaceElipson = 1e-10;
-   public static double myDistScale = 1.0;
-   
+
    public static double myClothThickness = 1e-2;   // Should correspond to penetrationTol
    public static double myImminentImpulseScale = 1.00;   // 0.25
    public static double myTimestep = 0.01;
@@ -53,13 +52,15 @@ public class ContinuousCollider {
    
    public enum Stage {IMMINENT, ACTUAL, ZONE};
    public static Stage mStage = Stage.ACTUAL;
+   
+   // Legacy. For forcing backstepping. 0.00 = turned off
    public static double mHitTimeBacktrack = 0.00;
-   public static double minHitTimeBacktrack = 0;
 
    public static int myMaxNumActualIters = 10;
-   public static double myDistScaleDX = 0.5;
+   public static double myImpactZonePenetrationTol = -1e-2;
    public static boolean myEnableProximityDetection = true;
-   public static boolean myEnableActualZoneDetection = true;
+   public static boolean myEnableContinuousDetection = true;
+   public static boolean myEnableImpactZoneDetection = true;
    
    /**
     * Maintains a reference to the unilaterals that were used to undo
@@ -563,7 +564,7 @@ public class ContinuousCollider {
       PenetratingPoint pentPt = new PenetratingPoint(
          sv.myVertex, st.myFace, ccrv.bary, v_hit, v2f_cur, null);
       
-      pentPt.distance = v2f_cur.norm () * myDistScale;
+      pentPt.distance = v2f_cur.norm ();
       
       // Compute normal (direction that vertex should bounce from face).
       
@@ -658,7 +659,7 @@ public class ContinuousCollider {
       eeCt.point0 = se0.computeInstanteousEdgePoint (ccrv.hitTime, ccrv.r);
       eeCt.point1 = se1.computeInstanteousEdgePoint (ccrv.hitTime, ccrv.s);
       
-      eeCt.displacement = e10_pt_cur.norm () * myDistScale;
+      eeCt.displacement = e10_pt_cur.norm ();
       eeCt.point1ToPoint0Normal = e01cross;
       
       // NEW: Edit 0 to minHitTimeBacktrack is 2nd arg
