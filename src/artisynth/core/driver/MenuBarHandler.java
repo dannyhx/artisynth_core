@@ -7,14 +7,11 @@
 package artisynth.core.driver;
 
 import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Container;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.ItemListener;
-import java.awt.event.ItemEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -28,14 +25,12 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JCheckBox;
 import javax.swing.JColorChooser;
-import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JMenu;
-import javax.swing.JLabel;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -44,10 +39,11 @@ import javax.swing.JPopupMenu;
 import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JSeparator;
 import javax.swing.JToolBar;
+import javax.swing.border.BevelBorder;
+import javax.swing.border.Border;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.filechooser.FileFilter;
-import javax.swing.border.EtchedBorder;
 
 import artisynth.core.gui.ControlPanel;
 import artisynth.core.gui.editorManager.Command;
@@ -58,6 +54,7 @@ import artisynth.core.gui.probeEditor.OutputNumericProbeEditor;
 import artisynth.core.gui.selectionManager.SelectionManager;
 import artisynth.core.gui.timeline.GuiStorage;
 import artisynth.core.inverse.InverseManager;
+import artisynth.core.inverse.TrackingController;
 import artisynth.core.mechmodels.MechModel;
 import artisynth.core.modelbase.ComponentUtils;
 import artisynth.core.modelbase.CompositeComponent;
@@ -67,8 +64,8 @@ import artisynth.core.modelmenu.ArtisynthModelMenu;
 import artisynth.core.modelmenu.ModelActionEvent;
 import artisynth.core.modelmenu.ModelActionListener;
 import artisynth.core.probes.Probe;
-import artisynth.core.probes.WayPointProbe;
 import artisynth.core.probes.TracingProbe;
+import artisynth.core.probes.WayPointProbe;
 import artisynth.core.util.AliasTable;
 import artisynth.core.util.ArtisynthPath;
 import artisynth.core.util.ExtensionFileFilter;
@@ -79,17 +76,17 @@ import maspack.properties.HasProperties;
 import maspack.properties.PropertyUtils;
 import maspack.render.RenderListener;
 import maspack.render.RenderableUtils;
-import maspack.render.RendererEvent;
 import maspack.render.Renderer.HighlightStyle;
+import maspack.render.RendererEvent;
 import maspack.render.GL.GLGridPlane;
 import maspack.render.GL.GLViewer;
 import maspack.solvers.PardisoSolver;
 import maspack.util.ClassFinder;
+import maspack.util.FunctionTimer;
 import maspack.util.GenericFileFilter;
 import maspack.util.InternalErrorException;
 import maspack.util.StringHolder;
 import maspack.widgets.AutoCompleteStringField;
-import maspack.widgets.*;
 import maspack.widgets.ButtonCreator;
 import maspack.widgets.DoubleField;
 import maspack.widgets.GridDisplay;
@@ -122,8 +119,20 @@ ModelActionListener {
 
    public static final int MAX_MENU_ROWS = 20; // change to grid layout if larger
 
-   protected JButton navBarButton, rerenderButton, resetButton, playButton,
-   singleStepButton;
+   protected JButton navBarButton;
+   protected JButton rerenderButton;
+   protected ImageIcon realtimeEnabledIcon;
+   protected ImageIcon realtimeDisabledIcon;
+   protected JButton realtimeButton;
+   protected JButton resetStateButton;
+   protected JButton resetButton;
+   protected JButton backButton;
+   protected JButton playButton;
+   protected JButton singleStepButton;
+   protected JButton forwardButton;
+   // initialized in 
+   protected Color defaultButtonBackground;
+   protected Border defaultButtonBorder;
 
    protected JMenuItem[] scriptMenuItems;
 
@@ -196,6 +205,17 @@ ModelActionListener {
          myApplicationMenuAddedP = enable;
       }
    }         
+
+   private void setButtonPressed (JButton button, boolean pressed) {
+      if (pressed) {
+         button.setBorder (new BevelBorder (BevelBorder.LOWERED));
+         button.setBackground (Color.LIGHT_GRAY);
+      }
+      else {
+         button.setBorder (defaultButtonBorder);
+         button.setBackground (defaultButtonBackground);
+      }
+   }
 
    /**
     * creates menu items
@@ -330,23 +350,52 @@ ModelActionListener {
       // Create a space separator
       // height makes space for GridDisplay box
       myMenuBar.add(Box.createRigidArea(new Dimension(20, 28)));
-
       // Create navigation bar button
-      navBarButton = ButtonCreator.createIconicButton(
-         GuiStorage.getNavBarIcon(),
-         myFrame.getNavPanel().getStatus() ? "Hide NavBar" : "Show Navbar",
-            myFrame.getNavPanel().getStatus() ? "Hide NavBar" : "Show Navbar",
-               ButtonCreator.BUTTON_ENABLED, false, this);
+      if (myFrame.getNavPanel().getStatus()) {
+         navBarButton = ButtonCreator.createIconicButton(
+            GuiStorage.getNavBarIcon(),
+            "Hide NavPanel", "Hide navigation panel", 
+            ButtonCreator.BUTTON_ENABLED, false, this);
+      }
+      else {
+         navBarButton = ButtonCreator.createIconicButton(
+            GuiStorage.getNavBarIcon(),
+            "Show NavPanel", "Show navigation panel", 
+            ButtonCreator.BUTTON_ENABLED, false, this);
+      }
+
+      defaultButtonBackground = navBarButton.getBackground();
+      defaultButtonBorder = navBarButton.getBorder();
 
       myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
       myToolBar.add(navBarButton);
-      myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
 
+      myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
+      resetStateButton = ButtonCreator.createIconicButton(
+         GuiUtils.loadIcon(ControlPanel.class, "icon/resetState.png"),
+         "Reset initial state", "Reset the initial state", 
+         ButtonCreator.BUTTON_ENABLED, false, this);
+      myToolBar.add(resetStateButton);
+
+      myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
       rerenderButton = ButtonCreator.createIconicButton(
          GuiUtils.loadIcon(ControlPanel.class, "icon/refresh.png"),
-         "Re-render", "Re-render", ButtonCreator.BUTTON_ENABLED, false, this);
+         "Rerender", "Rerender all displays",
+         ButtonCreator.BUTTON_ENABLED, false, this);
 
       myToolBar.add(rerenderButton);
+
+      myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
+//      realtimeEnabledIcon =
+//         GuiUtils.loadIcon(ControlPanel.class, "icon/checkedClock.png");
+//      realtimeDisabledIcon =
+//         GuiUtils.loadIcon(ControlPanel.class, "icon/uncheckedClock.png");
+      realtimeButton = ButtonCreator.createIconicButton(
+         GuiUtils.loadIcon(ControlPanel.class, "icon/clock.png"),
+         "Disable real-time", "Enables real-time simulation when pressed", 
+         ButtonCreator.BUTTON_ENABLED, false, this);
+      myToolBar.add(realtimeButton);
+      setButtonPressed (realtimeButton, true);
 
       // Charles modification
       // creates a message Box. Currently only used for Units
@@ -367,25 +416,45 @@ ModelActionListener {
 
       // Create reset button
       resetButton = ButtonCreator.createIconicButton(
-         GuiStorage.getResetIcon(), "Reset", "Reset",
+         GuiStorage.getResetIcon(),
+         "Reset", "Reset time to 0",
          ButtonCreator.BUTTON_ENABLED, false, this);
       myToolBar.add(resetButton);
       myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
 
+      // Create back button
+      backButton = ButtonCreator.createIconicButton(
+         GuiStorage.getRewindIcon(),
+         "Skip back", "Skip back to previous valid waypoint",
+         ButtonCreator.BUTTON_ENABLED, false, this);
+      myToolBar.add(backButton);
+      myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
+
       // Create play button
       playButton = ButtonCreator.createIconicButton(
-         GuiStorage.getPlayIcon(), "Play", "Play",
+         GuiStorage.getPlayIcon(),
+         "Play", "Start simulation",
          ButtonCreator.BUTTON_DISABLED, false, this);
       myToolBar.add(playButton);
       myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
 
       // Create step button
       singleStepButton = ButtonCreator.createIconicButton(
-         GuiStorage.getStepForwardIcon(), "Single step", "Single step",
+         GuiStorage.getStepForwardIcon(),
+         "Single step", "Advance simulation by a single time step",
          ButtonCreator.BUTTON_DISABLED, false, this);
 
       myToolBar.add(singleStepButton);
       myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
+
+      // Create back button
+      forwardButton = ButtonCreator.createIconicButton(
+         GuiStorage.getFastForwardIcon(),
+         "Skip forward", "Skip forward to next valid waypoint",
+         ButtonCreator.BUTTON_DISABLED, false, this);
+      myToolBar.add(forwardButton);
+      myToolBar.add(Box.createRigidArea(new Dimension(2, 0)));
+      forwardButton.setEnabled (false);
 
       // Set the menu bar
       myFrame.setJMenuBar(myMenuBar);
@@ -478,7 +547,11 @@ ModelActionListener {
       @Override
       public void run() {
          if (menuFile != null && menuFile.exists()) {
+            FunctionTimer timer = new FunctionTimer();
+            timer.start();
             ArtisynthModelMenu generator = readDemoMenu(menuFile.getAbsolutePath());
+            timer.stop();
+            //System.out.println ("menu parse time=" + timer.result(1));
 
             // XXX only replace menu if it differs from current menu
             if (myModelsMenuGenerator == null || !generator.getMenuTree().equalsTree(myModelsMenuGenerator.getMenuTree())) {
@@ -604,7 +677,6 @@ ModelActionListener {
             e.printStackTrace();
             GuiUtils.showError (myFrame, "Error writing "+modelFile.getPath());
          }
-         updateModelButtons();
       }
    }
 
@@ -617,24 +689,26 @@ ModelActionListener {
       
       if (chooser.showDialog(myFrame, "Save As") ==
           JFileChooser.APPROVE_OPTION) {
-         File modelFile = chooser.getSelectedFile();
+         File file = chooser.getSelectedFile();
+         if (file.exists() && !GuiUtils.confirmOverwrite (myFrame, file)) {
+            return;
+         }
          int status = 0;
          try {
             status = myMain.saveModelFile (
-               modelFile, null,
+               file, null,
                chooser.getSaveWayPointData(),
                chooser.getCoreCompsOnly());
          }
          catch (Exception e) {
             e.printStackTrace();
             GuiUtils.showError (
-               myFrame, "Error writing " + modelFile.getPath());
+               myFrame, "Error writing " + file.getPath());
          }
          if (status > 0) {
             GuiUtils.showNotice (
                myFrame, "Removed "+status+" non-core components");
          }
-         updateModelButtons();
       }
    }
 
@@ -645,8 +719,6 @@ ModelActionListener {
          e.printStackTrace();
          GuiUtils.showError (myFrame, "Error reloading model:\n" + e);
       }
-      updateModelButtons();
-
    }
 
    private void doLoadModel() {
@@ -659,7 +731,6 @@ ModelActionListener {
             GuiUtils.showError(
                myFrame, "Error reading " + modelFile.getPath() + ":\n" + e);
          }
-         updateModelButtons();
       }
    }
 
@@ -676,7 +747,6 @@ ModelActionListener {
          if (!myMain.loadModel(mi)) {
             GuiUtils.showError (myFrame, myMain.getErrorMessage());
          }
-         updateModelButtons();
       }
    }
 
@@ -1215,6 +1285,7 @@ ModelActionListener {
             scheduler.setRealTimeAdvance (true);
             scheduler.setRealTimeScaling (scaling);
          }
+         myMain.rerender();
       }
    }
 
@@ -1350,7 +1421,7 @@ ModelActionListener {
     */
    public void actionPerformed(ActionEvent event) {
       String cmd = event.getActionCommand();
-
+      RootModel root = myMain.getRootModel();
       //
       // Scripts menu
       if (isScriptMenuItem(event.getSource())) {
@@ -1552,10 +1623,21 @@ ModelActionListener {
          setJythonConsoleVisible(true);
       }
       else if (cmd.equals("Show Inverse panel")) {
-         myMain.getInverseManager().showInversePanel(myMain.getRootModel (), InverseManager.findInverseController ());
+         ControlPanel panel = InverseManager.findInversePanel(root);
+         TrackingController controller = 
+            InverseManager.findInverseController(root);
+         if (panel == null && controller != null) {
+            InverseManager.addInversePanel (root, controller);
+//            myMain.getInverseManager().showInversePanel(
+//               myMain.getRootModel(), controller);
+         }
       }
       else if (cmd.equals("Hide Inverse panel")) {
-         myMain.getInverseManager().hideInversePanel();
+         ControlPanel panel = InverseManager.findInversePanel(root);
+         if (panel != null) {
+            root.removeControlPanel(panel);
+         }
+         //myMain.getInverseManager().hideInversePanel();
       }
       else if (cmd.equals("Show movie panel")) {
          myFrame.getMain().getViewer().getCanvas().display();
@@ -1576,24 +1658,24 @@ ModelActionListener {
          myMain.createViewerFrame();
       }
       else if (cmd.equals("Clear traces")) {
-         myMain.getRootModel().clearTraces();
+         root.clearTraces();
       }
       else if (cmd.equals("Disable all tracing")) {
-         myMain.getRootModel().disableAllTracing();
+         root.disableAllTracing();
       }
       else if (cmd.equals("Remove traces")) {
          RemoveComponentsCommand rmCmd =
          new RemoveComponentsCommand(
-            "remove traces", myMain.getRootModel().getTracingProbes());
+            "remove traces", root.getTracingProbes());
          myMain.getUndoManager().saveStateAndExecute(rmCmd);
          myMain.rerender();
       }
       else if (cmd.equals("Set traces visible")) {
-         myMain.getRootModel().setTracingProbesVisible(true);
+         root.setTracingProbesVisible(true);
          myMain.rerender();
       }
       else if (cmd.equals("Set traces invisible")) {
-         myMain.getRootModel().setTracingProbesVisible(false);
+         root.setTracingProbesVisible(false);
          myMain.rerender();
       }
       else if (cmd.equals("Hide viewer toolbar")) {
@@ -1605,10 +1687,10 @@ ModelActionListener {
          attachViewerToolbar(toolbarPanel);
       }
       else if (cmd.equals("Merge control panels")) {
-         myMain.getRootModel().mergeAllControlPanels(true);
+         root.mergeAllControlPanels(true);
       }
       else if (cmd.equals("Separate control panels")) {
-         myMain.getRootModel().mergeAllControlPanels(false);
+         root.mergeAllControlPanels(false);
       }
       else if (cmd.equals("Show progress")) {
          spawnProgressBar ();
@@ -1620,7 +1702,7 @@ ModelActionListener {
          myFrame.displayAboutArtisynth();
       }
       else if (cmd.equals("About the current model")) {
-         myFrame.displayAboutModel(myMain.getRootModel());
+         myFrame.displayAboutModel(root);
       }
       else if (cmd.equals("Keybindings")) {
          myFrame.displayKeybindings();
@@ -1628,25 +1710,25 @@ ModelActionListener {
       //
       // Tool bar buttons
       //
-      else if (cmd.equals("Hide NavBar")) {
+      else if (cmd.equals("Hide NavPanel")) {
          myFrame.getNavPanel().setStatus(!myFrame.getNavPanel().getStatus());
          myFrame.refreshSplitPane();
-         navBarButton.setToolTipText("Show Navbar");
-         navBarButton.setActionCommand("Show Navbar");
+         navBarButton.setToolTipText("Show navigation panel");
+         navBarButton.setActionCommand("Show NavPanel");
       }
-      else if (cmd.equals("Show Navbar")) {
+      else if (cmd.equals("Show NavPanel")) {
          myFrame.getNavPanel().setStatus(!myFrame.getNavPanel().getStatus());
          myFrame.refreshSplitPane();
-         navBarButton.setToolTipText("Hide NavBar");
-         navBarButton.setActionCommand("Hide NavBar");
+         navBarButton.setToolTipText("Hide navigation panel");
+         navBarButton.setActionCommand("Hide NavPanel");
       }
-      else if (cmd.equals("Re-render")) {
+      else if (cmd.equals("Rerender")) {
          myMain.rerender();
       }
       else if (cmd.equals("Reset")) {
          myMain.getScheduler().reset();
       }
-      else if (cmd.equals("Rewind")) {
+      else if (cmd.equals("Skip back")) {
          myMain.getScheduler().rewind();
       }
       else if (cmd.equals("Play")) {
@@ -1658,9 +1740,25 @@ ModelActionListener {
       else if (cmd.equals("Single step")) {
          myMain.getScheduler().step();
       }
-      else if (cmd.equals("Fast forward")) {
+      else if (cmd.equals("Skip forward")) {
          myMain.getScheduler().fastForward();
       }
+      else if (cmd.equals("Reset initial state")) {
+         if (root != null) {
+            root.resetInitialState();
+         }
+      }
+      else if (cmd.equals("Disable real-time")) {
+         myMain.getScheduler().setRealTimeAdvance(false);
+         realtimeButton.setActionCommand ("Enable real-time");
+         setButtonPressed (realtimeButton, false);
+      }
+      else if (cmd.equals("Enable real-time")) {
+         myMain.getScheduler().setRealTimeAdvance(true);
+         realtimeButton.setActionCommand ("Disable real-time");
+         setButtonPressed (realtimeButton, true);
+      }
+
       else if (cmd.equals("cancel")) {
          return;
       }
@@ -1725,7 +1823,7 @@ ModelActionListener {
 
    public void enableShowPlay() {
       playButton.setIcon(GuiStorage.getPlayIcon());
-      playButton.setToolTipText("Play");
+      playButton.setToolTipText("Start simulation");
       playButton.setActionCommand("Play");
       playButton.setEnabled(true);
       // setResetButton (true);
@@ -1734,10 +1832,20 @@ ModelActionListener {
 
    public void disableShowPlay() {
       playButton.setIcon(GuiStorage.getPauseIcon());
-      playButton.setToolTipText("Pause");
+      playButton.setToolTipText("Pause simulation");
       playButton.setActionCommand("Pause");
       // setResetButton (true);
       singleStepButton.setEnabled(false);
+   }
+   
+   protected void updateForwardButton () {
+      boolean enabled = false;
+      RootModel root = myMain.getRootModel();
+      if (root != null) {
+         enabled = 
+            (root.getWayPoints().getValidAfter (myMain.getTime()) != null);
+      }
+      forwardButton.setEnabled (enabled);     
    }
 
    public void detachToolbar() {
@@ -1884,24 +1992,6 @@ ModelActionListener {
    // }
    // }
 
-   void updateModelButtons() {
-      // RootModel rootModel = myMain.getRootModel();
-      //
-      // if (rootModel.getAbout() != null && rootModel.getAbout().length() > 0)
-      // {
-      // // then the root model contains an information string; add
-      // // the appropriate menu item
-      // if (!GuiUtils.containsMenuComponent (helpMenu, aboutModelItem)) {
-      // helpMenu.add (aboutModelItem);
-      // }
-      // }
-      // else {
-      // if (GuiUtils.containsMenuComponent (helpMenu, aboutModelItem)) {
-      // helpMenu.remove (aboutModelItem);
-      // }
-      // }
-   }
-
    public void updateWidgets() {
       // return if frame is not visible, since updating widgets while
       // frame is being set visible can cause some problems
@@ -1925,6 +2015,7 @@ ModelActionListener {
       if (myGridDisplay != null) {
          myGridDisplay.updateWidgets();
       }
+      updateForwardButton();
    }
 
    private JMenuItem addMenuItem(JMenu menu, String label, String cmd) {
@@ -2143,8 +2234,8 @@ ModelActionListener {
          }
       }
 
-      if (InverseManager.inverseControllerExists()) {
-         if (InverseManager.isInversePanelVisible()) {
+      if (InverseManager.findInverseController(root) != null) {
+         if (InverseManager.findInversePanel(root) != null) {
             addMenuItem(menu, "Hide Inverse panel");
          }
          else {

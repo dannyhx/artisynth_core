@@ -177,13 +177,14 @@ public class NumericInputProbe extends NumericProbeBase
       int[] variableDimensions = new int[props.length];
 
       for (int i = 0; i < props.length; i++) {
+         if (props[i] == null) {
+            throw new IllegalArgumentException ("prop["+i+"] is null");
+         }
          NumericConverter numInfo = null;
          try {
             numInfo = new NumericConverter (props[i].get());
          }
          catch (Exception e) {
-            throw new IllegalArgumentException ("property '"
-            + props[i].getInfo().getName() + "' is not numeric");
          }
          driverExpressions[i] = "V" + i;
          variableNames[i] = "V" + i;
@@ -284,6 +285,19 @@ public class NumericInputProbe extends NumericProbeBase
       // myAttachedFile = null;
       ReaderTokenizer rtok =
          new ReaderTokenizer (new BufferedReader (new FileReader (file)));
+      try {
+         read (rtok, setTimes);
+      }
+      catch (IOException e) {
+         throw e;
+      }
+      finally {
+         rtok.close();
+      }
+   }
+   
+   protected void read (ReaderTokenizer rtok, boolean setTimes) 
+      throws IOException {
       rtok.commentChar ('#');
       rtok.ordinaryChar ('/');
       double time = 0;
@@ -398,19 +412,19 @@ public class NumericInputProbe extends NumericProbeBase
    public void save() throws IOException {
       File file = getAttachedFile();
       if (file != null) {
-         try {
-            if (isAttachedFileRelative()) {
-               file.getParentFile().mkdirs();
-            }
-            PrintWriter pw =
-               new PrintWriter (new BufferedWriter (new FileWriter (file)));
-            System.out.println ("saving input probe to " + file.getName());
-            write (pw, myFormatStr);
-            pw.close();
+         if (isAttachedFileRelative()) {
+            file.getParentFile().mkdirs();
          }
-         catch (Exception e) {
-            System.out.println ("Error writing file " + file.getName());
-            e.printStackTrace();
+         PrintWriter pw = 
+            new PrintWriter (new BufferedWriter (new FileWriter (file)));
+         try {
+            write (pw, myFormatStr);
+         }
+         catch (IOException e) {
+            throw e;
+         }
+         finally {
+            pw.close();
          }
       }
    }
@@ -429,10 +443,12 @@ public class NumericInputProbe extends NumericProbeBase
    protected void load(boolean setTimes) throws IOException {
       File file = getAttachedFile();
       if (file != null) {
-         if (!file.exists()) {
-            System.out.println ("Input probe file " + file.getName()
-            + " does not exist");
+         if (!file.exists ()) {
+            throw new IOException ("File '"+file+"' does not exist");
          }
+         else if (!file.canRead ()) {
+            throw new IOException ("File '"+file+"' is not readable");
+         }         
          else {
             read (file,setTimes);
          }
@@ -846,8 +862,20 @@ public class NumericInputProbe extends NumericProbeBase
       tmpDriverExpressions = null;
       tmpVariableDimensions = null;
       if (getAttachedFileName() != null) {
-         load();
-      }      
+         // Bit of a hack here. If there is an attached file and if no data has
+         // been defined, try tp read the data from the attached file.  This is
+         // for backward compatibility.
+         if (myNumericList == null || myNumericList.isEmpty()) {
+            try {
+               load();
+            }
+            catch (Exception e) {
+               System.out.println (
+                  "Warning: can't read input probe file " +
+                  getAttachedFileName() + ": " + e.getMessage());
+            }
+         }
+      }       
    }
 
    public void writeItems (

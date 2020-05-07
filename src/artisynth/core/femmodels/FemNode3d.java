@@ -25,6 +25,7 @@ import artisynth.core.mechmodels.MechSystemBase;
 import artisynth.core.modelbase.ComponentChangeEvent;
 import artisynth.core.modelbase.ComponentChangeEvent.Code;
 import artisynth.core.modelbase.CompositeComponent;
+import artisynth.core.modelbase.CopyableComponent;
 import artisynth.core.modelbase.ModelComponent;
 import artisynth.core.modelbase.TransformGeometryContext;
 import artisynth.core.modelbase.TransformableGeometry;
@@ -142,12 +143,18 @@ public class FemNode3d extends FemNode implements Boundable {
          "stress", "average stress in this node");
       myProps.addReadOnly (
          "vonMisesStress", "average von Mises stress in this node");
+      myProps.addReadOnly (
+         "MAPStress",
+         "maximum absolute principal stress value");
       myProps.add (
          "computeStrain", "compute strain for this node", false);
       myProps.addReadOnly (
          "strain", "average strain in this node");
       myProps.addReadOnly (
          "vonMisesStrain", "average von Mises strain in this node");
+      myProps.addReadOnly (
+         "MAPStrain",
+         "maximum absolute principal strain value");
       myProps.add("index", "Index of node (for external use)", -1);
    }
 
@@ -295,7 +302,7 @@ public class FemNode3d extends FemNode implements Boundable {
     * 
     * @return max abs principal stress, or 0 is stress is not being computed
     */   
-   public double getMaxAbsPrincipalStress () {
+   public double getMAPStress () {
       return (myAvgStress == null) ? 0 : computeMaxAbsEigenvalue(myAvgStress);
    }
 
@@ -339,7 +346,7 @@ public class FemNode3d extends FemNode implements Boundable {
 
     * @return max abs strain, or 0 is strain is not being computed
     */
-   public double getMaxAbsPrincipalStrain () {
+   public double getMAPStrain () {
       return (myAvgStrain == null) ? 0 : computeMaxAbsEigenvalue(myAvgStrain);
    }
 
@@ -880,7 +887,15 @@ public class FemNode3d extends FemNode implements Boundable {
          myBackNode.myMass = 0;
       }
       for (FemElement3dBase e : myElementDeps) {
-         double massPerNode = e.getRestVolume()*e.getDensity()/e.numNodes();
+         double restMass = e.getRestVolume()*e.getDensity();
+         int nidx = e.getLocalNodeIndex(this);
+         double massPerNode;
+         if (FemModel3d.useNodalMassWeights) {
+            massPerNode = restMass*e.getNodeMassWeights()[nidx];
+         }
+         else {
+            massPerNode = restMass/e.numNodes();
+         }
          if (e.getElementClass() == ElementClass.SHELL) {
             if (getBackNode() == null) {
                // should be allocated already, but just in case
@@ -892,6 +907,28 @@ public class FemNode3d extends FemNode implements Boundable {
          mass += massPerNode;
       }
       return mass;
+   }
+   
+   protected double computeDefaultMass() {
+      double mass = 0;
+      for (FemElement3dBase e : myElementDeps) {
+         double restMass = e.getRestVolume()*e.getDensity();
+         int nidx = e.getLocalNodeIndex(this);
+         //double massPerNode = restMass/e.numNodes();
+         double massPerNode = restMass*e.getNodeMassWeights()[nidx];
+         mass += massPerNode;
+      }
+      return mass;     
+   }
+   
+   protected double computeDensityScale() {
+      if (myMassExplicitP) {
+         // XXX what if default mass is 0?
+         return myMass/computeDefaultMass();
+      }
+      else {
+         return 1.0;
+      }
    }
 
    @Override
@@ -989,12 +1026,23 @@ public class FemNode3d extends FemNode implements Boundable {
 
       FemNode3d node = (FemNode3d)super.copy (flags, copyMap);
 
+      if ((flags & CopyableComponent.REST_POSITION) != 0) {
+         node.setPosition (myRest);
+         node.setVelocity (Vector3d.ZERO);
+         node.zeroForces ();
+      }
+
       node.myRest = new Point3d (myRest);
       node.myInternalForce = new Vector3d();
       node.myElementDeps = new LinkedList<FemElement3dBase>();
       node.myShellElemCnt = 0;
       node.myNodeNeighbors = new LinkedList<FemNodeNeighbor>();
       node.myIndirectNeighbors = null;
+
+      if (myBackNode != null) {
+         node.myBackNode = myBackNode.copy (flags, copyMap);
+         node.myBackNode.myNode = node;
+      }
 
       node.myIncompressIdx = -1;
       //node.myLocalIncompressIdx = -1;

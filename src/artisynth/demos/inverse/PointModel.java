@@ -41,7 +41,8 @@ import artisynth.core.workspace.RootModel;
 
 public class PointModel extends RootModel
 {
-   
+   public static boolean omitFromMenu = true;
+
    public String getAbout() {
       return"A point-mass model being controlled by the inverse tracking controller.\n\n"+
 	    "The model and controller were developed by Ian Stavness, please cite: \n" +
@@ -504,14 +505,13 @@ public class PointModel extends RootModel
       RenderProps.setPointRadius ((Renderable)target, 0.525);
 
       if (useReactionForceTargetP) { 
-         ForceTargetTerm forceTerm = new ForceTargetTerm (myTrackingController);
+         ForceTargetTerm forceTerm = myTrackingController.addForceTargetTerm();
          ForceTarget ft = forceTerm.addForceTarget (
             model.bodyConnectors ().get ("center_constraint"));
          ft.setArrowSize (2);
          RenderProps.setLineStyle (ft, LineStyle.CYLINDER);
          RenderProps.setLineRadius (ft, 0.25);
          forceTerm.setWeight (1d);
-         myTrackingController.addForceTargetTerm (forceTerm);
       }
       
 //      myTrackingController.getSolver().setBounds(0.01, 0.99);

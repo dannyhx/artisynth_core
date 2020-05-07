@@ -8,6 +8,7 @@
 package artisynth.core.driver;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.event.WindowAdapter;
@@ -156,7 +157,6 @@ public class Main implements DriverInterface, ComponentChangeListener {
    protected Scheduler myScheduler;
    protected EditorManager myEditorManager;
    protected UndoManager myUndoManager;
-   protected InverseManager myInverseManager;
    protected MovieMaker myMovieMaker;
    protected Logger myLogger;
 
@@ -667,7 +667,6 @@ public class Main implements DriverInterface, ComponentChangeListener {
       
       myEditorManager = new EditorManager (this);
       myUndoManager = new UndoManager();
-      myInverseManager = new InverseManager(this);
 
       // need to create selection manager before MainFrame, because
       // some things in MainFrame will assume it exists
@@ -795,6 +794,27 @@ public class Main implements DriverInterface, ComponentChangeListener {
             myTimeline.setVisible (false);
          }
       }
+   }
+   
+   /**
+    * Queries whether real-time model advancement is enabled.
+    * 
+    * @return {@code true} if real-time model advancement is enabled
+    * @see #setRealTimeAdvance
+    */
+   public boolean getRealTimeAdvance() {
+      return myScheduler.getRealTimeAdvance();
+   }
+   
+   /**
+    * Enables or disables real-time model advancement. If enabled,
+    * the model simulation will be slowed down (if necessary) so
+    * that the simulation does proceed faster than real time.
+    * 
+    * @param enable if {@code true}, enables real-time model advancement
+    */
+   public void setRealTimeAdvance (boolean enable) {
+      myScheduler.setRealTimeAdvance (enable);
    }
 
    public void setFrameRate (double val) {
@@ -1223,7 +1243,6 @@ public class Main implements DriverInterface, ComponentChangeListener {
             createJythonConsole (/*useGui=*/false);
          }
       }
-      
    }
 
    public RootModel getRootModel() {
@@ -1417,7 +1436,6 @@ public class Main implements DriverInterface, ComponentChangeListener {
 
       if (myFrame != null) {
          myMenuBarHandler.enableShowPlay();
-         myMenuBarHandler.updateModelButtons();
 
          if (mySelectionMode == SelectionMode.Pull) {
             // add pull controller here, before nav panel is update            
@@ -1571,6 +1589,8 @@ public class Main implements DriverInterface, ComponentChangeListener {
                demoClass.getConstructor (String.class);
             newRoot = (RootModel)constructor.newInstance (modelName);
          }
+         // make sure all referenced components are part of the hierarchy
+         ComponentUtils.checkReferenceContainment (newRoot, newRoot);
          return newRoot;
       }
       catch (Exception e) {
@@ -1830,6 +1850,8 @@ public class Main implements DriverInterface, ComponentChangeListener {
    protected static StringHolder scriptsFilename =
       new StringHolder (".artisynthScripts");
    protected static StringHolder scriptFile = 
+         new StringHolder(); 
+   protected static StringHolder wayPointsFile = 
          new StringHolder(); 
    protected static StringHolder taskManagerClassName = 
          new StringHolder(); 
@@ -2135,6 +2157,9 @@ public class Main implements DriverInterface, ComponentChangeListener {
       parser.addOption (
          "-movieMethod %s #method to use when making movies",
          movieMethod);
+      parser.addOption (
+         "-waypoints %s # specifies a waypoints file to load",
+         wayPointsFile);
       
       Locale.setDefault(Locale.CANADA);
 
@@ -2318,7 +2343,9 @@ public class Main implements DriverInterface, ComponentChangeListener {
       }
 
       if (m.myFrame != null) {
-         m.myViewer.setBackgroundColor (bgColor[0], bgColor[1], bgColor[2]);
+         m.myViewerManager.setBackgroundColor (
+            new Color (bgColor[0], bgColor[1], bgColor[2]));
+         //m.myViewer.setBackgroundColor (bgColor[0], bgColor[1], bgColor[2]);
          // XXX this should be done in the Main constructor, but needs
          // to be done here instead because of sizing effects
          m.myMenuBarHandler.initToolbar();
@@ -2419,6 +2446,15 @@ public class Main implements DriverInterface, ComponentChangeListener {
       }
       else {
          m.setRootModel (new RootModel(), null, null);
+      }
+
+      if (wayPointsFile.value != null) {
+         try {
+            m.loadWayPoints (new File(wayPointsFile.value));
+         }
+         catch (IOException e) {
+            e.printStackTrace(); 
+         }
       }
 
       if (exitOnBreak.value) {
@@ -2569,10 +2605,6 @@ public class Main implements DriverInterface, ComponentChangeListener {
 
    public UndoManager getUndoManager() {
       return myUndoManager;
-   }
-
-   public InverseManager getInverseManager() {
-      return myInverseManager;
    }
 
    /**
@@ -2841,7 +2873,7 @@ public class Main implements DriverInterface, ComponentChangeListener {
          numRemoved = incomp.size();
       }
       try {
-         pw = new IndentingPrintWriter (file);
+         pw = ArtisynthIO.newIndentingPrintWriter (file);
          if (fmtStr == null) {
             fmtStr = getModelSaveFormat();
          }
@@ -2936,15 +2968,10 @@ public class Main implements DriverInterface, ComponentChangeListener {
    protected void setWayPointsFile (File file) throws IOException {
       if (getRootModel() != null) {
          WayPointProbe wayPoints = getRootModel().getWayPoints();
-         String workspace = new String (ArtisynthPath.getWorkingDirPath());
-
-         String absfile = file.getCanonicalPath();
-         
-         if (absfile.startsWith (workspace)) {
-            absfile = new String (absfile.substring (workspace.length() + 1));
-         }
-         System.out.println ("absfile=" + absfile);
-         wayPoints.setAttachedFileName (absfile);
+         String relOrAbsPath = ArtisynthPath.getRelativeOrAbsolutePath (
+            ArtisynthPath.getWorkingDir(), file);
+         System.out.println ("waypoints file path=" + relOrAbsPath);
+         wayPoints.setAttachedFileName (relOrAbsPath);
       }
    }
 
@@ -3150,7 +3177,9 @@ public class Main implements DriverInterface, ComponentChangeListener {
       // 
       // if (invalidateWaypoints)  && !myScheduler.isPlaying()) {
       if (stateInvalidated) {
-         myScheduler.invalidateInitialState();
+         if (root != null) {
+            root.invalidateInitialState();
+         }
       }
    }
 
