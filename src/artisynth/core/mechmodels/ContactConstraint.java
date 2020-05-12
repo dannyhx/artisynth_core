@@ -8,7 +8,7 @@ package artisynth.core.mechmodels;
 
 import java.util.ArrayList;
 
-import _custom.cont.ContinuousCollider;
+import _custom.cont.CollisionDetector;
 import maspack.collision.PenetrationRegion;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.MatrixBlock;
@@ -51,7 +51,7 @@ public class ContactConstraint {
    
    // DANCOLEDIT
    public int m = 0;
-   public ContinuousCollider.Stage myStage = null;
+   public CollisionDetector.Stage myStage = null;
 
    public double getForce() {
       return myLambda;

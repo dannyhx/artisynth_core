@@ -11,7 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import _custom.cont.ContinuousCollider;
+import _custom.cont.CollisionDetector;
 import _custom.cont.SweptMeshInfo;
 import _custom.cont.SweptTriangle;
 import _custom.cont.SweptVertex;
@@ -132,8 +132,8 @@ public class CollisionManager extends RenderableCompositeBase
    implements ScalableUnits, Constrainer, HasNumericState {
 
    // DANCOLEDIT
-   protected ContinuousCollider myContCldr = null;
-   public ContinuousCollider getContinuousCollider() { return myContCldr; }
+   protected CollisionDetector myContCldr = null;
+   public CollisionDetector getContinuousCollider() { return myContCldr; }
    
    // Current assumptions:
    //
@@ -2275,7 +2275,7 @@ public class CollisionManager extends RenderableCompositeBase
          // DANCOLEDIT - CONTINUOUS case
          case CONTINUOUS: {
             if (myContCldr == null) {
-               myContCldr = new ContinuousCollider ();
+               myContCldr = new CollisionDetector ();
             }
      
             cinfo = myContCldr.getContacts (c0, c1);

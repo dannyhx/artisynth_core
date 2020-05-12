@@ -1,15 +1,17 @@
 package _custom.cont;
 
+import maspack.geometry.Face;
+import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
-import maspack.matrix.RigidTransform3d;
-import maspack.matrix.Vector2d;
 import maspack.matrix.Vector3d;
-import maspack.util.DataBuffer;
-import _custom.cont.BoundablePointArray;
-import maspack.geometry.*;
 
+/** Space-time path of a triangle, across a single time step. */
 public class SweptTriangle extends BoundablePointArray {
 
+   // Convenient array indices that represent the starting and ending 
+   // vertex positions of the traversed triangle.
+   // (A0,B0,C0) -> (A1,B1,C1)
+   
    public final int A1 = 0;
    public final int B1 = 1;
    public final int C1 = 2;
@@ -18,9 +20,10 @@ public class SweptTriangle extends BoundablePointArray {
    public final int B0 = 4;
    public final int C0 = 5;
 
+   /** Traversing triangle. */
    Face myFace;
    
-
+   /** Space-time path of a triangle, across a single time step. */
    public SweptTriangle (Face face, Point3d[] oldPositions) {
       super (6);
       myFace = face;
@@ -38,6 +41,15 @@ public class SweptTriangle extends BoundablePointArray {
       myPnts[C0] = oldPositions[vtxs[2].getIndex()];
    }  
 
+   /** Get the instanteous location of the triangle.
+    * 
+    * @param t 
+    * Fraction of the path, ranging from 0 to 1. For example, 0.5 returns the
+    * triangle that's half-way along its traversed path.
+    * 
+    * @return 
+    * Vertex positions of the instanteous triangle.
+    */
    public Point3d[] computeInstanteousTriangle(double t) {
       Point3d[] tri = new Point3d[3];
       
@@ -55,6 +67,13 @@ public class SweptTriangle extends BoundablePointArray {
       return tri;
    }
    
+   /** Get the instanteous normal of a triangle.
+    * 
+    * @param t 
+    * Fraction of the path, ranging from 0 to 1. For example, 0.5 returns the
+    * normal of the triangle when the triangle is half-way along its traversed
+    * path.
+    */
    public Vector3d computeInstanteousNormal(double t) {
       Point3d[] instTri = computeInstanteousTriangle (t);
       return MathUtil.getNormal (instTri[0], instTri[1], instTri[2]);

@@ -4,15 +4,24 @@ import java.util.ArrayList;
 
 import artisynth.core.mechmodels.CollisionHandler;
 
+/** Aggregation of unilateral constraints.
+ * 
+ * Maintains a reference to the unilaterals that were used to undo
+ * the penetration points. These unilaterals are adjusted during remeshing
+ * before they're applied to the subsequent constraint backward Euler 
+ * solve.
+ */
 public class ContactConstraintAgg {
    
+   /** Collision handler for each collidable body pair. Each handler has its
+    *  own set of unilateral constraints. */
    public ArrayList<CollisionHandler> myColHdlrs;
    
    public ContactConstraintAgg() {
-      
    }
    
-   public ContactConstraintAgg(ArrayList<CollisionHandler> colHdlrs, boolean isShallowCopy) {
+   public ContactConstraintAgg(
+   ArrayList<CollisionHandler> colHdlrs, boolean isShallowCopy) {
       set(colHdlrs, isShallowCopy);
    }
    
@@ -23,12 +32,14 @@ public class ContactConstraintAgg {
          myColHdlrs = colHdlrs;
    }
    
+   /** Remove the unilateral constraints from the collidiable body pairs. */
    public void clearConstraints() {
       for (CollisionHandler colHdlr : myColHdlrs) {
          colHdlr.myUnilaterals.clear ();
       }
    }
    
+   /** Count the number of unilateral constraints. */
    public int numConstraints() {
       int cnt = 0;
       for (CollisionHandler colHdlr : myColHdlrs) {
@@ -38,10 +49,13 @@ public class ContactConstraintAgg {
    }
    
    /**
-    * Merge the unilateral constraints from newCCAgg into this.
+    * Merge the unilateral constraints from another aggregation into this.
+    * 
+    * @param newCCAgg
+    * Another aggregation of unilateral constraints that is to be merged into 
+    * this.
     */
-   public void addConstraints(ContactConstraintAgg newCCAgg)
-   {
+   public void addConstraints(ContactConstraintAgg newCCAgg) {
       if (newCCAgg.myColHdlrs == null) {
          return;
       }
@@ -57,6 +71,7 @@ public class ContactConstraintAgg {
       }
    }
    
+   /** Are the collidable body pairs the same? */
    protected boolean isSameCollidablePair(CollisionHandler A, CollisionHandler B) {
       return (A.getCollidable (0) == B.getCollidable (0) && 
               A.getCollidable (1) == B.getCollidable (1));

@@ -13,9 +13,11 @@ import maspack.render.Renderer;
 import maspack.render.color.ColorMap;
 import maspack.render.color.RainbowColorMap;
 
+/** Visualize a contact. Debugging purposes. */
 public class ContinuousRenderable {
    
    protected ContactInfo cinfo;
+   
    protected double vecLenScale = 5;
    
    public ContinuousRenderable(ContactInfo cinfo) {
@@ -23,17 +25,8 @@ public class ContinuousRenderable {
    }
    
    public void render(Renderer renderer, int flags) {
-      double a = 0;
-      ColorMap colorMap = new RainbowColorMap();
-      Color curColor = null;
-      
+
       for (EdgeEdgeContact eeCt : cinfo.getEdgeEdgeContacts ()) {
-         
-//         a += 0.05;
-//         curColor = colorMap.getColor (a);
-//         
-//         renderer.drawArrow (eeCt.edge0.tail.pnt, eeCt.edge0.head.pnt, 0.003, true);
-//         renderer.drawArrow (eeCt.edge1.tail.pnt, eeCt.edge1.head.pnt, 0.003, true);
          
          // Repulsion normal
          renderer.setColor (Color.BLUE);

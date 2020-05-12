@@ -1,23 +1,29 @@
 package _custom.cont;
 
+import maspack.geometry.HalfEdge;
+import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
-import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector2d;
 import maspack.matrix.Vector3d;
-import maspack.util.DataBuffer;
-import _custom.cont.BoundablePointArray;
-import maspack.geometry.*;
 
+/** 
+ * Space-time path of an edge, across a single time step.
+ */
 public class SweptEdge extends BoundablePointArray {
 
+   // Convenient array indices that represent the starting and ending 
+   // head (H) and tail (T) vertex positions of the traversed edge.
+   // (H0,T0) -> (H1,T1)
+   
    public final int H1 = 0;
    public final int T1 = 1;
    public final int H0 = 2;
    public final int T0 = 3;
    
+   /** Traversing edge. */
    HalfEdge myEdge;
 
-   
+   /** Space-time path of an edge, across a single time step. */   
    public SweptEdge (HalfEdge edge, Point3d[] oldPositions) {
       super (4);
       myEdge = edge.getPrimary();
@@ -30,6 +36,7 @@ public class SweptEdge extends BoundablePointArray {
       myPnts[T0] = oldPositions[tail.getIndex()];
    }  
    
+   /** Is the path length zero? */
    public boolean isSweepIdle(double elipson) {
       return (
          myPnts[H1].distance (myPnts[H0]) < elipson &&
@@ -37,6 +44,12 @@ public class SweptEdge extends BoundablePointArray {
       );
    }
    
+   /** Get the instanteous location of the edge's head vertex,
+    * 
+    * @param t 
+    * Fraction of the path, ranging from 0 to 1. For example, 0.5 returns the
+    * head vertex that's half-way along its traversed path.
+    */
    public Point3d computeInstanteousHead(double t) {
       Point3d instHead = new Point3d();
       instHead.sub (myPnts[H1], myPnts[H0]);
@@ -49,6 +62,12 @@ public class SweptEdge extends BoundablePointArray {
       return instHead;
    }
    
+   /** Get the instanteous location of the edge's tail vertex.
+    * 
+    * @param t 
+    * Fraction of the path, ranging from 0 to 1. For example, 0.5 returns the
+    * tail vertex that's half-way along its traversed path.
+    */
    public Point3d computeInstanteousTail(double t) {
       Point3d instTail = new Point3d();
       instTail.sub (myPnts[T1], myPnts[T0]);
@@ -61,6 +80,15 @@ public class SweptEdge extends BoundablePointArray {
       return instTail;
    }
    
+   /** Get the instanteous location of the edge within the traversed path.
+    * 
+    * @param t 
+    * Fraction of the path, ranging from 0 to 1. For example, 0.5 returns the
+    * edge that's half-way along its traversed path.
+    * 
+    * @return 
+    * Instanteous edge in vector form.
+    */
    public Vector3d computeInstanteousEdgeVec(double t) {
       Point3d instHead = computeInstanteousHead (t);
       Point3d instTail = computeInstanteousTail (t);
@@ -71,6 +99,16 @@ public class SweptEdge extends BoundablePointArray {
       return instEdgeVec;
    }
    
+   /** Get the instanteous location of a point in the edge.
+    * 
+    * @param t 
+    * Fraction of the path, ranging from 0 to 1. For example, 0.5 returns the
+    * edge that's half-way along its traversed path.
+    * 
+    * @param s 
+    * Fraction of the edge, ranging from 0 to 1. For example, 0.5 refers to the
+    * point that's in the middle of the edge.
+    */
    public Point3d computeInstanteousEdgePoint(double t, double s) {
       Vector3d instEdgeVec = computeInstanteousEdgeVec(t);
       Point3d instTail = computeInstanteousTail (t);
@@ -82,6 +120,15 @@ public class SweptEdge extends BoundablePointArray {
       return edgePt;
    }
    
+   /** Get the instanteous location of the edge within the traversed path.
+    * 
+    * @param t 
+    * Fraction of the path, ranging from 0 to 1. For example, 0.5 returns the
+    * edge that's half-way along its traversed path.
+    * 
+    * @return
+    * Head and tail vertex locations of the instanteous edge.
+    */
    public Point3d[] computeInstanteousEdgePoints(double t) {
       Point3d[] ePnts = new Point3d[2];
       ePnts[0] = computeInstanteousHead (t);
@@ -89,6 +136,34 @@ public class SweptEdge extends BoundablePointArray {
       return ePnts;
    }
    
+   /**
+    * Given this edge and another edge (se1) at time t, calculate the closest
+    * points of both edges.
+    * 
+    * @param se1
+    * Another traversed edge.
+    * 
+    * @param t 
+    * Time within the traversal of both edges that the closest points should
+    * be determined. [0,1].
+    * 
+    * @param out_e0 
+    * Closest point of this edge. Output parameter.
+    * 
+    * @param out_e1
+    * Closest point of another edge. Output parameter.
+    * 
+    * @param rs 
+    * Closest point of this edge and another edge. Each point is represented as 
+    * a fraction along the line segment from tail to head of the corresponding
+    * edge. [0,1]. Output parameter.
+    * 
+    * @param epsilon 
+    * 1e-10 is sufficient.
+    * 
+    * @return 
+    * Distance between the two closest points.
+    */
    public double computeClosestEdgePairPoints(SweptEdge se1, double t, 
    Point3d out_e0, Point3d out_e1, Vector2d rs, double epsilon) {
       // Borrowed from ContinuousCollider.minimumDistanceBetweenSegments

@@ -15,28 +15,44 @@ import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector3d;
 import maspack.render.RenderableUtils;
 
+/** Space-time traversal of a mesh. */
 public class SweptMeshInfo {
    
    public PolygonalMesh myMesh;
-   public FemMeshComp myFemMeshComp;
-   
-   /** Previous positions of vertices in local-space. */
+      
+   /** Previous vertex positions in the mesh's local-space. */
    public Point3d[] prevPositions;      
    
-   /** Transformed instance of {@link #prevPositions} such that if they are
-    * transformed to the current world-space of {@link #myMesh}, the positions 
-    * in the previous world-space of {@link #myMesh} is actually obtained.
-    * This allows BVTree intersection methods to rely on myMesh.getMeshToWorld()
-    * only rather than needing to be refactored to account for 2 different
-    * transformation matrices (previous and current). */
+   /** 
+    * Previous vertex positions in the mesh's local-space {@link #prevPositions}
+    * that have been pre-transformed such that if a "to current world-space" 
+    * matrix is applied, the vertex positions in the "previous world-space" is
+    * actually obtained (i.e. previous vertex positions in world-space).
+    * 
+    * This allows BVTree intersection methods to rely on a single matrix
+    * (i.e. provided by myMesh.getMeshToWorld()) only, instead of needing 
+    * to refactor the BVTree to account for 2 different transformation 
+    * matrices to obtain either the previous and current world-space vertex
+    * positions.
+    * 
+    * The comments in {@link #updatePrevPositionsX0()} provides more 
+    * details regarding this property. 
+    */
    public Point3d[] prevPositionsX0;    
    
-   /** World-space transformation matrix of {@link #myMesh} in the previous
-    * timestep. */
+   /** Matrix that can transform {@link #previousPositions} from local-space
+    *  to the previous world-space. In other words, this is the 
+    *  "to world-space" transformation matrix that was used in the previous 
+    *  time step.  */
    public RigidTransform3d X0 = new RigidTransform3d();
    
+   /** Space-time traversal of the vertices, organized in a AABB tree. */
    public AABBTree myVertexTree;
+   
+   /** Space-time traversal of the edges, organized in a AABB tree. */
    public AABBTree myEdgeTree;
+   
+   /** Space-time traversal of the triangles, organized in a AABB tree. */
    public AABBTree myTriangleTree;
    
    public static double myMargin = 0.6e-2;    // Half of cloth thickness
@@ -106,8 +122,6 @@ public class SweptMeshInfo {
       
       /* --- Assemble AABB trees --- */
       
-//      double margin = 1e-6*RenderableUtils.getRadius(mesh);
-      
       myVertexTree = new AABBTree();
       myVertexTree.setMaxLeafElements(1);
       myVertexTree.setMargin (myMargin);
@@ -124,6 +138,11 @@ public class SweptMeshInfo {
       myTriangleTree.build (sweptTriangles, sweptTriangles.length);
    }
    
+   /** Update the previous vertex positions to the current vertex positions.
+    * 
+    * Also update the previous "to world-space" transformation matrix to the 
+    * current one.  
+    */
    public void copyCurrent2PreviousPositions() {
       int numv = myMesh.numVertices();
       for (int i=0; i<numv; i++) {
@@ -133,17 +152,24 @@ public class SweptMeshInfo {
       X0.set( myMesh.getMeshToWorld () ); 
    }
    
+   /** Update {@link #prevPositionsX0}, which become the previous vertex 
+    *  positions in world-space when the current "to world-space" 
+    *  transformation matrix is applied. */
    public void updatePrevPositionsX0() {
       for (int p=0; p<prevPositionsX0.length; p++) {
-         // Get world-space of previous position
+         // Get world-space of previous position.
          Point3d ptPrevW = new Point3d( prevPositions[p] );
          ptPrevW.transform (X0);
          
-         // Apply inverse of meshToWorld. When AABB performs intersection 
-         // lookup, it will apply meshToWorld, obtaining the world-space
-         // of previous positions of the previous timestep.
-         prevPositionsX0[p].set(ptPrevW);
+         // However, when AABB tests are carried out, the AABB tests
+         // automatically applies the "to current world-space" matrix.
+         // ---> We don't want ptPrevW to be further transformed.
          
+         // Therefore, apply inverse of the "to current world-space" matrix.
+         // That way, when the AABB tests automatically apply the 
+         // "to current world-space" matrix, we end up with the original
+         // ptPrevW.
+         prevPositionsX0[p].set(ptPrevW);
          prevPositionsX0[p].inverseTransform (myMesh.getMeshToWorld ());
       }
    }

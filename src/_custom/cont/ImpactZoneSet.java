@@ -3,56 +3,36 @@ package _custom.cont;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
-import artisynth.core.femmodels.BackNode3d;
-import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.mechmodels.CollisionHandler;
 import artisynth.core.mechmodels.ContactConstraint;
 import artisynth.core.mechmodels.ContactMaster;
-import artisynth.core.mechmodels.DynamicComponent;
-import artisynth.core.mechmodels.Particle;
 
+/** Collection of impact zones. */
 public class ImpactZoneSet {
  
+   /** A single impact zone, which contains unilateral constraints that share
+    *  common vertices.  */
    public class ImpactZone extends LinkedList<ContactConstraint> {
       private static final long serialVersionUID = 1L;
       
-      public void setImpactZoneConstraintsActive(
-      ArrayList<CollisionHandler> colHdlrs) {
+      /** For each unilateral constraint, place them back to their original
+       *  belonging collidable body pair. */
+      public void setImpactZoneConstraintsActive() {
          for (ContactConstraint cc : this) {
             cc.myCsnHldr.myUnilaterals.add (cc);
          }
       }
-      
-      public void setImpactZoneNodesDynamicOnly(ArrayList<DynamicComponent> comps) {
-         for (DynamicComponent comp : comps) {
-            if (! hasComp(comp)) {
-               if (comp instanceof FemNode3d) {
-                  ((FemNode3d)comp).setDynamic (false);
-               }
-               else if (comp instanceof BackNode3d) {
-                  ((BackNode3d)comp).setDynamic (false);
-               }
-               else {
-                  assert(false);
-               }
-            }
-         }
-      }
-      
-      protected boolean hasComp(DynamicComponent comp) {
-         for (ContactConstraint cc : this) {
-            for (ContactMaster cm : cc.getMasters ()) {
-               if (cm.getComp () == comp) {
-                  return true;
-               }
-            }
-         }
-         return false;
-      }
    }
    
+   /** Container for the impact zones. */
    public ArrayList<ImpactZone> mIZs = new ArrayList<ImpactZone>();
    
+   /** Create a collection of impact zones. 
+    *
+    * @param colHdlrs
+    * Collection of collidable pairs. Unilateral constraints will be retrieved
+    * from them, and grouped into impact zones.
+    */
    public ImpactZoneSet(ArrayList<CollisionHandler> colHdlrs) {
       for (CollisionHandler colHldr : colHdlrs) {
          for (ContactConstraint cc : colHldr.myUnilaterals) {
@@ -62,47 +42,24 @@ public class ImpactZoneSet {
       }
    }
    
+   /** Remove all the unilateral constraints from the collection of 
+    *  collidable pairs. */
    public static void clearConstraints(ArrayList<CollisionHandler> colHdlrs) {
       for (CollisionHandler colHldr : colHdlrs) {
          colHldr.myUnilaterals.clear ();
       }
    }
    
+   /** Return the unilateral constraints back to their original belonging 
+    *  collidable body pair.  */
    public void restoreConstraints(ArrayList<CollisionHandler> colHdlrs) {
       clearConstraints(colHdlrs);
       for (ImpactZone iz : mIZs) {
-         iz.setImpactZoneConstraintsActive (colHdlrs);
+         iz.setImpactZoneConstraintsActive ();
       }
    }
    
-   public static void loadDynamics(ArrayList<DynamicComponent> comps) {
-      for (DynamicComponent comp : comps) {
-         if (comp instanceof FemNode3d) {
-            ((FemNode3d)comp).setDynamic (((FemNode3d)comp).wasDynamic);
-         }
-         else if (comp instanceof BackNode3d) {
-            ((BackNode3d)comp).setDynamic (((BackNode3d)comp).wasDynamic);
-         }
-         else {
-            assert(false);
-         }
-      }
-   }
-   
-   public static void saveDynamics(ArrayList<DynamicComponent> comps) {
-      for (DynamicComponent comp : comps) {
-         if (comp instanceof FemNode3d) {
-            ((FemNode3d)comp).wasDynamic = comp.isDynamic ();
-         }
-         else if (comp instanceof BackNode3d) {
-            ((BackNode3d)comp).wasDynamic = comp.isDynamic ();
-         }
-         else {
-            assert(false);
-         }
-      }
-   }
-  
+   /** Bin the given unilateral constraint to its corresponding impact zone. */
    protected void addConstraint(ContactConstraint cc) {
       ImpactZone iz = findCorrespondingImpactZone (cc);
       if (iz == null) {
@@ -115,6 +72,8 @@ public class ImpactZoneSet {
       iz.add (cc);
    }
    
+   /** Given a unilateral constraint, get the impact zone that it is binned 
+    *  into. */
    protected ImpactZone findCorrespondingImpactZone(ContactConstraint cc) {
       for (ImpactZone iz : mIZs) {
          for (ContactConstraint cur_cc : iz) {
@@ -127,6 +86,7 @@ public class ImpactZoneSet {
       return null;
    }
    
+   /** Do the two unilateral constraints share a common vertex? */
    protected boolean isConstraintPairShareCommonVertex(ContactConstraint A,
    ContactConstraint B) {
       

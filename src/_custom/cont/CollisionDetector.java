@@ -26,41 +26,68 @@ import maspack.matrix.Vector3d;
 import maspack.util.Pair;
 
 /**
- * TODO
- * Use faster collision detection model:
- * https://onlinelibrary.wiley.com/doi/full/10.1111/cgf.13095
+ * Detects nearby (discrete) and colliding (continuous) features. 
  * 
- * Artisynth AABB tree runs faster if bvhWorld set to Identity, which is 
- * ok for FEM models.
+ * DEV NOTES:
+ *    Artisynth AABB tree runs faster if bvhWorld set to Identity, which is 
+ *    ok for FEM models.
  *      - Currently using intersectTreeWorldIdentity() 
  */
-public class ContinuousCollider {
+public class CollisionDetector {
 
    public static boolean myDebug = false;
+   
+   /** Tolerance when comparing collision times. */
    public static double myTimeElipson = 1e-8;
+   
+   /** Distance tolerance when determining collisions. */
    public static double mySpaceElipson = 1e-10;
 
+   /** Minimum distance that nearby features should be repelled apart. */
    public static double myClothThickness = 1e-2;   // Should correspond to penetrationTol
+   
+   /** Boost repulsion of nearby features, if needed. */
    public static double myImminentImpulseScale = 1.00;   // 0.25
+   
+   /** Assumed time step. */
    public static double myTimestep = 0.01;
    
+   /** Space-time path of each collidable body. */
    public LinkedHashMap<CollidableBody,SweptMeshInfo> myBody2SweptMeshInfo;
-   protected ContinuousCollisions myContCol;
    
+   /** Utility to perform narrow-phase continuous collision detection. */
+   protected NarrowPhaseCCD myContCol;
+   
+   // Debugging only. The FEM models that are currently under examination.  
    protected FemMeshComp mFmc0;
    protected FemMeshComp mFmc1;
-   
-   public enum Stage {IMMINENT, ACTUAL, ZONE};
+
+   /** Detect nearby (NEARBY) or colliding (ACTUAL) features? 
+    *  (ACTUAL_ZONED) is the same as (ACTUAL) except impact zones are used. */
    public static Stage mStage = Stage.ACTUAL;
+   public enum Stage {NEARBY, ACTUAL, ACTUAL_ZONED};
    
-   // Legacy. For forcing backstepping. 0.00 = turned off
+   /** Legacy. For forcing backstepping. 0.00 = turned off. Not useful. */
    public static double mHitTimeBacktrack = 0.00;
 
+   /** Max number of iterations to perform continuous detection and resolution 
+    *  in order to eliminate secondary collisions. */
    public static int myMaxNumActualIters = 10;
+   
+   /** Minimum distance (as a negative) that colliding features should be kept 
+    *  apart during their resolution. */
    public static double myImpactZonePenetrationTol = -1e-2;
+   
+   /** Enable nearby feature detection? */
    public static boolean myEnableProximityDetection = true;
+   
+   /** Enable colliding feature detection? */
    public static boolean myEnableContinuousDetection = true;
+   
+   /** Enable colliding feature detection using impact zones? */
    public static boolean myEnableImpactZoneDetection = true;
+   
+   
    
    /**
     * Maintains a reference to the unilaterals that were used to undo
@@ -70,17 +97,18 @@ public class ContinuousCollider {
     */
    public static ContactConstraintAgg myCCAgg = null;
    
+   /** Visualize detected contacts. Debugging purpose. */
    public static ContinuousRenderable mContRend;
-   int m;
    
-   public ContinuousCollider() {
+   public CollisionDetector() {
       myBody2SweptMeshInfo = new LinkedHashMap<CollidableBody,SweptMeshInfo>();
-      myContCol = new ContinuousCollisions();
+      myContCol = new NarrowPhaseCCD();
    }
    
    
    /* --- Setters and Getters --- */
    
+   /** Get a mesh's space-time path, across the latest time step. */
    public SweptMeshInfo getSweptMeshInfo(CollidableBody body) {
       return myBody2SweptMeshInfo.get (body);
    }
@@ -89,6 +117,8 @@ public class ContinuousCollider {
    /* --- Primary Functions (public) --- */
    
    /** 
+    * Clear the space-time path of each mesh.
+    * 
     * Call this whenever a simulation is re-initialized.
     */
    public void clearSweptMeshInfo() {
@@ -96,6 +126,8 @@ public class ContinuousCollider {
    }
    
    /** 
+    * Update the previous vertex positions to the current vertex positions. 
+    * 
     * Call this at the beginning of each physics step.
     */
    public void copyCurrent2PreviousPositions() {
@@ -104,6 +136,12 @@ public class ContinuousCollider {
       }
    }
    
+   /**
+    * Search for nearby or colliding features between two bodies.
+    * 
+    * @return
+    * Info regarding each detected collision.
+    */
    public ContactInfo getContacts(CollidableBody body0, CollidableBody body1) {
       for (CollidableBody body : new CollidableBody[] {body0,body1} ) {
          SweptMeshInfo smi = myBody2SweptMeshInfo.get (body);
@@ -115,9 +153,14 @@ public class ContinuousCollider {
          
          smi.updatePrevPositionsX0 ();
          
-         if (mStage == Stage.IMMINENT) {
+         if (mStage == Stage.NEARBY) {
 //            smi.computeAvgVelocities (myTimestep);
             smi.saveCurrentPositions ();
+            
+            // Previous and current positions are set to be equal.
+            // Essentially AABB will only enclose the mesh features at t=0
+            // (i.e. previous time step), allowing us to search for nearby
+            // features at t=0.
             smi.copyPrevious2CurrentPositions ();
          }
          
@@ -145,7 +188,7 @@ public class ContinuousCollider {
       ContactInfo cinfo = getContacts (smi0, smi1, isDynamic0, isDynamic1);
       
       for (SweptMeshInfo smi : new SweptMeshInfo[] {smi0,smi1} ) {
-         if (mStage == Stage.IMMINENT) {
+         if (mStage == Stage.NEARBY) {
             smi.loadCurrentPositions ();
          }
          
@@ -156,10 +199,9 @@ public class ContinuousCollider {
    }
    
    /**
-    * Call this after remeshing.
+    * Refresh the AABB of the mesh features for the given FEM model.
     * 
-    * @param comp
-    * MeshComponent of the FemModel that was remeshed.
+    * Call this after remeshing the FEM model.
     */
    public void rebuildSweptMeshInfo(FemMeshComp comp) {
       FemModel3d femModel = (FemModel3d)comp.getParent ().getParent (); 
@@ -204,6 +246,27 @@ public class ContinuousCollider {
       }
    }
    
+   /**
+    * Perform collision detection between two given meshes. 
+    * 
+    * Whether nearby or colliding collisions features are detected depends on 
+    * {@link #mStage}.
+    * 
+    * @param smi0
+    * Space-time path of mesh0. 
+    * 
+    * @param smi1
+    * Space-time path of mesh1.
+    * 
+    * @param isDynamic0
+    * Is mesh0 dynamic?
+    * 
+    * @param isDynamic1
+    * Is mesh1 dynamic?
+    * 
+    * @return
+    * Info regarding any collisions detected.
+    */
    protected ContactInfo getContacts (SweptMeshInfo smi0, SweptMeshInfo smi1, 
    boolean isDynamic0, boolean isDynamic1) {
       
@@ -214,25 +277,19 @@ public class ContinuousCollider {
       
       if (myDebug)
          System.out.println ("Computing penetration points for m=0"); 
-      m=0;
       ArrayList<PenetratingPoint> pentPts0 = findPenetratingPoints(smi0, smi1);
       
       if (myDebug)
          System.out.println ("Computing penetration points for m=1"); 
-      m=1;
       ArrayList<PenetratingPoint> pentPts1 = (smi0 != smi1) ? 
          findPenetratingPoints(smi1, smi0) : new ArrayList<PenetratingPoint>();
        
-//      pentPts0 = new ArrayList<PenetratingPoint>();
-//      pentPts1 = new ArrayList<PenetratingPoint>();
-         
       cinfo.setPenetratingPoints (pentPts0, 0);
       cinfo.setPenetratingPoints (pentPts1, 1);    
 
       if (myDebug)
          System.out.println ("Computing edge-edge contacts for m=0 vs m=1");
       ArrayList<EdgeEdgeContact> eeCts = findEdgeEdgeContacts (smi0, smi1);
-//      eeCts = new ArrayList<EdgeEdgeContact>();
       cinfo.setEdgeEdgeContacts (eeCts);
 
       if (cinfo.getPenetratingPoints(0).isEmpty () &&
@@ -287,13 +344,25 @@ public class ContinuousCollider {
       }
       
       // Handle situations where 2 redundant edge-edge contacts exist:
-      //   [10,20]-[30,40] and [30,40]-[10,20] 
+      // e.g.  [10,20]-[30,40] and [30,40]-[10,20], where the numbers correspond
+      //       to vertex indices.
       cinfo.getEdgeEdgeContacts ().removeIf (eeCt -> 
          isExistingInverseEdgeEdgeContact (eeCt, cinfo.getEdgeEdgeContacts ()) &&
          isEdge0HeadGreaterThanEdge1Head (eeCt)  // Prevent removing both
       );
    }
    
+   /** Search for nearby or colliding vertex-triangle between two meshes. 
+    * 
+    * @param smi0
+    * Space-time path of mesh0. 
+    * 
+    * @param smi1
+    * Space-time path of mesh1. 
+    * 
+    * @return 
+    * Detected vertex-triangle collisions.
+    */
    protected ArrayList<PenetratingPoint> findPenetratingPoints(
    SweptMeshInfo smi0, SweptMeshInfo smi1) {
       
@@ -327,7 +396,7 @@ public class ContinuousCollider {
             continue;
          }
         
-         if (mStage == Stage.IMMINENT) {
+         if (mStage == Stage.NEARBY) {
             vtx2triCsns.addCollision (sv, st, ccrv);
          }
          // Case 1: This is the vertex's first collision
@@ -369,7 +438,7 @@ public class ContinuousCollider {
             SweptTriangle st = (SweptTriangle)csn.first;
             CCRV ccrv = csn.second;
             
-            PenetratingPoint pentPt = (mStage == Stage.IMMINENT) ?
+            PenetratingPoint pentPt = (mStage == Stage.NEARBY) ?
                createImminentPenetratingPoint((SweptVertex)sv, st, ccrv) :
                createPenetratingPoint((SweptVertex)sv, st, ccrv);
             
@@ -388,6 +457,17 @@ public class ContinuousCollider {
       return pentPts;
    }
    
+   /** Search for nearby or colliding edge-edge between two meshes.
+    * 
+    * @param smi0
+    * Space-time path of mesh0. 
+    * 
+    * @param smi1
+    * Space-time path of mesh1. 
+    * 
+    * @return 
+    * Detected edge-edge collisions.
+    */
    protected ArrayList<EdgeEdgeContact> findEdgeEdgeContacts(
    SweptMeshInfo smi0, SweptMeshInfo smi1) {
       
@@ -426,7 +506,7 @@ public class ContinuousCollider {
 
          // Store the confirmed collision.
          
-         if (mStage == Stage.IMMINENT) {
+         if (mStage == Stage.NEARBY) {
             e2eCsns.addCollision (se0, se1, ccrv);
          }
          // If this is the first confirmed collision
@@ -463,7 +543,7 @@ public class ContinuousCollider {
             SweptEdge se1 = (SweptEdge)csn.first;
             CCRV ccrv = csn.second;
             
-            EdgeEdgeContact eeCt = (mStage == Stage.IMMINENT) ?
+            EdgeEdgeContact eeCt = (mStage == Stage.NEARBY) ?
                createImminentEdgeEdgeContact((SweptEdge)se0, se1, ccrv) : 
                createEdgeEdgeContact((SweptEdge)se0, se1, ccrv);
             eeCts.add (eeCt);
@@ -476,7 +556,18 @@ public class ContinuousCollider {
    
    /* --- Helper Methods --- */
    
-   
+   /** 
+    * Measure to see if a vertex and triangle are nearby or colliding.
+    *
+    * @param sv 
+    * Space-time path of the vertex. 
+    * 
+    * @param st 
+    * Space-time path of the triangle. 
+    * 
+    * @return 
+    * Details regarding the collision, if any.
+    */
    public CCRV isCollision(SweptVertex sv, SweptTriangle st) {
       
       // Ignore collision checking if vertex is connected to the triangle.
@@ -488,7 +579,7 @@ public class ContinuousCollider {
    
       CCRV ccrv = null;
       
-      if (mStage == Stage.IMMINENT) {
+      if (mStage == Stage.NEARBY) {
          ccrv = isCollisionImminent(sv, st);
       }
       else {
@@ -507,6 +598,18 @@ public class ContinuousCollider {
       return ccrv;
    }
    
+   /** 
+    * Measure to see if two edges are nearby or colliding.
+    *
+    * @param se0
+    * Space-time path of edge0.
+    * 
+    * @param se1
+    * Space-time path of edge1.
+    * 
+    * @return 
+    * Details regarding the collision, if any.
+    */
    protected CCRV isCollision(SweptEdge se0, SweptEdge se1) {
       
       HalfEdge he0 = se0.myEdge;
@@ -524,7 +627,7 @@ public class ContinuousCollider {
       
       CCRV rv = null;
       
-      if (mStage == Stage.IMMINENT) {
+      if (mStage == Stage.NEARBY) {
          rv = isCollisionImminent(se0, se1);
       }
       else {
@@ -540,6 +643,10 @@ public class ContinuousCollider {
       return rv;
    }
    
+   /** 
+    * Refine a colliding vertex-triangle info into Artisynth's 
+    * PenetratingPoint class in order to hook up with its LCP solver.
+    */
    protected PenetratingPoint createPenetratingPoint(
    SweptVertex sv, SweptTriangle st, CCRV ccrv) {
       
@@ -613,7 +720,10 @@ public class ContinuousCollider {
       return pentPt;
    }
    
-   
+   /** 
+    * Refine a colliding edge-edge info into Artisynth's 
+    * EdgeEdgeContact class in order to hook up with its LCP solver.
+    */
    protected EdgeEdgeContact createEdgeEdgeContact(SweptEdge se0, SweptEdge se1, 
       CCRV ccrv) {
       
@@ -833,6 +943,8 @@ public class ContinuousCollider {
    /**
     * For each vertex or edge, keep an organized list of its collisions 
     * (e.g. vertex-triangle or edge-edge).
+    * 
+    * Used for filtering out redundant collisions. 
     */
    public class Boundable2BoundableCollisions {
       public LinkedHashMap<Boundable, ArrayList<Pair<Boundable,CCRV>>> 
@@ -910,8 +1022,17 @@ public class ContinuousCollider {
    
 
    
-   /* --- Functions for computing imminent contacts --- */
+   /* --- Functions for computing imminent (i.e. nearby) contacts --- */
 
+   /** 
+    * Is the vertex and triangle nearby?
+    * 
+    * @param sv 
+    * Vertex. Only its previous position is used.
+    * 
+    * @param st 
+    * Triangle. Only its previous position is used.
+    */
    protected CCRV isCollisionImminent(SweptVertex sv, SweptTriangle st) {
 
       Point3d[] svPntsW = sv.createTransformedPoints ();
@@ -969,6 +1090,10 @@ public class ContinuousCollider {
       return rv; 
    }
    
+   /** 
+    * Refine a nearby vertex-triangle info into Artisynth's 
+    * PenetratingPoint class in order to hook up with its LCP solver.
+    */
    protected PenetratingPoint createImminentPenetratingPoint(
    SweptVertex sv, SweptTriangle st, CCRV ccrv)
    {
@@ -1034,6 +1159,15 @@ public class ContinuousCollider {
       return pentPt;
    }
    
+   /** 
+    * Is the edge pair nearby?
+    * 
+    * @param sv 
+    * Edge0. Only its previous position is used.
+    * 
+    * @param st 
+    * Edge1. Only its previous position is used.
+    */
    protected CCRV isCollisionImminent(SweptEdge se0, SweptEdge se1) {
       Point3d pnt0 = new Point3d();
       Point3d pnt1 = new Point3d();
@@ -1095,6 +1229,10 @@ public class ContinuousCollider {
       return rv;
    }
    
+   /** 
+    * Refine a nearby edge-edge info into Artisynth's 
+    * PenetratingPoint class in order to hook up with its LCP solver.
+    */
    protected EdgeEdgeContact createImminentEdgeEdgeContact(
    SweptEdge se0, SweptEdge se1, CCRV ccrv)
    {
@@ -1156,160 +1294,9 @@ public class ContinuousCollider {
       return eeCt;
    }
    
-   
-   /////////// Impact Zone 
-   
-   public static void backtrackNode(FemNode3d node, Point3d newPos) {
-      // Displace towards newPos (e.g. pentPt.vPnt_justBefore_hitTime)
-      Vector3d disp = new Vector3d().sub (newPos, node.getPosition ());
-      
-      Point3d newNodePos = (Point3d)
-         new Point3d(node.getPosition ()).add (disp);
-      node.setPosition (newNodePos);
-      
-      BackNode3d bNode = node.getBackNode ();
-      Point3d newBackNodePos = (Point3d)
-         new Point3d(bNode.getPosition ()).add (disp);
-      bNode.setPosition (newBackNodePos);
-   }
-   
-   public static boolean isNewMinHitTime(FemNode3d node, double hitTime,
-   LinkedHashMap<FemNode3d,Double> node2minHitTime) {
-      Double existingHitTime = node2minHitTime.get (node);
-      if (existingHitTime == null || hitTime < existingHitTime) {
-         node2minHitTime.put (node, hitTime);
-         return true;
-      }
-      else {
-         return false;
-      }
-   }
-   
-   ///////////// Vertex-Triangle Normal and Distance
-   
-   public double computeVertexTriangleCollision_normalAndDist(
-   SweptVertex sv, SweptTriangle st, CCRV ccrv, Vector3d out_normal) {
-      // signed_vf_distance
-      
-      Vector3d x = sv.createTransformedPoint (sv.V0);
-      Vector3d y0 = st.createTransformedPoint (st.A0).sub (x);
-      Vector3d y1 = st.createTransformedPoint (st.B0).sub (x);
-      Vector3d y2 = st.createTransformedPoint (st.C0).sub (x);
-      
-      Vector3d y10 = new Vector3d().sub (y1, y0).normalize ();
-      Vector3d y20 = new Vector3d().sub (y2, y0).normalize ();
-      
-      out_normal.cross (y10, y20);
-      out_normal.normalize ();
-      
-      double dist = new Point3d().sub (x, y0).dot (out_normal);
-      
-      // Make sure normal is in correct direction
-      
-      Vector3d d0 = sv.computeDisplacement (0);
-      Vector3d d1 = st.computeDisplacement (0);
-      Vector3d d2 = st.computeDisplacement (1);
-      Vector3d d3 = st.computeDisplacement (2);
-      
-      double wt1 = ccrv.bary.x;
-      double wt2 = ccrv.bary.y; 
-      double wt3 = 1-wt1-wt2;
-      
-      _ensureCollisionNormalSigned (out_normal, d0, d1, d2, d3, wt1, wt2, wt3);
-      
-      return Math.abs (dist);
-//      return dist;
-   }
-   
-   ///////////// Edge-Edge Normal and Distance
-   
-   public double computeEdgeEdgeCollision_normalAndDist(SweptEdge se0,
-   SweptEdge se1, CCRV ccrv, Vector3d out_normal) {
-      // signed_ee_distance
-      
-      Vector3d x0 = se0.createTransformedPoint (se0.H0);
-      Vector3d x1 = se0.createTransformedPoint (se0.T0).sub (x0);
-      Vector3d y0 = se1.createTransformedPoint (se1.H0).sub (x0);
-      Vector3d y1 = se1.createTransformedPoint (se1.T0).sub (x0);
-      
-      Vector3d x10 = new Vector3d().sub (x1, x0).normalize ();
-      Vector3d y10 = new Vector3d().sub (y1, y0).normalize ();
-      
-      out_normal.cross (x10, y10);
-      
-      // TODO elipson
-      if (out_normal.normSquared () < 1e-6) {
-         // Parallel line case 
-         Vector3d e0 = new Vector3d().sub (x1, x0);
-         Vector3d e1 = new Vector3d().sub (y1, y0);
-         
-         double p0min = x0.dot (e1);
-         double p0max = x1.dot (e0);
-         double p1min = y0.dot (e0);
-         double p1max = y1.dot (e0);
-         
-         if (p1max < p1min) {
-            // Swap 
-            double tmp = p1max;
-            p1max = p1min;
-            p1min = tmp;
-         }
-         
-         double a = Math.max (p0min, p1min);
-         double b = Math.min (p0max, p1max);
-         double c = 0.5*(a+b);
-         
-         Vector3d y0_x0 = new Vector3d().sub (y0, x0);
-         
-         Vector3d d = new Vector3d().sub (y0, x0);
-         d.scaledAdd ( y0_x0.dot (e0), e0);
-         
-         out_normal.set (d);
-         out_normal.scale (-1);
-         out_normal.normalize ();
-      }
-      
-      out_normal.normalize ();
-      
-      Vector3d x0_y0 = new Vector3d();
-      double dist = x0_y0.dot (out_normal);
-      
-      // Make sure normal is in correct direction 
-      
-      Vector3d d0 = se0.computeDisplacement (0);
-      Vector3d d1 = se0.computeDisplacement (1);
-      Vector3d d2 = se1.computeDisplacement (0);
-      Vector3d d3 = se1.computeDisplacement (1);
-      
-      double wt1 = ccrv.r;
-      double wt2 = 1-ccrv.s; 
-      double wt3 = ccrv.s;
-      
-      _ensureCollisionNormalSigned (out_normal, d0, d1, d2, d3, wt1, wt2, wt3);
-      
-      return Math.abs (dist);
-//      return dist;
-   }
-   
    ////////////// Helper Functions
-   
-   protected void _ensureCollisionNormalSigned(Vector3d normal, Vector3d d0,
-   Vector3d d1, Vector3d d2, Vector3d d3, double wt1, double wt2, double wt3) {
-
-      Vector3d v1 = new Vector3d(d1).sub (d0);
-      Vector3d v2 = new Vector3d(d2).sub (d0);
-      Vector3d v3 = new Vector3d(d3).sub (d0);
-      
-      Vector3d wtSum = new Vector3d();
-      wtSum.scaledAdd (wt1, v1);
-      wtSum.scaledAdd (wt2, v2);
-      wtSum.scaledAdd (wt3, v3);
-      
-      if (normal.dot (wtSum) > 0) {
-         normal.negate ();
-      }
-   }
-   
+  
+   /** Is x close to 0 or 1? */
    public boolean isZeroOrOne(double x) {
       return (Math.abs (x) < myTimeElipson || Math.abs (1-x) < myTimeElipson); 
    }

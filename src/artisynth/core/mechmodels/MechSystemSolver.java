@@ -13,8 +13,8 @@ import java.util.Arrays;
 import java.util.LinkedList;
 
 import _custom.cont.ContactConstraintAgg;
-import _custom.cont.ContinuousCollider;
-import _custom.cont.ContinuousCollider.Stage;
+import _custom.cont.CollisionDetector;
+import _custom.cont.CollisionDetector.Stage;
 import _custom.cont.ImpactZoneSet;
 import _custom.cont.ImpactZoneSet.ImpactZone;
 import artisynth.core.mechmodels.CollisionManager.ColliderType;
@@ -2598,7 +2598,7 @@ public class MechSystemSolver {
       
       ContactConstraintAgg imminentCCAgg = new ContactConstraintAgg();
       
-      if (ContinuousCollider.myEnableProximityDetection) {
+      if (CollisionDetector.myEnableProximityDetection) {
       
          System.out.println ("---Handle imminent collisions");
          
@@ -2617,7 +2617,7 @@ public class MechSystemSolver {
             pos.set (x0);
          }
             
-         ContinuousCollider.mStage = Stage.IMMINENT;
+         CollisionDetector.mStage = Stage.NEARBY;
 
          start = System.currentTimeMillis ();
          if (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
@@ -2636,11 +2636,11 @@ public class MechSystemSolver {
                // Do not used the resultant x0+impulse. Instead, use x1+impulse.
                x1.add (imminentImpulse);
                
-               if (ContinuousCollider.myDebug)
+               if (CollisionDetector.myDebug)
                   printNonZeroImpulse(imminentImpulse);
                
-               if (ContinuousCollider.myEnableContinuousDetection || 
-                   ContinuousCollider.myEnableImpactZoneDetection)
+               if (CollisionDetector.myEnableContinuousDetection || 
+                   CollisionDetector.myEnableImpactZoneDetection)
                {
                   // Useful when CCD detects nothing; restore imminent
                   // CCs.
@@ -2673,7 +2673,7 @@ public class MechSystemSolver {
       
       ContactConstraintAgg actualCCAgg = new ContactConstraintAgg();
       
-      if (ContinuousCollider.myEnableContinuousDetection) {
+      if (CollisionDetector.myEnableContinuousDetection) {
       
          System.out.println ("---Handle actual collisions");
    
@@ -2682,7 +2682,7 @@ public class MechSystemSolver {
          pos.set (x1);
    
          int numCollisionIters = 0;
-         ContinuousCollider.mStage = Stage.ACTUAL;
+         CollisionDetector.mStage = Stage.ACTUAL;
          start = System.currentTimeMillis ();
          while (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
             end = System.currentTimeMillis ();
@@ -2700,7 +2700,7 @@ public class MechSystemSolver {
                
                mySys.setActivePosState (pos);
                
-               if (ContinuousCollider.myDebug)
+               if (CollisionDetector.myDebug)
                   printNonZeroImpulse(vel);
             }
             else {
@@ -2725,8 +2725,8 @@ public class MechSystemSolver {
             
             numCollisionIters++;
             
-            if (numCollisionIters > ContinuousCollider.myMaxNumActualIters) {
-               ContinuousCollider.mStage = Stage.ZONE;
+            if (numCollisionIters > CollisionDetector.myMaxNumActualIters) {
+               CollisionDetector.mStage = Stage.ACTUAL_ZONED;
                System.out.println ("Continuous Collision Handler failed to converge.");
                // Restore pre-CCD state
                mySys.setActivePosState (x1);
@@ -2746,13 +2746,13 @@ public class MechSystemSolver {
       // XXX force impact zone detection
 //      ContinuousCollider.mStage = Stage.ZONE;
       
-      if (ContinuousCollider.myEnableImpactZoneDetection && (
-         ContinuousCollider.mStage == Stage.ZONE ||  
-         ! ContinuousCollider.myEnableContinuousDetection
+      if (CollisionDetector.myEnableImpactZoneDetection && (
+         CollisionDetector.mStage == Stage.ACTUAL_ZONED ||  
+         ! CollisionDetector.myEnableContinuousDetection
       )) {
          System.out.println ("---Resorting to impact-zone collision handler");
 
-         ContinuousCollider.mStage = Stage.ZONE;
+         CollisionDetector.mStage = Stage.ACTUAL_ZONED;
          impulseScale = 1.00;
          
          // Save original penetration tolerances.
@@ -2760,21 +2760,11 @@ public class MechSystemSolver {
          LinkedList<Double> savedPentTols = new LinkedList<Double>();
          for (CollisionBehavior beh : colMgr.behaviors ()) {
             savedPentTols.add (beh.getPenetrationTol ());
-            beh.setPenetrationTol (ContinuousCollider.myImpactZonePenetrationTol);
+            beh.setPenetrationTol (CollisionDetector.myImpactZonePenetrationTol);
          }
          
          ArrayList<CollisionHandler> colHdlrs = colMgr.collisionHandlers ();
-         
-//         ArrayList<DynamicComponent> active =
-//            new ArrayList<DynamicComponent>();
-//         ArrayList<DynamicComponent> attached =
-//            new ArrayList<DynamicComponent>();
-//         ArrayList<DynamicComponent> parametric =
-//            new ArrayList<DynamicComponent>();
-//         ((MechModel)mySys).getDynamicComponents (active, attached, parametric);
-         
-//         ImpactZoneSet.saveDynamics (active);
-         
+
          int loop = 0;
          start = System.currentTimeMillis ();
          while (mySys.updateConstraints (t, stepAdjust, MechSystem.COMPUTE_CONTACTS)) {
@@ -2793,7 +2783,7 @@ public class MechSystemSolver {
                ImpactZoneSet.clearConstraints (colHdlrs);
                
                // Only use constraints of this impact zone.
-               iz.setImpactZoneConstraintsActive (colHdlrs);
+               iz.setImpactZoneConstraintsActive ();
      
                // Only set nodes that are part of impact zone as active.
 //               iz.setImpactZoneNodesDynamicOnly (active);
@@ -2815,10 +2805,9 @@ public class MechSystemSolver {
                   System.out.println ("No position correction.");
                }
                
-               if (ContinuousCollider.myDebug)
+               if (CollisionDetector.myDebug)
                   printNonZeroImpulse(vel);
                
-//               ImpactZoneSet.loadDynamics (active);
             } // Done correct each impact zone
             
             // Only update the velocities of constraints of the first iteration.
@@ -2831,12 +2820,6 @@ public class MechSystemSolver {
                actualCCAgg.set(
                   colMgr.collisionHandlers (), true);
             }
-            
-//            if (loop % 2 == 0) {
-//               for (CollisionBehavior beh : colMgr.behaviors ()) {
-//                  beh.setPenetrationTol (beh.getPenetrationTol () * 0.50);
-//               }
-//            }
             
             loop++;
             start = System.currentTimeMillis ();
@@ -2864,8 +2847,8 @@ public class MechSystemSolver {
          canonCCAgg.addConstraints (imminentCCAgg);
          canonCCAgg.addConstraints (actualCCAgg);
          
-         ContinuousCollider.myCCAgg = canonCCAgg;
-         System.out.println ("Number of constraints: " + ContinuousCollider.myCCAgg.numConstraints ());
+         CollisionDetector.myCCAgg = canonCCAgg;
+         System.out.println ("Number of constraints: " + CollisionDetector.myCCAgg.numConstraints ());
       }
 
       if (profileConstrainedBE) {
@@ -3172,14 +3155,14 @@ public class MechSystemSolver {
       // Note: Assumes that remeshing was done already.
       
       CollisionManager colMgr = getCollisionManager ();
-      ContinuousCollider contCldr = 
+      CollisionDetector contCldr = 
          (colMgr != null) ? colMgr.getContinuousCollider () : null;
          
       if (contCldr != null) {
          mySys.getActivePosState (this.x0);
          
          if (t0 - 1e-6 < 0) {
-            if (ContinuousCollider.myDebug)
+            if (CollisionDetector.myDebug)
                System.out.println ("Clearing swept mesh info.");
             contCldr.clearSweptMeshInfo ();
          }

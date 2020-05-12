@@ -1,14 +1,14 @@
 package _custom.cont;
 
-import _custom.cont.ContinuousCollisions;
-import _custom.cont.ContinuousCollisionsTest;
+import _custom.cont.NarrowPhaseCCD;
+import _custom.cont.NarrowPhaseCCDTest;
 import maspack.matrix.*;
 import maspack.util.*;
 
-public class ContinuousCollisionsTest extends UnitTest {
+public class NarrowPhaseCCDTest extends UnitTest {
 
    public void testSimple() {
-      ContinuousCollisions collider = new ContinuousCollisions();
+      NarrowPhaseCCD collider = new NarrowPhaseCCD();
       
       {
          // vertex p and triangle abc (t = 0)
@@ -121,7 +121,7 @@ public class ContinuousCollisionsTest extends UnitTest {
    }
 
    public void testSpecial() {
-      ContinuousCollisions collider = new ContinuousCollisions();
+      NarrowPhaseCCD collider = new NarrowPhaseCCD();
 
       Vector3d p0 = new Vector3d (0.25, 0.25, 0.25);
       Vector3d a0 = new Vector3d (0, 0, 0);
@@ -174,7 +174,7 @@ public class ContinuousCollisionsTest extends UnitTest {
    }
 
    public void timeSpecial() {
-      ContinuousCollisions collider = new ContinuousCollisions();
+      NarrowPhaseCCD collider = new NarrowPhaseCCD();
 
       Vector3d p0 = new Vector3d (0.25, 0.25, 0.25);
       Vector3d a0 = new Vector3d (0, 0, 0);
@@ -283,7 +283,7 @@ public class ContinuousCollisionsTest extends UnitTest {
    }
 
    public static void main (String[] args) {
-      ContinuousCollisionsTest tester = new ContinuousCollisionsTest();
+      NarrowPhaseCCDTest tester = new NarrowPhaseCCDTest();
 
       tester.runtest();
    }

@@ -47,7 +47,7 @@ public class ContinuousCollisionsMeshTest extends RootModel {
    
    /* --- Modules --- */
 
-   protected ContinuousCollider mContCldr;
+   protected CollisionDetector mContCldr;
    protected SweptMeshInfo[] mSMI;
    
    /* --- UI --- */
@@ -136,7 +136,7 @@ public class ContinuousCollisionsMeshTest extends RootModel {
    }
    
    protected void build_modules() {
-      mContCldr = new ContinuousCollider();
+      mContCldr = new CollisionDetector();
 
       mSMI = new SweptMeshInfo[mNumModels];
       

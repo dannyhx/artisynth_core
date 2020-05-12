@@ -3,8 +3,38 @@ package _custom.cont;
 import maspack.matrix.*;
 import maspack.util.*;
 
-public class ContinuousCollisions {
+/** Tools to perform narrow-phase continuous collision detection. */
+public class NarrowPhaseCCD {
 
+   /**
+    * Measure to see if a traversing vertex and traversing triangle will collide.
+    * 
+    * @param p0 
+    * Initial position of vertex.
+    * @param p1 
+    * Final position of vertex.
+    * 
+    * @param a0 
+    * Initial position of triangle's first vertex.
+    * @param a1 
+    * Final position of   triangle's first vertex.
+    * 
+    * @param b0 
+    * Initial position of triangle's second vertex.
+    * @param b1 
+    * Final position of   triangle's second vertex.
+    * 
+    * @param c0 
+    * Initial position of triangle's third vertex.
+    * @param c1 
+    * Final position of   triangle's third vertex.
+    * 
+    * @param epsilon
+    * Small distance tolerance.
+    * 
+    * @return
+    * Details regarding the collision.
+    */
    public CCRV collideVertexTrianglePnts (
       Vector3d p0, Vector3d p1 ,
       Vector3d a0, Vector3d a1, 
@@ -25,6 +55,35 @@ public class ContinuousCollisions {
          p0, pdiff, a0, adiff, b0, bdiff, c0, cdiff, epsilon);
    }
 
+   /**
+    * Measure to see if a traversing vertex and traversing triangle will collide.
+    * 
+    * @param p0 
+    * Initial position of vertex.
+    * @param pdiff 
+    * Path of vertex.
+    * 
+    * @param a0 
+    * Initial position of triangle's first vertex.
+    * @param adiff
+    * Path of triangle's first vertex.
+    * 
+    * @param b0 
+    * Initial position of triangle's second vertex.
+    * @param bdiff 
+    * Path of triangle's second vertex.
+    * 
+    * @param c0 
+    * Initial position of triangle's third vertex.
+    * @param cdiff 
+    * Path of triangle's third vertex.
+    * 
+    * @param epsilon
+    * Small distance tolerance.
+    * 
+    * @return
+    * Details regarding the collision.
+    */
    public CCRV collideVertexTriangleDiff (
       Vector3d p0, Vector3d pdiff,
       Vector3d a0, Vector3d adiff,
@@ -108,6 +167,35 @@ public class ContinuousCollisions {
       return rv;
    }
 
+   /**
+    * Measure to see if two traversing edges will collide.
+    * 
+    * @param a0
+    * Initial position of edge0's head.
+    * @param a1
+    * Final position of edge0's head.
+    * 
+    * @param b0
+    * Initial position of edge0's tail.
+    * @param b1
+    * Final position of edge0's tail.
+    * 
+    * @param c0
+    * Initial position of edge1's head.
+    * @param c1
+    * Final position of edge1's head.
+    * 
+    * @param d0
+    * Initial position of edge1's tail.
+    * @param d1
+    * Final position of edge1's tail.
+    * 
+    * @param epsilon
+    * Small distance tolerance.
+    * 
+    * @return
+    * Details regarding the collision.
+    */
    public CCRV collideEdgeEdgePnts (
       Vector3d a0, Vector3d a1, 
       Vector3d b0, Vector3d b1, 
@@ -128,7 +216,35 @@ public class ContinuousCollisions {
          a0, adiff, b0, bdiff, c0, cdiff, d0, ddiff, epsilon);
    }
 
-
+   /**
+    * Measure to see if two traversing edges will collide.
+    * 
+    * @param a0
+    * Initial position of edge0's head.
+    * @param adiff
+    * Path of edge0's head.
+    * 
+    * @param b0
+    * Initial position of edge0's tail.
+    * @param bdiff
+    * Path of edge0's tail.
+    * 
+    * @param c0
+    * Initial position of edge1's head.
+    * @param cdiff
+    * Path of edge1's head.
+    * 
+    * @param d0
+    * Initial position of edge1's tail.
+    * @param ddiff
+    * Path of edge1's tail.
+    * 
+    * @param epsilon
+    * Small distance tolerance.
+    * 
+    * @return
+    * Details regarding the collision.
+    */
    public CCRV collideEdgeEdgeDiff (
       Vector3d a0, Vector3d adiff,
       Vector3d b0, Vector3d bdiff,
@@ -302,12 +418,32 @@ public class ContinuousCollisions {
    }
 
    /**
-    * @param rv 
-    * Return values will be stored in here:
-    * [minDist, r, s] where 
-    * minDist = Minimum distance between two edges at the time of collision.
-    *       r = Fraction along line segment from tail to head of edge0 where collision occurred.
-    *       s = Fraction along line segment from tail to head of edge1 where collision occurred.
+    * Given this edge and another edge (se1) at time t, calculate the closest
+    * points of both edges.
+    * 
+    * @param se1
+    * Another traversed edge.
+    * 
+    * @param t 
+    * Time within the traversal of both edges that the closest points should
+    * be determined. [0,1].
+    * 
+    * @param out_e0 
+    * Closest point of this edge. Output parameter.
+    * 
+    * @param out_e1
+    * Closest point of another edge. Output parameter.
+    * 
+    * @param rs 
+    * Closest point of this edge and another edge. Each point is represented as 
+    * a fraction along the line segment from tail to head of the corresponding
+    * edge. [0,1]. Output parameter.
+    * 
+    * @param epsilon 
+    * 1e-10 is sufficient.
+    * 
+    * @return 
+    * Distance between the two closest points.
     */
    void minimumDistanceBetweenSegments (
       Vector3d u, Vector3d v, Vector3d w, double epsilon, double[] rv) {

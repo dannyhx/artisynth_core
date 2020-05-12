@@ -8,8 +8,8 @@ package artisynth.core.mechmodels;
 
 import java.util.*;
 
-import _custom.cont.ContinuousCollider;
-import _custom.cont.ContinuousCollider.Stage;
+import _custom.cont.CollisionDetector;
+import _custom.cont.CollisionDetector.Stage;
 import _custom.cont.MeshUtil;
 import maspack.collision.*;
 import maspack.geometry.*;
@@ -1094,7 +1094,7 @@ public class CollisionHandler extends ConstrainerBase
       for (ContactConstraint cc : myUnilaterals) {
          // Imminent: Tell `getUnilateralInfo()` that it doesn't have to account
          // for the penetration tolerance.
-         cc.myStage = ContinuousCollider.mStage;
+         cc.myStage = CollisionDetector.mStage;
       }
       
       // --- DAN-EXPERIMENTAL-BILATERAL
@@ -1121,7 +1121,7 @@ public class CollisionHandler extends ConstrainerBase
       
       // --- DAN-EXPERIMENTAL-BILATERAL
       
-      if (ContinuousCollider.myDebug)
+      if (CollisionDetector.myDebug)
          System.out.println ("Num of unilaterals: " + myUnilaterals.size ());
 
       removeInactiveContacts ();

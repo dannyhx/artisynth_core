@@ -1,20 +1,23 @@
 package _custom.cont;
 
-import _custom.cont.BoundablePointArray;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
-import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector3d;
-import maspack.util.DataBuffer;
 
+/** Space-time path of a vertex, across a single time step. */
 public class SweptVertex extends BoundablePointArray {
 
+   // Convenient array indices that represent the ending (V1) and starting (V0)
+   // vertex location. 
+   
    public final int V1 = 0;
    public final int V0 = 1;
    
+   /** Traversing vertex. */
    Vertex3d myVertex;
    
 
+   /** Space-time path of a vertex, across a single time step. */
    public SweptVertex (Vertex3d vertex, Point3d[] oldPositions) {
       super(2);
       myVertex = vertex;
@@ -23,10 +26,17 @@ public class SweptVertex extends BoundablePointArray {
       myPnts[V0] = oldPositions[myVertex.getIndex()];
    }
    
+   /** Is the path length zero? */
    public boolean isSweepIdle(double elipson) {
       return (myPnts[V1].distance (myPnts[V0]) < elipson);
    }
    
+   /** Get the instanteous location of the vertex.
+    * 
+    * @param t 
+    * Fraction of the path, ranging from 0 to 1. For example, 0.5 returns the
+    * vertex that's half-way along its traversed path.
+    */
    public Point3d computeInstanteousPoint(double t) {
       Point3d instPt = new Point3d();
       instPt.sub (myPnts[V1], myPnts[V0]);
@@ -39,9 +49,6 @@ public class SweptVertex extends BoundablePointArray {
       return instPt;
    }
  
-   
-   
-   
    
    
    

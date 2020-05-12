@@ -7,9 +7,22 @@ import maspack.util.DataBuffer;
 import maspack.matrix.Matrix3d;
 import maspack.geometry.*;
 
+/** Represents a single AABB that encloses the space-time path of a mesh 
+ *  feature, across a single time step. */
 public class BoundablePointArray implements Boundable {
 
+   /** Boundary points that comprise the space-time path. AABB will be big
+    *  enough to enclose all the points. 
+    *
+    *  By convention, the first half of the array is comprised of points 
+    *  that represents the mesh feature at the END of the path, while the 
+    *  second half of the array corresponds to the mesh feature at the START of 
+    *  the path.
+    */
    protected Point3d[] myPnts;
+   
+   /** What transformation matrix should be used when calling the transformation
+    *  functions (e.g. {@link #createTransformedPoints()})?*/
    public RigidTransform3d X;
    
    /* --- Stored Meta Data for Continuous Collision --- */
@@ -19,10 +32,13 @@ public class BoundablePointArray implements Boundable {
    
    
    
-   
-   
-   
-
+   /** 
+    * Represents a single AABB that encloses the space-time path of a mesh 
+    * feature. 
+    *
+    * @param size
+    * Number of boundary points that comprise the path. 
+    */
    public BoundablePointArray (int size) {
       myPnts = new Point3d[size];
    }
@@ -35,6 +51,9 @@ public class BoundablePointArray implements Boundable {
       return myPnts[idx];
    }
    
+   /** Retrieve a transformed point. Transformation matrix used is according 
+    *  to {@link #X}.
+    */
    public Point3d createTransformedPoint(int idx) {
       Point3d xPnt = new Point3d(myPnts[idx]);
       xPnt.transform (this.X);
@@ -63,6 +82,9 @@ public class BoundablePointArray implements Boundable {
       return -1;
    }
    
+   /** Retrieve all the points with transformation applied. Transformation 
+    *  matrix used is according to {@link #X}.
+    */
    public Point3d[] createTransformedPoints() {
       Point3d[] xPts = new Point3d[ numPoints() ];
       
@@ -74,6 +96,13 @@ public class BoundablePointArray implements Boundable {
       return xPts;
    }
    
+   /** Compute the displacement of a point across the space-time path. 
+    *  Transformation matrix used is according to {@link #X}.
+    *
+    * @param p 
+    * Identifies the moving point. Must be an index within the first half of the 
+    * {@link #myPnts} array. 
+    */
    public Vector3d computeDisplacement(int p) {
       int numMovingPts = myPnts.length/2;
       

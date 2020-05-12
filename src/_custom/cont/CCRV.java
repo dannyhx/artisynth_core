@@ -1,6 +1,5 @@
 package _custom.cont;
 
-import maspack.matrix.Point3d;
 import maspack.matrix.Vector2d;
 import maspack.matrix.Vector3d;
 
@@ -31,15 +30,19 @@ public class CCRV {
    
    /* --- Vertex-triangle imminent collision --- */
    
+   /** Normal of the triangle. */
    public Vector3d normal;
+   
+   /** Penetration distance. */
    public double thicknessPenetration;
    
    
-   
+   /** Contains computed collision info. */
    public CCRV() {
       this.hitTime = -1;
    }
    
+   /** Contains computed collision info. */
    public CCRV(double hitTime) {
       this.hitTime = hitTime;
    }
