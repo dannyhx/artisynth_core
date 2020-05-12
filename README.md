@@ -1,18 +1,3 @@
-# Large Growth Deformations of Thin Tissue using Solid-Shells
-
-This is a branch of [ArtiSynth](https://www.artisynth.org) to enable growth for
-solid-shells. The growth simulator was developed for the thesis titled
-_Large Growth Deformations of Thin Tissue using Solid-Shells_ by Danny Huang, 
-and has been made open-source to ensure reproducibility of the methods and 
-experiments.
-
- 
-
-
-
-
-
-
 
 
 
