@@ -11,10 +11,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import _custom.cont.CollisionDetector;
-import _custom.cont.SweptMeshInfo;
-import _custom.cont.SweptTriangle;
-import _custom.cont.SweptVertex;
 import maspack.collision.AbstractCollider;
 import maspack.collision.ContactInfo;
 import maspack.collision.MeshCollider;
@@ -67,6 +63,10 @@ import artisynth.core.modelbase.StructureChangeEvent;
 import artisynth.core.util.ScalableUnits;
 import artisynth.core.util.ScalarRange;
 import artisynth.core.util.ScanToken;
+import artisynth.demos.growth.collision.CollisionDetector;
+import artisynth.demos.growth.collision.SweptMeshInfo;
+import artisynth.demos.growth.collision.SweptTriangle;
+import artisynth.demos.growth.collision.SweptVertex;
 
 /**
  * A special component that manages collisions between collidable bodies on

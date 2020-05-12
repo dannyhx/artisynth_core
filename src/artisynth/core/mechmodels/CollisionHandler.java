@@ -6,27 +6,47 @@
  */
 package artisynth.core.mechmodels;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import _custom.cont.CollisionDetector;
-import _custom.cont.CollisionDetector.Stage;
-import _custom.cont.MeshUtil;
-import maspack.collision.*;
-import maspack.geometry.*;
-import maspack.matrix.*;
-import maspack.properties.*;
-import maspack.render.*;
-import maspack.util.*;
-import artisynth.core.mechmodels.MechSystem.ConstraintInfo;
-import artisynth.core.mechmodels.MechSystem.FrictionInfo;
-import artisynth.core.femmodels.BackNode3d;
-import artisynth.core.femmodels.FemElement3d;
-import artisynth.core.femmodels.FemElement3dBase;
-import artisynth.core.femmodels.FemMeshComp;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.mechmodels.CollisionBehavior.Method;
-import artisynth.core.mechmodels.CollisionManager.ColliderType;
 import artisynth.core.mechmodels.CollisionManager.BehaviorSource;
+import artisynth.core.mechmodels.CollisionManager.ColliderType;
+import artisynth.core.mechmodels.MechSystem.ConstraintInfo;
+import artisynth.core.mechmodels.MechSystem.FrictionInfo;
+import artisynth.demos.growth.collision.CollisionDetector;
+import artisynth.demos.growth.util.MeshUtil;
+import maspack.collision.ContactInfo;
+import maspack.collision.ContactPlane;
+import maspack.collision.EdgeEdgeContact;
+import maspack.collision.IntersectionContour;
+import maspack.collision.IntersectionPoint;
+import maspack.collision.PenetratingPoint;
+import maspack.geometry.HalfEdge;
+import maspack.geometry.PolygonalMesh;
+import maspack.geometry.Vertex3d;
+import maspack.matrix.Point3d;
+import maspack.matrix.SparseBlockMatrix;
+import maspack.matrix.Vector3d;
+import maspack.matrix.VectorNd;
+import maspack.matrix.VectorNi;
+import maspack.properties.PropertyList;
+import maspack.render.HasRenderProps;
+import maspack.render.RenderList;
+import maspack.render.RenderProps;
+import maspack.render.Renderable;
+import maspack.render.Renderer;
+import maspack.util.DataBuffer;
+import maspack.util.InternalErrorException;
 
 /**
  * Class that generates the contact constraints between a specific

@@ -8,7 +8,6 @@ package artisynth.core.mechmodels;
 
 import java.util.ArrayList;
 
-import _custom.cont.CollisionDetector;
 import maspack.collision.PenetrationRegion;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.MatrixBlock;
@@ -19,6 +18,7 @@ import maspack.util.DataBuffer;
 import maspack.util.NumberFormat;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.mechmodels.MechSystem.FrictionInfo;
+import artisynth.demos.growth.collision.CollisionDetector;
 
 /**
  * Information for a contact constraint formed by a single contact point.
