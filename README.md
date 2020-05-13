@@ -1,16 +1,15 @@
 # LG
 
-This is a branch of [ArtiSynth](https://www.artisynth.org) to enable growth for
+This is a fork of [ArtiSynth](https://www.artisynth.org) to enable growth for
 solid-shells. The growth simulator was developed for the thesis titled
-_LG_ by Danny Huang, 
-and has been made open-source to ensure reproducibility of the methods and 
+_LG_, and has been made open-source to ensure reproducibility of the methods and 
 experiments.
 
-## Installation.
+## Installation
 
-The growth simulator can be setup by downloading and compiling the "shell_growth"
-branch of ArtiSynth. The steps below can be followed to setup and 
-run the growth simulator.
+The growth simulator can be setup by downloading the code repository and 
+compiling the code using the Eclipse IDE. The steps below can be followed 
+to setup and run the growth simulator.
 
 ```bash
 # Download and install Git (if haven't done so).
@@ -28,7 +27,7 @@ mkdir eclipse-workspace
 cd eclipse-workspace
 
 # Download the ArtiSynth repository.
-git clone https://github.com/artisynth/artisynth_core.git
+git clone https://github.com/dannyhx/artisynth_core.git
 cd artisynth_core
 
 # Switch to the shell_growth branch.
@@ -65,7 +64,7 @@ Next > Next (Import existing Eclipse projects) > Finish
 Run (located in top taskbar) > Run Configurations ... > Java Application > 
 ArtiSynth > Arguments tab > Set the Program arguments to
 
--model artisynth.models.plants.growth.paperdemos.Intricate_Wrinkles   
+-model artisynth.demos.growth.models.paper.Intricate_Wrinkles   
 -noTimeline     
 -play                   
 -disableHybridSolves    
@@ -90,7 +89,7 @@ ArtiSynth > Arguments tab > Set the Program arguments to
 
 ## Source Code Layout
 
-The source code relating to growth is contained in the `artisynth.models.plants.growth`
+The source code relating to growth is contained in the `artisynth.demos.growth.`
 java package. Within the growth package, the components are organized as follows
 
 ```bash
