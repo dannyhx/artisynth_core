@@ -1,8 +1,8 @@
-# LG
+# Large Growth Deformations of Thin Tissue using Solid-Shells
 
 This is a fork of [ArtiSynth](https://www.artisynth.org) to enable growth for
 solid-shells. The growth simulator was developed for the thesis titled
-_LG_, and has been made open-source to ensure reproducibility of the methods and 
+_Large Growth Deformations of Thin Tissue using Solid-Shells_, and has been made open-source to ensure reproducibility of the methods and 
 experiments.
 
 ## Installation
