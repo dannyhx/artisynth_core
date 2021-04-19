@@ -46,7 +46,16 @@ public class GrowTriElement extends ShellTriElement {
    
    public GrowTriElement (GrowNode3d p0, GrowNode3d p1,
    GrowNode3d p2, double thickness) {
-      super(p0, p1, p2, thickness);
+      super(p0, p1, p2, thickness, false);
+      
+      Matrix3d Fg = new Matrix3d();
+      Fg.setIdentity ();
+      setPlasticDeformation( Fg );
+   }
+   
+   public GrowTriElement (GrowNode3d p0, GrowNode3d p1,
+   GrowNode3d p2, double thickness, boolean membrane) {
+      super(p0, p1, p2, thickness, membrane);
       
       Matrix3d Fg = new Matrix3d();
       Fg.setIdentity ();
