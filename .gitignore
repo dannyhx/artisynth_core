@@ -66,3 +66,4 @@ EXTCLASSPATH
 ######################
 .DS_Store
 
+/classes/
