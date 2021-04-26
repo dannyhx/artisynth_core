@@ -1,5 +1,6 @@
 package artisynth.demos.growth.remesh;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 
 import artisynth.core.femmodels.BackNode3d;
@@ -12,6 +13,9 @@ import artisynth.core.mechmodels.CollisionHandler;
 import artisynth.core.mechmodels.ContactConstraint;
 import artisynth.core.mechmodels.ContactMaster;
 import artisynth.core.mechmodels.ContactPoint;
+import artisynth.core.mechmodels.Particle;
+import artisynth.core.mechmodels.PointParticleAttachment;
+import artisynth.core.mechmodels.VertexContactMaster;
 import artisynth.demos.growth.collision.ContactConstraintAgg;
 import maspack.geometry.Face;
 import maspack.geometry.PolygonalMesh;
@@ -19,6 +23,7 @@ import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
 import maspack.util.DataBuffer;
+import maspack.util.Pair;
 
 /**
  * Remeshing operations (e.g. edge bisect, flip, and collapse) that operate
@@ -279,18 +284,31 @@ public class ShellRemeshOps extends RemeshOps {
             // Take the average of 2 constraints and their masters
 
             // Constraint specific
-            Vector3d nrm_avg = new Vector3d();// Nrm calc as if for single mast.
-            double dist_avg = 0; // Distance calculated as if for single master.
+//            Vector3d nrm_avg = new Vector3d();// Nrm calc as if for single mast.
+            
+//            double dist_avg = 0; // Distance calculated as if for single master.
+            
             int numCCs = n0_ccs.size() + n1_ccs.size ();
 
             // Contact point specific (not really needed for impulses)
             Point3d cpnt0_avg = new Point3d();
             Point3d cpnt1_avg = new Point3d();
             
+            Particle nodeC_fb = (isBackNode) ? backC : nodeC;
+            
+            ContactConstraint cc_avg = new ContactConstraint();
+            cc_avg.myMasters0.add(createSingleNodeVertexContactMaster(nodeC_fb, 1));
+            cc_avg.myMasters1.add(createSingleNodeVertexContactMaster(nodeC_fb, 1));
+            cc_avg.m = (n0_ccs.size() > 0) ? n0_ccs.get (0).m : n1_ccs.get(0).m;
+            
+            // Calculate average normal and distance among the two nodes.
+            
+            // For nodeA and nodeB...
             for (int i=0; i<2; i++) {
                LinkedList<ContactConstraint> ccs = (i==0) ? n0_ccs : n1_ccs;
                FemNode3d node = (i==0) ? nodeA : nodeB;
                   
+               // For each constraint (normal, dist, 2 contact points)
                for (ContactConstraint cc : ccs) {
                   Vector3d nrm = cc.getNormal ();
                   double dist = cc.getDistance ();
@@ -298,30 +316,42 @@ public class ShellRemeshOps extends RemeshOps {
                   cpnt0_avg.add( cc.myCpnt0.getPoint () );
                   cpnt1_avg.add( cc.myCpnt1.getPoint () );
                   
-                  for (ContactMaster cm : 
-                       getFilteredContactMasters (node, cc, isBackNode)) 
-                  {
-                     double wt = cm.getWeight ();
-                     
-                     nrm_avg.scaledAdd (wt, nrm); 
-                     dist_avg += wt*dist;
+//                  for (ContactMaster cm : 
+//                       getFilteredContactMasters (node, cc, isBackNode)) 
+//                  {
+                     // DAN21TODO
+//                     double wt = cm.getWeight ();
+//                     
+//                     nrm_avg.scaledAdd (wt, nrm); 
+//                     dist_avg += wt*dist;
+//                  }
+                  
+                  for (int m = 0; m < 2; m++) {
+                     ArrayList<ContactMaster> masters = (m == 0) ? cc.myMasters0 : cc.myMasters1;
+                     for (ContactMaster cm : masters) {
+                        VertexContactMaster vcm = (VertexContactMaster)cm; 
+                        double wt = vcm.myWgts[0];
+                        
+//                      nrm_avg.scaledAdd (wt, nrm); 
+//                      dist_avg += wt*dist;
+                        
+                        cc_avg.getNormal ().scaledAdd(wt, nrm);
+                        cc_avg.setDistance (cc_avg.getDistance () + wt*dist);
+                     }
                   }
+                  
                }
             }
             
-            nrm_avg.scale ( 1.0/2 );  // Interpolate 
-            nrm_avg.normalize ();
+            cc_avg.getNormal().scale ( 1.0/2 );  // Interpolate 
+            cc_avg.getNormal ().normalize ();
             
             cpnt0_avg.scale ( 1.0/numCCs );
             cpnt1_avg.scale ( 1.0/numCCs );
           
-            dist_avg *= (1.0 / 2);   // Interpolate
+            cc_avg.setDistance(cc_avg.getDistance () * (1.0 / 2));   // Interpolate
 
             // Store average in new master (node impulse relies on 'weight').
-            
-            ContactMaster cm_avg = (isBackNode) ? 
-               new ContactMaster(backC, 1.0) :
-               new ContactMaster(nodeC, 1.0);
             
             // Create contact points (this isn't really needed for 
             // node impulses).
@@ -331,15 +361,10 @@ public class ShellRemeshOps extends RemeshOps {
 
             // Store new master into new unilateral.
             
-            ContactConstraint cc = new ContactConstraint();
-            cc.m = (n0_ccs.size() > 0) ? n0_ccs.get (0).m : n1_ccs.get(0).m;
-            cc.setNormal (nrm_avg);
-            cc.setDistance (dist_avg);
-            cc.setContactPoints (cpntC0, cpntC1);
-            cc.getMasters ().add (cm_avg);
+            cc_avg.setContactPoints (cpntC0, cpntC1);
             
             // Add our interpolated unilateral.
-            colHdlr.myUnilaterals.add (cc);
+            colHdlr.myUnilaterals.add (cc_avg);
          }
          
       }  // For each colHdlr
@@ -356,11 +381,76 @@ public class ShellRemeshOps extends RemeshOps {
       // CSNCMT
       for (CollisionHandler colHdlr : mCCAgg.myColHdlrs) {
          for (ContactConstraint cc : colHdlr.myUnilaterals) {
-            for (boolean isBackNode : new boolean[] {false, true}) {
-               LinkedList<ContactMaster> cms = 
-                  getFilteredContactMasters (node, cc, isBackNode);
-               cc.getMasters ().removeAll (cms);
+            // Scan through ContactConstraint's ContactMasters, searching for
+            // ones involving the given node. If found such ContactMaster,
+            // delete it.
+            for (int m = 0; m < 2; m++) {
+               ArrayList<ContactMaster> masters = (m == 0) ? cc.myMasters0 : cc.myMasters1;
+               for (ContactMaster cm : masters) {
+                  if (cm instanceof VertexContactMaster) {
+                     VertexContactMaster vcm = (VertexContactMaster)cm; 
+                    
+                     ContactMaster ppaToDelete = null;
+                     int ppaIdxToDelete = -1;
+                     
+                     for (ArrayList<ContactMaster> vcm_cms : vcm.myMasterLists) {
+                        
+                        // For each ContactMaster list in the VertexContactMaster
+                        int ppaIdx = 0;
+                        for (ContactMaster vcm_cm : vcm_cms) {
+                           if (vcm_cm instanceof PointParticleAttachment) {
+                              PointParticleAttachment ppa = (PointParticleAttachment)cm;
+                              Particle particle = ppa.myParticle;
+                              
+                              if (particle == node) {
+                                 ppaToDelete = vcm_cm;
+                                 ppaIdxToDelete = ppaIdx;
+                                 break;
+                              }
+                           } else {
+                              throw new AssertionError("Unexpected ContactMaster type."); 
+                           }
+                           
+                           ppaIdx++;
+                        } 
+                        
+                        if (ppaToDelete != null) {
+                           // Delete PPA.
+                           vcm_cms.remove (ppaToDelete);
+                           break;
+                        }
+                     }
+                     
+                     if (ppaToDelete != null) {
+                        // Delete PPA's weight.
+                        int new_wgt_idx = 0;
+                        double[] new_wgts = new double[vcm.myWgts.length-1];
+                        
+                        for (int i = 0; i < vcm.myWgts.length; i++) {
+                           if (i != ppaIdxToDelete) {
+                              new_wgts[new_wgt_idx] = vcm.myWgts[i];
+                              new_wgt_idx++;
+                           }
+                        }
+                     }
+                  } else {
+                     throw new AssertionError("Unexpected ContactMaster type."); 
+                  }
+               }
+               
+               // If VertexContactMaster is actually empty, then remove it
+               // from ContactConstraint's list of masters (0 or 1).
+               
+               ArrayList<ContactMaster> masters_copy = (ArrayList<ContactMaster>)masters.clone();
+               for (ContactMaster curMaster : masters_copy) {
+                  VertexContactMaster curVcm = (VertexContactMaster)curMaster; 
+                  
+                  if (curVcm.myWgts.length == 0) {
+                     masters.remove (curVcm);
+                  }
+               }
             }
+               
             // TODO. Need to remove vtx from the vertices of cm.cpnt?
          }
       }
@@ -369,7 +459,7 @@ public class ShellRemeshOps extends RemeshOps {
       // java.lang.IllegalArgumentException: Requested block location
       // 270,28 is out of bounds; matrix block size is 588X26
       for (CollisionHandler colHdlr : mCCAgg.myColHdlrs) {
-         colHdlr.myUnilaterals.removeIf (cc -> cc.getMasters ().isEmpty ());
+         colHdlr.myUnilaterals.removeIf (cc -> cc.getAllMasters ().isEmpty ());
       }
    }
    
@@ -388,7 +478,8 @@ public class ShellRemeshOps extends RemeshOps {
       
       // CSNCMT
       for (ContactConstraint cc : colHdlr.myUnilaterals) {
-         if (getFilteredContactMasters (node, cc, isBackNode).size () > 0) {
+         ContactConstraint filtered_cc = getFilteredContactMasters (node, cc, isBackNode);
+         if (filtered_cc.myMasters0.size () > 0 || filtered_cc.myMasters1.size() > 0) {
             n_ccs.add (cc);
          }
       }
@@ -400,29 +491,88 @@ public class ShellRemeshOps extends RemeshOps {
     * Get contact masters (if any) within the given contact constraint cc
     * that are associated with the given node.
     * 
-    * Recall that contact masters are assigned on a node basis, each with their
-    * own weight.
+    * Recall that contact masters are usually instances of VertexContactMaster,
+    * which either involves one node or 3 nodes.
+    * 
+    * @return
+    * ContactConstraint with myMasters0 and myMasters1 populated.
+    * Each myMasters list will contain 0 or 1 VertexContactMaster. 
+    * In turn, every VertexContactMaster will have a PointParticleAttachment 
+    * (filtered from the 1 or 3 nodes), which identifies the interested node, 
+    * and associated weight.
     */
-   protected LinkedList<ContactMaster> getFilteredContactMasters(FemNode3d node,
+   protected ContactConstraint getFilteredContactMasters(FemNode3d node,
    ContactConstraint cc, boolean isBackNode) {
-      LinkedList<ContactMaster> n_cms = new LinkedList<ContactMaster> ();
-      
+      ContactConstraint n_cc = new ContactConstraint();
+
       BackNode3d backNode = node.getBackNode ();
-      
+//      
       // CSNCMT
       // For each contact master in the constraint.
-      for (ContactMaster cm : cc.getMasters ()) {
-         CollidableDynamicComponent cmComp = cm.getComp ();
+      for (int m = 0; m < 2; m++) {
+         ArrayList<ContactMaster> masters = (m == 0) ? cc.myMasters0 : cc.myMasters1;
          
-         if (!isBackNode && cmComp == node) {
-            n_cms.add (cm);
+         // ContactMasters belonging to the given (n)ode.
+         ArrayList<ContactMaster> n_masters = (m == 0) ? n_cc.myMasters0 : n_cc.myMasters1; 
+
+         int vcm_idx = 0;
+         for (ContactMaster cm : masters) {
+            // DAN21:
+            if (cm instanceof VertexContactMaster) {
+               VertexContactMaster vcm = (VertexContactMaster)cm; 
+              
+               // For each ContactMaster list in the VertexContactMaster
+               for (ArrayList<ContactMaster> vcm_cms : vcm.myMasterLists) {
+                  
+                  for (ContactMaster vcm_cm : vcm_cms) {
+                     if (vcm_cm instanceof PointParticleAttachment) {
+                        PointParticleAttachment ppa = (PointParticleAttachment)cm;
+                        Particle particle = ppa.myParticle;
+                        
+                        if (!isBackNode && particle == node || isBackNode && particle == backNode) {
+                           VertexContactMaster n_vcm = new VertexContactMaster();
+                           n_vcm.myMasterLists = new ArrayList[] {new ArrayList<ContactMaster>()};
+                           n_vcm.myMasterLists[0].add (ppa);
+                           n_vcm.myWgts = new double[] {vcm.myWgts[vcm_idx]};
+                           
+                           n_masters.add (n_vcm);
+                        }
+                     } else {
+                        throw new AssertionError("Unexpected ContactMaster type."); 
+                     }
+                  } 
+               }
+            } else {
+               throw new AssertionError("Unexpected ContactMaster type."); 
+            }
+            
+            vcm_idx++;
          }
-         else if (isBackNode && cmComp == backNode) {
-            n_cms.add (cm);
-         }
+         
+         
+         // CSNOLD
+//         CollidableDynamicComponent cmComp = cm.getComp ();
+//         
+//         if (!isBackNode && cmComp == node) {
+//            n_cms.add (cm);
+//         }
+//         else if (isBackNode && cmComp == backNode) {
+//            n_cms.add (cm);
+//         }
       }
-      
-      return n_cms;
+//      
+      return n_cc;
+   }
+
+   /* --- Convenient --- */
+   
+   protected VertexContactMaster createSingleNodeVertexContactMaster(Particle node, double wt) {
+      VertexContactMaster vcm = new VertexContactMaster();
+      vcm.myMasterLists = new ArrayList[] {new ArrayList<ContactMaster>()};
+      vcm.myMasterLists[0].add (new PointParticleAttachment(node, null));
+      vcm.myWgts = new double[] {wt};
+
+      return vcm;
    }
    
    /* --- Interfacing --- */

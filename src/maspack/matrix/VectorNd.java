@@ -99,7 +99,7 @@ public class VectorNd extends VectorBase
     * @param values
     * element values for the new vector
     */
-   public VectorNd (double[] values) {
+   public VectorNd (double... values) {
       resetSize (values.length);
       set (values);
    }
@@ -111,7 +111,7 @@ public class VectorNd extends VectorBase
     * @param values
     * element values for the new vector
     */
-   public VectorNd (float[] values) {
+   public VectorNd (float... values) {
       resetSize (values.length);
       set (values);
    }
@@ -1138,7 +1138,7 @@ public class VectorNd extends VectorBase
       }
       for (int i = 0; i < size; i++) {
          double dist = Math.abs (buf[i] - v1.buf[i]);
-         if (dist > eps) {
+         if (!(dist <= eps)) {
             return false;
          }
       }

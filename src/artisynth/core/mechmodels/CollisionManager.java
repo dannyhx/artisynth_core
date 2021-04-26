@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -219,6 +220,10 @@ public class CollisionManager extends RenderableCompositeBase
    static ColliderType myDefaultColliderType = ColliderType.TRI_INTERSECTION;
    ColliderType myColliderType = myDefaultColliderType;
    PropertyMode myColliderTypeMode = PropertyMode.Inherited;
+
+   static Method defaultMethod = Method.DEFAULT;
+   Method myMethod = defaultMethod;
+   PropertyMode myMethodMode = PropertyMode.Inherited;
 
    private static CollidablePair RIGID_RIGID =
       new CollidablePair (Collidable.Rigid, Collidable.Rigid);
@@ -451,6 +456,9 @@ public class CollisionManager extends RenderableCompositeBase
          defaultColorMap, "CE");
 
       myProps.addInheritable (
+         "method:Inherited", "collision handling method", defaultMethod);
+
+      myProps.addInheritable (
          "colliderType", "type of collider to use for collisions",
          myDefaultColliderType);
    }
@@ -563,6 +571,10 @@ public class CollisionManager extends RenderableCompositeBase
       myColorMapCollidableMode = PropertyMode.Inherited;
       setColorMapRange (defaultColorMapRange);
       myForceBehavior = null;
+      myMethod = defaultMethod;
+      myMethodMode = PropertyMode.Inherited;
+      myColliderType = myDefaultColliderType;
+      myColliderTypeMode = PropertyMode.Inherited;
    }
 
    ArrayList<CollisionHandler> collisionHandlers() {
@@ -691,7 +703,8 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    /** 
-    * Gets the rigid region tolerance associated with this behavior.
+    * Gets the default rigid region tolerance associated with all collision
+    * behaviors.
     * 
     * @return rigid region tolerance
     */
@@ -700,7 +713,8 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    /** 
-    * Sets the rigid region tolerance associated with this behavior.
+    * Sets the default rigid region tolerance associated with all collision
+    * behaviors.
     * 
     * @param tol new rigid region tolerance
     */
@@ -729,8 +743,9 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    /** 
-    * Gets the rigid point tolerance associated with this behavior.  This is
-    * the point clustering distance used when computing contact planes.
+    * Gets the default rigid point tolerance associated with all collision
+    * behaviors.  This is the point clustering distance used when computing
+    * contact planes.
     * 
     * @return rigid point tolerance
     */
@@ -739,7 +754,8 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    /** 
-    * Sets the rigid point tolerance associated with this behavior.
+    * Sets the default rigid point tolerance associated with all collision
+    * behaviors.
     * 
     * @param tol new rigid point tolerance
     */
@@ -836,7 +852,8 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    /** 
-    * Gets the contact compliance associated with this behavior.
+    * Gets the default contact compliance associated will all collision
+    * behaviors.
     * 
     * @return contact compliance
     */
@@ -845,7 +862,8 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    /** 
-    * Sets the contact compliance associated with this behavior.
+    * Sets the default contact compliance associated with all collision
+    * behaviors.
     * 
     * @param c new contact compliance
     */
@@ -867,7 +885,8 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    /** 
-    * Gets the contact damping associated with this behavior.
+    * Gets the default contact damping associated with all collision
+    * behaviors.
     * 
     * @return contact damping
     */
@@ -876,7 +895,7 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    /** 
-    * Sets the contact damping associated with this behavior.
+    * Sets the default contact damping associated with all collision behaviors.
     * 
     * @param d new contact damping
     */
@@ -1141,7 +1160,39 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    /** 
-    * Returns the collider type to be used for determining.
+    * Returns the collision method to be used for collisions.
+    * 
+    * @return collision method
+    */
+   public Method getMethod() {
+      return myMethod;
+   }
+
+   /** 
+    * Set the collision method to be used for collisions. The default value is
+    * {@link Method#DEFAULT}, which means that the method will be determined
+    * based on the colliding bodies.
+    * 
+    * @param method collision method to be used
+    */
+   public void setMethod (Method method) {
+      myMethod = method;
+      myMethodMode =
+         PropertyUtils.propagateValue (
+            this, "method", myMethod, myMethodMode);      
+   }
+
+   public void setMethodMode (PropertyMode mode) {
+      myMethodMode =
+         PropertyUtils.setModeAndUpdate (this, "method", myMethodMode, mode);
+   }
+
+   public PropertyMode getMethodMode() {
+      return myMethodMode;
+   }
+
+   /** 
+    * Returns the collider type to be used for determining collisions.
     * 
     * @return collider type
     */
@@ -1488,7 +1539,7 @@ public class CollisionManager extends RenderableCompositeBase
     */
    CollidablePair validateBehaviorResponsePair (
       Collidable c0, Collidable c1, boolean requiresLowestCommonModel) {
-
+      
       if (c0 instanceof Group) {
          throw new IllegalArgumentException (
             "First collidable cannot be a group: " +
@@ -2597,26 +2648,9 @@ public class CollisionManager extends RenderableCompositeBase
       }
    }
 
-   protected int numUnmarkedMasters (ContactConstraint c, boolean[] marked) {
-      int num = 0;
-      ArrayList<ContactMaster> masters = c.getMasters();
-      for (int i=0; i<masters.size(); i++) {
-         int idx = masters.get(i).myComp.getSolveIndex();
-         if (idx < marked.length && marked[idx] == false) {
-            num++;
-         }
-      }
-      return num;
-   }
-
-   protected void markMasters (ContactConstraint c, boolean[] marked) {
-      ArrayList<ContactMaster> masters = c.getMasters();
-      for (int i=0; i<masters.size(); i++) {
-         int idx = masters.get(i).myComp.getSolveIndex();
-         if (idx < marked.length && marked[idx] == false) {
-            marked[idx] = true;
-         }
-      }
+   protected int markActiveMasters (
+      ContactConstraint c, HashSet<DynamicComponent> marked) {
+      return c.collectMasterComponents (marked, /*activeOnly=*/true);
    }
 
    public void reduceBilateralConstraints (
@@ -2625,16 +2659,14 @@ public class CollisionManager extends RenderableCompositeBase
       int[] dofs = new int[myMechModel.numActiveComponents()];
       myMechModel.getDynamicDOFs (dofs);
 
-      boolean[] marked = new boolean[myMechModel.numActiveComponents()];
+      boolean[] mx = new boolean[myMechModel.numActiveComponents()];
+      HashSet<DynamicComponent> marked = new HashSet<>();
 
       // make sure each constraint has at least one unmarked active master
       for (int i=0; i<bilaterals.size(); i++) {
          ContactConstraint c = bilaterals.get(i);
-         if (numUnmarkedMasters (c, marked) == 0) {
+         if (markActiveMasters (c, marked) == 0) {
             c.setActive (false);
-         }
-         else {
-            markMasters (c, marked);
          }
       }
    }
@@ -3043,6 +3075,7 @@ public class CollisionManager extends RenderableCompositeBase
    }
 
    public void setState (DataBuffer data) {
+      updateBehaviorStructures();
       if (!myHandlerTableValid) {
          MechModel topMech = MechModel.topMechModel(this);
          topMech.updateCollidableBodyIndices();

@@ -17,7 +17,9 @@ import java.io.*;
 import java.util.Arrays;
 
 public class KKTSolver {
-   private static boolean myUseUmfpack = false;
+
+   private SparseSolverId mySolverType = SparseSolverId.Pardiso;
+
    public static boolean computeResidualMG = false;
 
    boolean myTimeSolves = false;
@@ -95,15 +97,28 @@ public class KKTSolver {
       NUMERIC_ERROR
    };
 
+   public KKTSolver (SparseSolverId solverType) {
+      switch (solverType) {
+         case Pardiso: {
+            myPardiso = new PardisoSolver();
+            myMatrixSolver = myPardiso;
+            break;
+         }
+         case Umfpack: {
+            myUmfpack = new UmfpackSolver();
+            myMatrixSolver = myUmfpack;
+            break;
+         }
+         default: {
+            throw new IllegalArgumentException (
+               "Solver type " + solverType + " not supported");
+         }
+      }
+      mySolverType = solverType;
+   }
+
    public KKTSolver() {
-      if (myUseUmfpack) {
-         myUmfpack = new UmfpackSolver();
-         myMatrixSolver = myUmfpack;
-      }
-      else {
-         myPardiso = new PardisoSolver();
-         myMatrixSolver = myPardiso;
-      }
+      this (SparseSolverId.Pardiso);
    }
 
    /**
@@ -173,7 +188,7 @@ public class KKTSolver {
       // values in some cases
       getCRSValues (M, sizeM, numVals, GT, Rg);
 
-      if (myUseUmfpack) {
+      if (mySolverType == SparseSolverId.Umfpack) {
          setUmfpackIndices (sizeMG, numVals);
          if (myUmfpack.analyze (
             myColOffs, myRowIdxs, sizeMG, myUmfpackVals.length) !=
@@ -471,6 +486,9 @@ public class KKTSolver {
             timerStop ("buildLCP m=" + NT.colSize() + ":");
          }
       }
+      // System.out.println ("M=\n" + M.toString ("%10.6f"));
+      // System.out.println ("GT=\n" + GT.toString ("%10.6f"));
+      // System.out.println ("NT=\n" + NT.toString ("%10.6f"));
       myState = State.FACTORED;
       long t1 = System.nanoTime();
       //System.out.println ("factor " + (t1-t0)*1e-6);
@@ -686,7 +704,7 @@ public class KKTSolver {
       myNumD = 0;
       myDT = null;
       
-      if (!myUseUmfpack && myDirectCnt > 0 &&
+      if (myPardiso != null && myDirectCnt > 0 &&
           (myIterativeCnt == 0 || myIterativeCnt+1 < estimateOptimalCount())) {
          long t0 = System.nanoTime();
          getCRSValues (M, sizeM, myNumVals, GT, Rg);
@@ -836,8 +854,8 @@ public class KKTSolver {
       for (int i = 0; i < myQ.size(); i++) {
          myZBasic[i] = false;
       }
-      // System.out.println ("LCP M=[\n" + myLcpM + "]");
-      // System.out.println ("Q=" + myQ);
+      //System.out.println ("LCP M=[\n" + myLcpM + "]");
+      //System.out.println ("Q=" + myQ);
 
       myDantzig.setComputeResidual (true);
       if (myTimeSolves) timerStart();
@@ -845,7 +863,7 @@ public class KKTSolver {
          myDantzig.solve (myZ, myLcpM, myQ, myZBasic);
       if (myTimeSolves) timerStop("solveLCP:");
       myDantzig.setComputeResidual (false);
-      // System.out.println ("status=" + status + " res=" + myDantzig.getResidual());
+      //System.out.println ("status=" + status + " res=" + myDantzig.getResidual());
       // System.out.println ("M=\n" + myLcpM);
       // System.out.println ("q=\n" + myQ);
       // System.out.println ("z=\n" + myZ);
@@ -1367,7 +1385,7 @@ public class KKTSolver {
    private void factorMG (
       Object M, int sizeM, SparseBlockMatrix GT, VectorNd Rg) {
       getCRSValues (M, sizeM, myNumVals, GT, Rg);
-      if (myUseUmfpack) {
+      if (mySolverType == SparseSolverId.Umfpack) {
          loadUmfpackValues (mySizeM + myNumG, myNumVals);
          int status = myUmfpack.factor (myUmfpackVals);
          if (status < 0) {

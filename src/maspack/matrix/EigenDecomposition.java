@@ -481,6 +481,51 @@ public class EigenDecomposition {
    } 
 
    /**
+    * Returns the number of imaginary eigenvalues. For symmetric matrices, this
+    * number is always 0. For unsymmetric matrices, the number is estimated by
+    * identifying the the number of complex conjugate pairs whose magnitude
+    * exceeds an appropriate number tolerance.
+    *
+    * @return number of imaginary eigenvalues
+    */
+   public int numEigImag () {
+      if (state == State.UNSET) {
+         throw new ImproperStateException ("Decomposition not initialized");
+      }
+      int num = 0;
+      if (state == State.SET_UNSYMMETRIC) {
+         int n = mySize;
+         double tol = 100*maxabs*EPS;
+         for (int i=0; i<n; i++) {
+            if (i <n-1 && pairIsConjugate (eigr, eigi, i, tol)) {
+               i++;
+               num += 2;
+            }
+         }
+      }
+      return num;
+   }
+
+   public VectorNd getComplexPairs() {
+      if (state == State.UNSET) {
+         throw new ImproperStateException ("Decomposition not initialized");
+      }
+      VectorNd ceigs = new VectorNd();
+      if (state == State.SET_UNSYMMETRIC) {
+         int n = mySize;
+         double tol = 100*maxabs*EPS;
+         for (int i=0; i<n; i++) {
+            if (i <n-1 && pairIsConjugate (eigr, eigi, i, tol)) {
+               ceigs.append (eigr.get(i));
+               ceigs.append (eigi.get(i));
+               i++;
+            }
+         }
+      }
+      return ceigs;
+   }
+
+   /**
     * Returns the minimum absolute value of all the eigenvalues.
     *
     * @return minimum absolute value of all eigenvalues
@@ -671,7 +716,7 @@ public class EigenDecomposition {
          vtmp.buf[i] /= eig[i];
       }
       x.mul (V_, vtmp);
-      return singular;
+      return !singular;
    }
 
    /**
@@ -730,14 +775,13 @@ public class EigenDecomposition {
          xtmp.mul (V_, vtmp);
          X.setColumn (j, xtmp);
       }
-      return singular;
+      return !singular;
    }
 
    /**
     * Computes the inverse of the original matrix M associated this
     * decomposition, and places the result in MI. This method only works if the
     * decomposition was symmetric and if V was computed.
-
     * 
     * @param MI
     * matrix in which the inverse is stored
@@ -780,7 +824,7 @@ public class EigenDecomposition {
          xtmp.mul (V_, vtmp);
          MI.setColumn (j, xtmp);
       }
-      return singular;
+      return !singular;
    }
 
 
@@ -1668,4 +1712,10 @@ public class EigenDecomposition {
       return 0;      
    }
 
+   public static void main (String[] args) {
+      MatrixNd M = new MatrixNd (2,2);
+      EigenDecomposition ed = new EigenDecomposition(M);
+      System.out.println ("eigs=" + ed.getEigReal());
+
+   }
 }

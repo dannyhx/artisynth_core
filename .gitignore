@@ -36,7 +36,6 @@ CVS
 *.exe
 *.h.gch
 /build
-/classes
 
 ######################
 # Temp files
@@ -67,3 +66,4 @@ EXTCLASSPATH
 ######################
 .DS_Store
 
+/classes/

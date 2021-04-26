@@ -2404,8 +2404,8 @@ public class MeshFactory {
    }
 
    /**
-    * Creates a box with rounded ends on the x-axis ends. The rounding is done
-    * circularly, in the x-y plane. The x width (specified by wx) gives the
+    * Creates a box with rounded ends on the z-axis ends. The rounding is done
+    * circularly, in the z-x plane. The z width (specified by wz) gives the
     * distance between the centers of each semi-circle which is used to create
     * the rounding. The mesh is quad-based, except at the center of the
     * semi-circles.
@@ -2419,46 +2419,13 @@ public class MeshFactory {
    public static PolygonalMesh createQuadRoundedBox(
       double wx, double wy, double wz, int nslices) {
 
-      return createQuadRoundedBox (wx, wy, wz, 1, 1, 1, nslices);
+      return createQuadRoundedBox (wx, wy, wz, 1, 1, 1, nslices, false);
    }
 
-   //    if (nslices < 1) {
-   //       throw new IllegalArgumentException("nslices must be at least 1");
-   //    }
-
-   //    // do this the easy way: create a prism in which the rounding is at
-   //    // the ends of the x axis in the x-y plane, and then rotate the
-   //    // whole thing to place the rounded ends along the z axis.
-
-   //    int numVertices = 2 * (nslices + 1);
-   //    double radius = wy / 2;
-   //    double[] xy = new double[2 * numVertices];
-   //    xy[0] = wx / 2;
-   //    xy[1] = -radius;
-   //    for (int i = 0; i <= nslices; i++) {
-   //       double ang = Math.PI * (i / (double)nslices - 0.5);
-   //       xy[i * 2 + 0] = radius * Math.cos(ang) + wx / 2;
-   //       xy[i * 2 + 1] = radius * Math.sin(ang);
-   //    }
-   //    int ibase = 2 * (nslices + 1);
-   //    for (int i = 0; i <= nslices; i++) {
-   //       double ang = Math.PI * (i / (double)nslices + 0.5);
-   //       xy[i * 2 + ibase + 0] = radius * Math.cos(ang) - wx / 2;
-   //       xy[i * 2 + ibase + 1] = radius * Math.sin(ang);
-   //    }
-   //    PolygonalMesh mesh = createPrism(xy, xy, wz);
-
-   //    // rotate to place rounded ends on the z-axis ...
-   //    RigidTransform3d X = new RigidTransform3d();
-   //    X.R.setAxisAngle(1, 1, 1, 2 * Math.PI / 3);
-   //    mesh.inverseTransform(X);
-   //    return mesh;
-   // }
-
    /**
-    * Creates a box with rounded ends on the x-axis ends, and with a specified
+    * Creates a box with rounded ends on the z-axis ends, and with a specified
     * mesh resolution in the x, y, and z directions. The rounding is done
-    * circularly, in the x-y plane. The x width (specified by wx) gives the
+    * circularly, in the z-x plane. The z width (specified by wz) gives the
     * distance between the centers of each semi-circle which is used to create
     * the rounding. The mesh is quad based, except at the center of the
     * semi-circles.
@@ -2471,9 +2438,13 @@ public class MeshFactory {
     * @param nz number of mesh divisions along z between the rounding centers
     * @param nslices gives the number of sides used to approximate each
     * semi-circlar end
+    * @param flatBottom if true, make the bottom flat instead of
+    * rounded
+    * @return created mesh
     */
    public static PolygonalMesh createQuadRoundedBox(
-      double wx, double wy, double wz, int nx, int ny, int nz, int nslices) {
+      double wx, double wy, double wz,
+      int nx, int ny, int nz, int nslices, boolean flatBottom) {
 
       if (nx < 1) {
          throw new IllegalArgumentException("nx must be at least 1");
@@ -2489,7 +2460,7 @@ public class MeshFactory {
       }
 
       // ensure ny is even so that the annular vertex is fits with
-      // the x-y side faces
+      // the z-x side faces
       if (ny%2 != 0) {
          ny++;
       }
@@ -2514,14 +2485,18 @@ public class MeshFactory {
       addQuadCylindricalSection (
          mesh, r, wz, Math.PI, nz, nslices, /*outward=*/true, XLM, vtxMap);
       XLM.R.mulRpy (Math.PI, 0, 0); // flip 180 about z
-      XLM.p.set (0, -wz/2, -wx/2);
-      addQuadAnnularSector (mesh, 0, r, Math.PI, nr, nslices, XLM, vtxMap);
-      XLM.p.set (0, 0, -wx/2);
-      addQuadCylindricalSection (
-         mesh, r, wz, Math.PI, nz, nslices, /*outward=*/true, XLM, vtxMap);
+      if (!flatBottom) {
+         XLM.p.set (0, -wz/2, -wx/2);
+         addQuadAnnularSector (mesh, 0, r, Math.PI, nr, nslices, XLM, vtxMap);
+         XLM.p.set (0, 0, -wx/2);
+         addQuadCylindricalSection (
+            mesh, r, wz, Math.PI, nz, nslices, /*outward=*/true, XLM, vtxMap);
+      }
       XLM.R.mulRpy (0, 0, Math.PI); // flip 180 about x
-      XLM.p.set (0, wz/2, -wx/2);
-      addQuadAnnularSector (mesh, 0, r, Math.PI, nr, nslices, XLM, vtxMap);
+      if (!flatBottom) {
+         XLM.p.set (0, wz/2, -wx/2);
+         addQuadAnnularSector (mesh, 0, r, Math.PI, nr, nslices, XLM, vtxMap);
+      }
       XLM.R.mulRpy (Math.PI, 0, 0); // flip 180 about z
       XLM.p.set (0, wz/2, wx/2);
       addQuadAnnularSector (mesh, 0, r, Math.PI, nr, nslices, XLM, vtxMap);
@@ -2533,31 +2508,63 @@ public class MeshFactory {
       XLM.R.mulRpy (0, 0, Math.PI); // flip 180 about x    
       XLM.p.set (wy/2, 0, 0);
       addQuadRectangle (mesh, wx, wz, nx, nz, XLM, vtxMap);  
+      if (flatBottom) {
+         XLM.R.setRpy (0, 0, Math.PI);
+         XLM.p.set (0, 0, -wx/2);
+         addQuadRectangle (mesh, wy, wz, ny, nz, XLM, vtxMap);  
+      }
       return mesh;
    }
 
    /**
-    * Creates a triangule box mesh with rounded ends on the x-axis ends, and
+    * Creates a triangular box mesh with rounded ends on the z-axis ends, and
     * with a specified mesh resolution in the x, y, and z directions. The
-    * rounding is done circularly, in the x-y plane. The x width (specified by
-    * wx) gives the distance between the centers of each semi-circle which is
+    * rounding is done circularly, in the z-x plane. The z width (specified by
+    * wz) gives the distance between the centers of each semi-circle which is
     * used to create the rounding.
     * 
+    * @param wz width along the z axis
     * @param wx width along the x axis
     * @param wy width along the y axis
-    * @param wz width along the z axis
+    * @param nz number of mesh divisions along z between the rounding centers
     * @param nx number of mesh divisions along x between the rounding centers
     * @param ny number of mesh divisions along y between the rounding centers
-    * @param nz number of mesh divisions along z between the rounding centers
     * @param nslices gives the number of sides used to approximate each
     * semi-circlar end
     */
    public static PolygonalMesh createRoundedBox(
-      double wx, double wy, double wz, 
-      int nx, int ny, int nz, int nslices) {
+      double wz, double wx, double wy, 
+      int nz, int nx, int ny, int nslices) {
 
       PolygonalMesh mesh = 
-         createQuadRoundedBox (wx, wy, wz, nx, ny, nz, nslices);
+         createQuadRoundedBox (wz, wx, wy, nz, nx, ny, nslices, false);
+      mesh.triangulate();
+      return mesh;
+   }
+      
+   /**
+    * Creates a triangular box mesh with rounded ends on the z-axis ends, and
+    * with a specified mesh resolution in the x, y, and z directions. The
+    * rounding is done circularly, in the z-x plane. The z width (specified by
+    * wy) gives the distance between the centers of each semi-circle which is
+    * used to create the rounding.
+    * 
+    * @param wz width along the z axis
+    * @param wx width along the x axis
+    * @param wy width along the y axis
+    * @param nz number of mesh divisions along z between the rounding centers
+    * @param nx number of mesh divisions along x between the rounding centers
+    * @param ny number of mesh divisions along y between the rounding centers
+    * @param nslices gives the number of sides used to approximate each
+    * semi-circlar end
+    * @param flatBottom if true, make the bottom flat instead of rounded
+    */
+   public static PolygonalMesh createRoundedBox(
+      double wz, double wx, double wy, 
+      int nz, int nx, int ny, int nslices, boolean flatBottom) {
+
+      PolygonalMesh mesh = 
+         createQuadRoundedBox (wz, wx, wy, nz, nx, ny, nslices, flatBottom);
       mesh.triangulate();
       return mesh;
    }
@@ -2565,18 +2572,18 @@ public class MeshFactory {
    /**
     * Creates a triangular box mesh with rounded ends on the z-axis ends. The
     * rounding is done circularly, in the z-x plane. The z width (specified by
-    * wz) gives the distance between the centers of each semi-circle which is
+    * wy) gives the distance between the centers of each semi-circle which is
     * used to create the rounding.
     * 
+    * @param wz width along the z axis
     * @param wx width along the x axis
     * @param wy width along the y axis
-    * @param wz width along the z axis
     * @param nslices gives the number of sides used to approximate each
     * semi-circlar end
     */
    public static PolygonalMesh createRoundedBox(
-      double wx, double wy, double wz, int nslices) {
-      PolygonalMesh mesh = createQuadRoundedBox(wx, wy, wz, nslices);
+      double wz, double wx, double wy, int nslices) {
+      PolygonalMesh mesh = createQuadRoundedBox(wz, wx, wy, nslices);
       mesh.triangulate();
       return mesh;
    }

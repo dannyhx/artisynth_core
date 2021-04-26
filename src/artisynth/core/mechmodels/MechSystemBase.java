@@ -28,12 +28,16 @@ import maspack.properties.PropertyList;
 import maspack.properties.PropertyMode;
 import maspack.properties.PropertyUtils;
 import maspack.render.RenderableUtils;
+import maspack.solvers.SparseSolverId;
 import maspack.util.DataBuffer;
 import maspack.util.IntHolder;
 import maspack.util.InternalErrorException;
 import maspack.util.NumberFormat;
 import maspack.util.FunctionTimer;
+import maspack.util.Range;
+import maspack.util.EnumRange;
 import artisynth.core.mechmodels.MechSystemSolver.PosStabilization;
+import artisynth.core.mechmodels.MechSystemSolver.Integrator;
 import artisynth.core.modelbase.*;
 import artisynth.core.util.ArtisynthIO;
 import artisynth.core.util.TimeBase;
@@ -50,6 +54,8 @@ public abstract class MechSystemBase extends RenderableModelBase
    // advance will be saved
    protected boolean myStateWillBeSaved = false;
 
+   public static boolean useAllDynamicComps = true;
+   protected ArrayList<DynamicComponent> myAllDynamicComponents;
    protected ArrayList<DynamicComponent> myDynamicComponents;
    protected ArrayList<MotionTargetComponent> myParametricComponents;
    protected ArrayList<DynamicAttachment> myAttachments;
@@ -95,6 +101,18 @@ public abstract class MechSystemBase extends RenderableModelBase
    protected boolean myDynamicsEnabled = DEFAULT_DYNAMICS_ENABLED; 
    protected boolean myProfilingP = DEFAULT_PROFILING;
    protected int myProfilingCnt = 0;
+
+   protected static Integrator DEFAULT_INTEGRATOR =
+      Integrator.ConstrainedBackwardEuler;
+   protected Integrator myIntegrator = DEFAULT_INTEGRATOR;
+
+   protected static SparseSolverId DEFAULT_MATRIX_SOLVER =
+      SparseSolverId.Pardiso;
+   // define a separate default matrix solver that can be overridden
+   protected static SparseSolverId myDefaultMatrixSolver =
+      DEFAULT_MATRIX_SOLVER;
+   protected SparseSolverId myMatrixSolver = DEFAULT_MATRIX_SOLVER;
+
    protected boolean myInsideAdvanceP = false;
    protected double myAvgSolveTime;
    protected StepAdjustment myStepAdjust;
@@ -171,6 +189,7 @@ public abstract class MechSystemBase extends RenderableModelBase
             throw new IllegalArgumentException (
                "number of impulse forces is "+numf+", expecting "+chkf);
          }
+
          // numf == -1 means all forces should be set to 0
          
          // create special vector to access the state ...
@@ -209,6 +228,9 @@ public abstract class MechSystemBase extends RenderableModelBase
          DEFAULT_UPDATE_FORCES_AT_STEP_END);
       myProps.add (
          "profiling", "print step time and computation time", DEFAULT_PROFILING);
+      myProps.add ("integrator", "integration method", DEFAULT_INTEGRATOR);
+      myProps.add ("matrixSolver", "matrix solver", DEFAULT_MATRIX_SOLVER);
+
    }
 
    public void setPenetrationLimit (double lim) {
@@ -239,6 +261,8 @@ public abstract class MechSystemBase extends RenderableModelBase
          setStabilization (myDefaultStabilization);
          mySolver.setUpdateForcesAtStepEnd (DEFAULT_UPDATE_FORCES_AT_STEP_END);
       }
+      setMatrixSolver (myDefaultMatrixSolver);
+      setIntegrator (DEFAULT_INTEGRATOR);
    }
 
    public boolean getDynamicsEnabled() {
@@ -257,11 +281,15 @@ public abstract class MechSystemBase extends RenderableModelBase
          mySolver = new MechSystemSolver (this);
          mySolver.setStabilization (getStabilization());
          mySolver.setUpdateForcesAtStepEnd (getUpdateForcesAtStepEnd());
+         mySolver.setIntegrator (getIntegrator());
+         mySolver.setMatrixSolver (getMatrixSolver());
       }
    }
 
    public MechSystemBase (String name) {
       super (name);
+      setMatrixSolver (myDefaultMatrixSolver);
+      setIntegrator (DEFAULT_INTEGRATOR);     
       allocateSolver (/*oldSolver=*/null);
       myAttachmentWorker = new DynamicAttachmentWorker();
       //setStabilization (myDefaultStabilization);
@@ -585,7 +613,17 @@ public abstract class MechSystemBase extends RenderableModelBase
             new ArrayList<DynamicComponent>();
          ArrayList<DynamicComponent> parametric =
             new ArrayList<DynamicComponent>();
-         getDynamicComponents (active, attached, parametric);
+         if (useAllDynamicComps) {
+            myAllDynamicComponents = new ArrayList<DynamicComponent>();
+            getDynamicComponents (myAllDynamicComponents);
+            for (DynamicComponent c : myAllDynamicComponents) {
+               placeDynamicComponent (active, attached, parametric, c);
+            }
+         }
+         else {
+            getDynamicComponents (active, attached, parametric);
+         }
+
          myNumActive = active.size();
          myNumAttached = attached.size();
 
@@ -831,6 +869,22 @@ public abstract class MechSystemBase extends RenderableModelBase
       }
    } 
 
+   /**
+    * Returns a list of all the active dynamic components, which
+    * collectively determine the values returned by {@link #getActiveForces},
+    * {@link #getActivePosState}, etc. The returned list is a copy and
+    * may be modified.
+    *  
+    * @return list of all the active dynamic components.
+    */
+   public ArrayList<DynamicComponent> getActiveDynamicComponents() {
+      ArrayList<DynamicComponent> comps = new ArrayList<>();
+      for (int i=0; i<myNumActive; i++) {
+         comps.add (myDynamicComponents.get(i));
+      }  
+      return comps;
+   }
+   
    /** 
     * {@inheritDoc}
     */
@@ -1185,23 +1239,43 @@ public abstract class MechSystemBase extends RenderableModelBase
       int numDynComps = state.zget();
       int numAuxStateComps = state.zget();
 
-      if (numDynComps != myNumActive+myNumParametric) {
-         throw new IllegalArgumentException (
-            "state contains "+numDynComps+" active & parametric components, "+
-            "expecting "+(myNumActive+myNumParametric));
+      if (useAllDynamicComps) {
+         if (numDynComps != myAllDynamicComponents.size()) {
+            throw new IllegalArgumentException (
+               "state contains "+numDynComps+" dynamic components, "+
+               "expecting "+myAllDynamicComponents.size());
+         }
+         if (numAuxStateComps != myAuxStateComponents.size()) {
+            throw new IllegalArgumentException (
+               "number of AuxState components is "+numAuxStateComps+
+               ", expecting "+myAuxStateComponents.size());
+         }
+         for (DynamicComponent c : myAllDynamicComponents) {
+            c.setState (state);
+         }
+         updateSlavePos();
+         updateSlaveVel();
       }
-      if (numAuxStateComps != myAuxStateComponents.size()) {
-         throw new IllegalArgumentException (
-            "number of AuxState components is "+numAuxStateComps+
-            ", expecting "+myAuxStateComponents.size());
-      }
+      else {
+         if (numDynComps != myNumActive+myNumParametric) {
+            throw new IllegalArgumentException (
+               "state contains "+numDynComps+" active & parametric components, "+
+               "expecting "+(myNumActive+myNumParametric));
+         }
+         if (numAuxStateComps != myAuxStateComponents.size()) {
+            throw new IllegalArgumentException (
+               "number of AuxState components is "+numAuxStateComps+
+               ", expecting "+myAuxStateComponents.size());
+         }
 
-      for (int i=0; i<myNumActive+myNumParametric; i++) {
-         DynamicComponent c = myDynamicComponents.get(i);
-         c.setState (state);
+         for (int i=0; i<myNumActive+myNumParametric; i++) {
+            DynamicComponent c = myDynamicComponents.get(i);
+            c.setState (state);
+         }
+         updatePosState(); // do we need?
+         updateVelState(); // do we need?
       }
-      updatePosState(); // do we need?
-      updateVelState(); // do we need?
+      
 //      state.dskip (di);
 
       // setting aux state must be done here because it may change the number
@@ -1229,16 +1303,29 @@ public abstract class MechSystemBase extends RenderableModelBase
       int numu = getNumUnilateralForces();
 
       state.zput (0x1234);
-      state.zput (myNumActive+myNumParametric);
-      state.zput (myAuxStateComponents.size());
-      if (state.hasDataFrames()) {
-         state.addDataFrame (null);
+      if (useAllDynamicComps) {
+         state.zput (myAllDynamicComponents.size());
+         state.zput (myAuxStateComponents.size());
+         if (state.hasDataFrames()) {
+            state.addDataFrame (null);
+         }
+         for (DynamicComponent c : myAllDynamicComponents) {
+            state.getState (c);
+         }
       }
+      else {
+         state.zput (myNumActive+myNumParametric);
+         state.zput (myAuxStateComponents.size());
+         if (state.hasDataFrames()) {
+            state.addDataFrame (null);
+         }
 
-      for (int i=0; i<myNumActive+myNumParametric; i++) {
-         DynamicComponent c = myDynamicComponents.get(i);
-         state.getState (c);
+         for (int i=0; i<myNumActive+myNumParametric; i++) {
+            DynamicComponent c = myDynamicComponents.get(i);
+            state.getState (c);
+         }
       }
+      
       updateAuxStateComponentList();
       for (int i=0; i<myAuxStateComponents.size(); i++) {
          state.getState (myAuxStateComponents.get(i));
@@ -1284,23 +1371,45 @@ public abstract class MechSystemBase extends RenderableModelBase
          }
       }
       
-      nstate.zput (0x1234);
-      nstate.zput (myNumActive+myNumParametric);
-      nstate.zput (myAuxStateComponents.size());
-      // specify -1 constrainers, to cause forces to be zeroed
 
-      nstate.addDataFrame (null);
+      if (useAllDynamicComps) {
+         nstate.zput (0x1234);
+         nstate.zput (myAllDynamicComponents.size());
+         nstate.zput (myAuxStateComponents.size());
+         // specify -1 constrainers, to cause forces to be zeroed
 
-      for (int i=0; i<myNumActive+myNumParametric; i++) {
-         HasNumericState c = myDynamicComponents.get(i);
-         NumericState.DataFrame frame = compMap.get(c);
-         if (frame != null && frame.getVersion() == c.getStateVersion()) {
-            nstate.getState (frame, ostate);
-         }
-         else {
-            nstate.getState (c);
+         nstate.addDataFrame (null);
+
+         for (DynamicComponent c : myAllDynamicComponents) {
+            NumericState.DataFrame frame = compMap.get(c);
+            if (frame != null && frame.getVersion() == c.getStateVersion()) {
+               nstate.getState (frame, ostate);
+            }
+            else {
+               nstate.getState (c);
+            }
          }
       }
+      else {
+         nstate.zput (0x1234);
+         nstate.zput (myNumActive+myNumParametric);
+         nstate.zput (myAuxStateComponents.size());
+         // specify -1 constrainers, to cause forces to be zeroed
+
+         nstate.addDataFrame (null);
+
+         for (int i=0; i<myNumActive+myNumParametric; i++) {
+            HasNumericState c = myDynamicComponents.get(i);
+            NumericState.DataFrame frame = compMap.get(c);
+            if (frame != null && frame.getVersion() == c.getStateVersion()) {
+               nstate.getState (frame, ostate);
+            }
+            else {
+               nstate.getState (c);
+            }
+         }
+      }
+      
       for (HasNumericState c : myAuxStateComponents) {
          NumericState.DataFrame frame = compMap.get(c);
          if (frame != null && frame.getVersion() == c.getStateVersion()) {
@@ -1386,7 +1495,56 @@ public abstract class MechSystemBase extends RenderableModelBase
    public boolean getProfiling() {
       return myProfilingP;
    }
+
+   public static void setDefaultMatrixSolver (SparseSolverId solverType) {
+      if (!solverType.isCompatible (Matrix.SYMMETRIC)) {
+         throw new IllegalArgumentException (
+            "Solver "+solverType+" will not solve symmetric indefinite matrices");
+      }
+      if (!solverType.isDirect()) {
+         throw new IllegalArgumentException (
+            "Solver "+solverType+" is not a direct solver");
+      }
+      myDefaultMatrixSolver = solverType;
+   }
    
+   public static SparseSolverId getDefaultMatrixSolver() {
+      return myDefaultMatrixSolver;
+   }
+
+   public void setMatrixSolver (SparseSolverId method) {
+      myMatrixSolver = method;
+      if (mySolver != null) {
+         mySolver.setMatrixSolver (method);
+         myMatrixSolver = mySolver.getMatrixSolver();
+      }
+   }
+
+   public SparseSolverId getMatrixSolver() {
+      return myMatrixSolver;
+   }
+
+   public Range getMatrixSolverRange() {
+      return new EnumRange<SparseSolverId>(
+         SparseSolverId.class, new SparseSolverId[] {
+            SparseSolverId.Pardiso,
+            SparseSolverId.Umfpack });
+   }
+
+   public void setIntegrator (Integrator integrator) {
+      myIntegrator = integrator;
+      if (mySolver != null) {
+         mySolver.setIntegrator (integrator);
+         if (mySolver.getIntegrator() != integrator) {
+            myIntegrator = mySolver.getIntegrator();
+         }
+      }
+   }
+
+   public Integrator getIntegrator () {
+      return myIntegrator;
+   }
+
    protected void clearCachedData (ComponentChangeEvent e) {
       myDynamicComponents = null;
       myAttachments = null;
@@ -1919,6 +2077,9 @@ public abstract class MechSystemBase extends RenderableModelBase
       msb.myBg = new VectorNd(0);
       msb.myRn = new VectorNd(0);
       msb.myBn = new VectorNd(0);
+
+      msb.setIntegrator (myIntegrator);
+      msb.setMatrixSolver (myMatrixSolver);
 
       return msb;
    }

@@ -6,6 +6,9 @@ import java.util.LinkedList;
 import artisynth.core.mechmodels.CollisionHandler;
 import artisynth.core.mechmodels.ContactConstraint;
 import artisynth.core.mechmodels.ContactMaster;
+import artisynth.core.mechmodels.Particle;
+import artisynth.core.mechmodels.PointParticleAttachment;
+import artisynth.core.mechmodels.VertexContactMaster;
 
 /** Collection of impact zones. */
 public class ImpactZoneSet {
@@ -90,15 +93,26 @@ public class ImpactZoneSet {
    protected boolean isConstraintPairShareCommonVertex(ContactConstraint A,
    ContactConstraint B) {
       
-      for (ContactMaster cmA : A.getMasters ()) {
-         for (ContactMaster cmB : B.getMasters ()) {
-            if (cmA.getComp () == cmB.getComp ()) {
+      for (ContactMaster cmA : A.getAllMasters ()) {
+         for (ContactMaster cmB : B.getAllMasters ()) {
+            Particle nodeA = getParticleFromVertexContactMaster(cmA);
+            Particle nodeB = getParticleFromVertexContactMaster(cmB);
+            
+            if (nodeA == nodeB) {
                return true;
             }
          }
       }
       
       return false;
+   }
+   
+   protected Particle getParticleFromVertexContactMaster(ContactMaster cm) {
+      VertexContactMaster vcm = (VertexContactMaster) cm;
+      ArrayList<ContactMaster> vcm_cms = vcm.myMasterLists[0];
+      
+      PointParticleAttachment ppa = (PointParticleAttachment) vcm_cms.get (0);
+      return ppa.myParticle;
    }
    
 }

@@ -7,10 +7,9 @@
 package artisynth.core.mechmodels;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
-import maspack.collision.PenetrationRegion;
 import maspack.geometry.Vertex3d;
-import maspack.matrix.MatrixBlock;
 import maspack.matrix.Point3d;
 import maspack.matrix.SparseBlockMatrix;
 import maspack.matrix.Vector3d;
@@ -28,8 +27,10 @@ public class ContactConstraint {
 
    static final double DOUBLE_PREC = 2.2204460492503131e-16;
 
-   ArrayList<ContactMaster> myMasters; // underlying master components which
+   // DAN21: public
+   public ArrayList<ContactMaster> myMasters0; // underlying master components which
                          // will be required to resolve the contact
+   public ArrayList<ContactMaster> myMasters1;
    //CollisionHandler myHandler; // handler to which the constraint belongs
    // DANCOLEDIT: public contactpoints
    
@@ -94,16 +95,30 @@ public class ContactConstraint {
    }
 
    public void clearMasters() {
-      myMasters.clear();
+      myMasters0.clear();
+      myMasters1.clear();
    }
 
-   public ArrayList<ContactMaster> getMasters() {
-      return myMasters;
+   public int collectMasterComponents (
+      HashSet<DynamicComponent> masters, boolean activeOnly) {
+      int num = 0;
+      for (ContactMaster cm : myMasters0) {
+         num += cm.collectMasterComponents (masters, activeOnly);
+      }
+      for (ContactMaster cm : myMasters1) {
+         num += cm.collectMasterComponents (masters, activeOnly);
+      }
+      return num;
    }
 
    public boolean isControllable() {
-      for (int i=0; i<myMasters.size(); i++) {
-         if (myMasters.get(i).myComp.isControllable()) {
+      for (ContactMaster cm : myMasters0) {
+         if (cm.isControllable()) {
+            return true;
+         }
+      }
+      for (ContactMaster cm : myMasters1) {
+         if (cm.isControllable()) {
             return true;
          }
       }
@@ -112,25 +127,19 @@ public class ContactConstraint {
 
    public ContactConstraint () {
       //myHandler = handler;
-      myMasters = new ArrayList<ContactMaster>();
+      myMasters0 = new ArrayList<ContactMaster>();
+      myMasters1 = new ArrayList<ContactMaster>();
       myNormal = new Vector3d();
       myCpnt0 = new ContactPoint();
       myCpnt0.myVtxs = new Vertex3d[0];
-      myIdentifyByPoint1 = false;
-   }
-   
-   public ContactConstraint (ContactPoint cpnt0) {
-      //myHandler = handler;
-      myMasters = new ArrayList<ContactMaster>();
-      myNormal = new Vector3d();
-      myCpnt0 = new ContactPoint(cpnt0);
       myIdentifyByPoint1 = false;
    }
 
    public ContactConstraint (
       ContactPoint cpnt0, ContactPoint cpnt1) {
       //myHandler = handler;
-      myMasters = new ArrayList<ContactMaster>();
+      myMasters0 = new ArrayList<ContactMaster>();
+      myMasters1 = new ArrayList<ContactMaster>();
       myNormal = new Vector3d();
       myCpnt0 = new ContactPoint(cpnt0);
       myCpnt1 = new ContactPoint(cpnt1);
@@ -163,13 +172,11 @@ public class ContactConstraint {
    }
 
    public void addConstraintBlocks (SparseBlockMatrix GT, int bj) {
-      for (int k=0; k<myMasters.size(); k++) {
-         ContactMaster cm = myMasters.get(k);
-         int bi = cm.getSolveIndex();
-         if (bi != -1) {
-            MatrixBlock blk = cm.getBlock(myNormal);
-            GT.addBlock(bi, bj, blk);
-         }
+      for (ContactMaster cm : myMasters0) {
+         cm.add1DConstraintBlocks (GT, bj, 1, myCpnt0, myNormal);
+      }
+      for (ContactMaster cm : myMasters1) {
+         cm.add1DConstraintBlocks (GT, bj, -1, myCpnt1, myNormal);
       }
    }
 
@@ -178,8 +185,11 @@ public class ContactConstraint {
       // compute relative velocity into dir
       dir.setZero();
 
-      for (int i=0; i<myMasters.size(); i++) {
-         myMasters.get(i).addRelativeVelocity (dir);
+      for (ContactMaster cm : myMasters0) {
+         cm.addRelativeVelocity (dir, 1, myCpnt0);
+      }
+      for (ContactMaster cm : myMasters1) {
+         cm.addRelativeVelocity (dir, -1, myCpnt1);
       }
       // turn this into tangential velocity
       dir.scaledAdd(-myNormal.dot(dir), myNormal);
@@ -208,25 +218,39 @@ public class ContactConstraint {
       SparseBlockMatrix DT, FrictionInfo[] finfo, double mu, int numf) {
 
       Vector3d dir = new Vector3d();
-      if (myMasters.size() > 0 && computeFrictionDir(dir) > 0 && mu > 0) {
-         finfo[numf].mu = mu;
-         finfo[numf].contactIdx0 = mySolveIndex;
-         finfo[numf].contactIdx1 = -1;
-         finfo[numf].flags = FrictionInfo.BILATERAL;
-         finfo[numf].flags = 0;
-         for (int i=0; i<myMasters.size(); i++) {
-            ContactMaster cm = myMasters.get(i);
-            int bi = cm.getSolveIndex();
-            if (bi != -1) {            
-               MatrixBlock blk = cm.get1DFrictionBlock (dir);
-               Vector3d tmp = new Vector3d();
-               tmp.x = blk.get(0,0);
-               tmp.y = blk.get(1,0);
-               tmp.z = blk.get(2,0);
-               DT.addBlock (bi, numf, blk);
+//<<<<<<< HEAD
+//      if (myMasters.size() > 0 && computeFrictionDir(dir) > 0 && mu > 0) {
+//         finfo[numf].mu = mu;
+//         finfo[numf].contactIdx0 = mySolveIndex;
+//         finfo[numf].contactIdx1 = -1;
+//         finfo[numf].flags = FrictionInfo.BILATERAL;
+//         finfo[numf].flags = 0;
+//         for (int i=0; i<myMasters.size(); i++) {
+//            ContactMaster cm = myMasters.get(i);
+//            int bi = cm.getSolveIndex();
+//            if (bi != -1) {            
+//               MatrixBlock blk = cm.get1DFrictionBlock (dir);
+//               Vector3d tmp = new Vector3d();
+//               tmp.x = blk.get(0,0);
+//               tmp.y = blk.get(1,0);
+//               tmp.z = blk.get(2,0);
+//               DT.addBlock (bi, numf, blk);
+//=======
+      if (myMasters0.size() > 0 || myMasters1.size() > 0) {
+         if (computeFrictionDir(dir) > 0 && mu > 0) {
+            finfo[numf].mu = mu;
+            finfo[numf].contactIdx0 = mySolveIndex;
+            finfo[numf].contactIdx1 = -1;
+            finfo[numf].flags = FrictionInfo.BILATERAL;
+            for (ContactMaster cm : myMasters0) {
+               cm.add1DConstraintBlocks (DT, numf, 1, myCpnt0, dir);
             }
+            for (ContactMaster cm : myMasters1) {
+               cm.add1DConstraintBlocks (DT, numf, -1, myCpnt1, dir);
+//>>>>>>> master
+            }
+            numf++;
          }
-         numf++;
       }
       return numf;      
    }
@@ -234,21 +258,19 @@ public class ContactConstraint {
    public int add2DFrictionConstraints (
       SparseBlockMatrix DT, FrictionInfo[] finfo, double mu, int numf) {
 
-      if (myMasters.size() > 0) {
+      if (myMasters0.size() > 0 || myMasters1.size() > 0) {
+         Vector3d dir0 = new Vector3d();
          Vector3d dir1 = new Vector3d();
-         Vector3d dir2 = new Vector3d();
-         computeFrictionDirs (dir1, dir2);
+         computeFrictionDirs (dir0, dir1);
          finfo[numf].mu = mu;
          finfo[numf].contactIdx0 = mySolveIndex;
          finfo[numf].contactIdx1 = -1;
          finfo[numf].flags = 0;
-         for (int i=0; i<myMasters.size(); i++) {
-            ContactMaster cm = myMasters.get(i);
-            int bi = cm.getSolveIndex();
-            if (bi != -1) {            
-               MatrixBlock blk = cm.get2DFrictionBlock (dir1, dir2);
-               DT.addBlock (bi, numf, blk);
-            }
+         for (ContactMaster cm : myMasters0) {
+            cm.add2DConstraintBlocks (DT, numf, 1, myCpnt0, dir0, dir1);
+         }
+         for (ContactMaster cm : myMasters1) {
+            cm.add2DConstraintBlocks (DT, numf, -1, myCpnt1, dir0, dir1);
          }
          numf++;
       }
@@ -256,71 +278,92 @@ public class ContactConstraint {
    }
 
    protected void assignMasters (
-      CollidableBody collidable, double w, ContactPoint cpnt) {
+      ArrayList<ContactMaster> masters, CollidableBody collidable,
+      double w, ContactPoint cpnt, String ctx) {
       
       if (collidable instanceof RigidBody) {
-         myMasters.add (
-            new ContactMaster ((RigidBody)collidable, w, cpnt));
+         masters.add ((RigidBody)collidable);
       }
-      else if (collidable instanceof RigidMeshComp) {
-         myMasters.add (
-            new ContactMaster (
-               ((RigidMeshComp)collidable).getRigidBody(), w, cpnt));        
-      }
-      else {   // FemMeshComp
+//<<<<<<< HEAD
+//      else {   // FemMeshComp
+//         Vertex3d[] vtxs = cpnt.getVertices();
+//         double[] wgts = cpnt.getWeights();
+//         ArrayList<ContactMaster> newMasters = new ArrayList<ContactMaster>();
+//         
+//         for (int i=0; i<vtxs.length; i++) {
+//            newMasters.clear();
+//            
+//            // Get master associated with vertex 
+//            collidable.getVertexMasters (newMasters, vtxs[i]);
+//            
+//            // Only 1 iteration (comp=FemNode, cpnt=null, weight=1.0)
+//            for (int j=0; j<newMasters.size(); j++) {
+//               ContactMaster cm = newMasters.get(j);
+//               boolean masterAlreadyAdded = false;
+//               
+//               // For each existing master of this constraint
+//               for (int k=0; k<myMasters.size(); k++) {
+//                  ContactMaster pm = myMasters.get(k);
+//                  // Is the vertex alredy been added?
+//                  if (pm.myComp == cm.myComp) {
+//                     // Add more weight to the master
+//                     pm.myWeight += (w*wgts[i]*cm.myWeight);
+//                     masterAlreadyAdded = true;
+//                     break;
+//                  }
+//               }
+//               
+//               if (!masterAlreadyAdded) {
+//                  cm.myWeight = w*wgts[i]*cm.myWeight;   // Modify weight
+//                  cm.myCpnt = cpnt;
+//                  myMasters.add (cm);
+//               }
+//            }
+//         }
+//=======
+//    RigidMeshComp no longer implements CollidableBody
+//      else if (collidable instanceof RigidMeshComp) {
+//         masters.add (((RigidMeshComp)collidable).getRigidBody());
+//      }
+      else {
          Vertex3d[] vtxs = cpnt.getVertices();
          double[] wgts = cpnt.getWeights();
-         ArrayList<ContactMaster> newMasters = new ArrayList<ContactMaster>();
-         
-         for (int i=0; i<vtxs.length; i++) {
-            newMasters.clear();
-            
-            // Get master associated with vertex 
-            collidable.getVertexMasters (newMasters, vtxs[i]);
-            
-            // Only 1 iteration (comp=FemNode, cpnt=null, weight=1.0)
-            for (int j=0; j<newMasters.size(); j++) {
-               ContactMaster cm = newMasters.get(j);
-               boolean masterAlreadyAdded = false;
-               
-               // For each existing master of this constraint
-               for (int k=0; k<myMasters.size(); k++) {
-                  ContactMaster pm = myMasters.get(k);
-                  // Is the vertex alredy been added?
-                  if (pm.myComp == cm.myComp) {
-                     // Add more weight to the master
-                     pm.myWeight += (w*wgts[i]*cm.myWeight);
-                     masterAlreadyAdded = true;
-                     break;
-                  }
-               }
-               
-               if (!masterAlreadyAdded) {
-                  cm.myWeight = w*wgts[i]*cm.myWeight;   // Modify weight
-                  cm.myCpnt = cpnt;
-                  myMasters.add (cm);
-               }
-            }
-         }
+         masters.add (new VertexContactMaster (collidable, vtxs, wgts, ctx)); 
+//>>>>>>> master
       }
    }
+   
+   // DAN21
+   public CollidableBody col0 = null;
+   public CollidableBody col1 = null;
    
    public void assignMasters (
       CollidableBody collidable0, CollidableBody collidable1) {
 
-      myMasters.clear();
+      clearMasters();
+      assignMasters (myMasters0, collidable0, 1, myCpnt0, "");
+      assignMasters (myMasters1, collidable1, 1, myCpnt1, "");
+      
+      // DAN21 
+      this.col0 = collidable0;
+      this.col1 = collidable1;
+   }
+   
+   public void assignMastersWithCtx (
+      CollidableBody collidable0, CollidableBody collidable1, String ctx) {
 
-      // if (!(collidable1 instanceof RigidBody) &&
-      //     collidable2 instanceof RigidBody) {
-      //    // use loc for RigidBody masters for Fem-RB contact
-      //    collidable1.getContactMasters (myMasters, 1, myInfo1);
-      //    ((RigidBody)collidable2).getContactMastersX (myMasters, -1, myInfo2);
-      //    return;
-      // } 
-      assignMasters (collidable0, 1, myCpnt0);
-      assignMasters (collidable1, -1, myCpnt1);
+      clearMasters();
+      assignMasters (myMasters0, collidable0, 1, myCpnt0, ctx);
+      assignMasters (myMasters1, collidable1, 1, myCpnt1, ctx);
    }
 
+   public ArrayList<ContactMaster> getAllMasters() {
+      ArrayList<ContactMaster> rv = new ArrayList<ContactMaster>();
+      rv.addAll (this.myMasters0);
+      rv.addAll (this.myMasters1);
+      return rv; 
+   }
+   
    public void getState (DataBuffer data) {
       // DANCOLEDIT
       data.zput (m);

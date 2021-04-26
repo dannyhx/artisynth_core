@@ -325,12 +325,28 @@ PointAttachable, ConnectableBody {
       return myFrameRelativeP;
    }
 
+   /**
+    * XXX sets or clears the attachment of the FEM frame to control whether it
+    * will appear "attached" when the system collects and arranges th dynamic
+    * components. Setting the attachment is done using a stub component that is
+    * not actually used.
+    */
+   private void setFrameAttached (boolean attached) {
+      if (attached) {
+         myFrame.setAttached (new FrameFem3dAttachment());
+      }
+      else {
+         myFrame.setAttached (null);
+      }
+   }
+
    public void setFrameRelative (boolean enable) {
       if (myFrameRelativeP != enable) {
          myFrameRelativeP = enable;
          if (enable) {
             System.out.println ("Frame relative ENABLED");
          }
+         setFrameAttached (!enable);
          if (myFrameConstraint == null) {
             // need to attach the frame to the FEM
             attachFrame (myFrame.getPose());
@@ -573,15 +589,15 @@ PointAttachable, ConnectableBody {
 
    protected void setDefaultValues() {
       super.setDefaultValues();
-      myDensity = DEFAULT_DENSITY;
-      myStiffnessDamping = DEFAULT_STIFFNESS_DAMPING;
-      myMassDamping = DEFAULT_MASS_DAMPING;
+      //myDensity = DEFAULT_DENSITY;
+      //myStiffnessDamping = DEFAULT_STIFFNESS_DAMPING;
+      //myMassDamping = DEFAULT_MASS_DAMPING;
       myElementWidgetSize = DEFAULT_ELEMENT_WIDGET_SIZE;
       myElementWidgetSizeMode = PropertyMode.Inherited;
       myHardIncompMethod = DEFAULT_HARD_INCOMP;
       mySoftIncompMethod = DEFAULT_SOFT_INCOMP;
       myColorMap = createDefaultColorMap();
-      setMaterial(createDefaultMaterial());
+      //setMaterial(createDefaultMaterial());
       myAutoGenerateSurface = defaultAutoGenerateSurface;
    }
 
@@ -589,9 +605,8 @@ PointAttachable, ConnectableBody {
    
    public <T extends FemMaterial> void setMaterial (T mat) {
       mySoftIncompMethodValidP = false;
-      /*T newMat=*/super.setMaterial(mat);
+      super.setMaterial(mat);
       updateSoftIncompMethod();
-      //return newMat;
    }
 
    public FemMaterial getElementMaterial (FemElement3dBase e) {
@@ -665,7 +680,15 @@ PointAttachable, ConnectableBody {
 
    public FemModel3d (String name) {
       super(name);
-      setDefaultValues();
+      // XXX Big hack to preserve legacy behavior. We used to have a redundant
+      // call to setDefaultValues() here. That in turn caused
+      // updateSoftIncompMethod() to be called with the softIncompMethod set to
+      // the default value, which tended to result in the softIncompMethod
+      // being set to ELEMENT instead of the default value AUTO. We leave this
+      // effect in place just to preserve legacy behavior.
+      mySoftIncompMethod = DEFAULT_SOFT_INCOMP;
+      updateSoftIncompMethod();
+      // end legacy behavior hack
       for (int i = 0; i < MAX_NODAL_INCOMP_NODES; i++) {
          myNodalConstraints[i] = new Vector3d();
       }
@@ -686,6 +709,7 @@ PointAttachable, ConnectableBody {
 
    protected void initializeChildComponents() {
       myFrame = new FemModelFrame ("frame");
+      setFrameAttached (true);
       myNodes = new PointList<FemNode3d>(FemNode3d.class, "nodes", "n");
       myElements = new FemElement3dList<FemElement3d> (
          FemElement3d.class, "elements", "e");
@@ -768,8 +792,21 @@ PointAttachable, ConnectableBody {
       return myNodes.get(idx);
    }
 
-   @Override
+   /**
+    * @deprecated use {@link #getNodeByNumber} instead
+    */
    public FemNode3d getByNumber(int num) {
+      return myNodes.getByNumber(num);
+   }
+
+   /**
+    * Locates a node within this FEM by number instead of index.
+    *
+    * @param num number of the node to locate
+    * @return node with the specified number, or {@code null} if no such node
+    * is present
+    */
+   public FemNode3d getNodeByNumber(int num) {
       return myNodes.getByNumber(num);
    }
 
@@ -1795,10 +1832,14 @@ PointAttachable, ConnectableBody {
       }
    }
 
+   public boolean containsConnector (BodyConnector c) {
+      return (myConnectors != null && myConnectors.contains(c)); 
+   }
+
    public List<BodyConnector> getConnectors() {
       return myConnectors;
    }
-
+   
    public void transformPose (RigidTransform3d T) {
       if (isFrameRelative()) {
          RigidTransform3d TFW = new RigidTransform3d();
@@ -1947,6 +1988,15 @@ PointAttachable, ConnectableBody {
          myFrameConstraint.updateFramePose(/*frameRelative=*/false);
       }
    }
+
+   public void invalidateElementRotationData() {
+      for (FemElement3d elem : myElements) {
+         elem.invalidateRotationData();
+      }
+      for (ShellElement3d elem : myShellElements) {
+         elem.invalidateRotationData();
+      }
+   }      
 
    /* --- Volume and Inversion Methods --- */
 
@@ -5172,6 +5222,7 @@ PointAttachable, ConnectableBody {
          fem.attachFrame (null);
       }
       fem.myFrameRelativeP = myFrameRelativeP;
+      fem.setFrameAttached (myFrameRelativeP);
 
       for (FemNode3d n : myNodes) {
          FemNode3d newn = n.copy(flags, copyMap);
@@ -5410,6 +5461,23 @@ PointAttachable, ConnectableBody {
          attached.add (myFrame);
       }
    }
+   
+   public void getDynamicComponents (List<DynamicComponent> comps) {
+      for (FemNode3d n : getNodes()) {
+         comps.add (n);
+         if (n.hasDirector()) {
+            comps.add (n.myBackNode);
+         }
+      }
+      comps.addAll (myMarkers);
+      comps.add (myFrame);
+      if (myFrameRelativeP) {
+         // XXX not yet supported for shell models
+         for (FemNode3d n : getNodes()) {
+            comps.add (n.myFrameNode);
+         }
+      }
+    }
 
    public void addGeneralMassBlocks (SparseNumberedBlockMatrix M) {
       if (myFrameRelativeP && useFrameRelativeCouplingMasses) {

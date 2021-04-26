@@ -14,6 +14,8 @@ import java.util.*;
 import maspack.geometry.GeometryTransformer;
 import maspack.matrix.AffineTransform3dBase;
 import maspack.matrix.Matrix;
+import maspack.matrix.Matrix3d;
+import maspack.matrix.Matrix6dBlock;
 import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
 import maspack.matrix.SparseNumberedBlockMatrix;
@@ -33,7 +35,6 @@ import maspack.util.Disposable;
 import artisynth.core.mechmodels.Collidable;
 import artisynth.core.mechmodels.Collidable.Group;
 import artisynth.core.mechmodels.MechSystemSolver.Integrator;
-import artisynth.core.mechmodels.MechSystemSolver.MatrixSolver;
 import artisynth.core.mechmodels.MechSystemSolver.PosStabilization;
 import artisynth.core.modelbase.ComponentChangeEvent;
 import artisynth.core.modelbase.ComponentList;
@@ -105,18 +106,16 @@ TransformableGeometry, ScalableUnits {
    // specifically, within the setState methods
    protected boolean myForcesNeedUpdating = false;
 
-   protected static Integrator DEFAULT_INTEGRATOR =
-      Integrator.ConstrainedBackwardEuler;
-   protected static MatrixSolver DEFAULT_MATRIX_SOLVER = MatrixSolver.Pardiso;
+   // add the frame marker rotation effects when computing the stiffness
+   // matrix. Note: this will make the stiffness matrix asymmetric, unless YPR
+   // stiffness is used
+   protected boolean myAddFrameMarkerStiffness = false;
 
    protected static double DEFAULT_POINT_DAMPING = 0;
    protected static double DEFAULT_FRAME_DAMPING = 0;
    protected static double DEFAULT_ROTARY_DAMPING = 0;
    protected static PosStabilization DEFAULT_STABILIZATION =
       PosStabilization.GlobalMass;
-
-   protected Integrator myIntegrationMethod;
-   protected MatrixSolver myMatrixSolver;
 
    protected static final Vector3d DEFAULT_GRAVITY = new Vector3d (0, 0, -9.8);
 
@@ -126,6 +125,10 @@ TransformableGeometry, ScalableUnits {
    protected static final double DEFAULT_PENETRATION_TOL = -1; 
    protected double myPenetrationTol = DEFAULT_PENETRATION_TOL;
    protected PropertyMode myPenetrationTolMode = PropertyMode.Inherited;
+
+   protected static final double DEFAULT_ROTARY_LIMIT_TOL = 0.0001;
+   protected double myRotaryLimitTol = DEFAULT_ROTARY_LIMIT_TOL;
+   protected PropertyMode myRotaryLimitTolMode = PropertyMode.Inherited;
 
    protected double myMaxTranslationalVel = 1e10;
    protected double myMaxRotationalVel = 1e10;
@@ -141,10 +144,6 @@ TransformableGeometry, ScalableUnits {
    static {
       myProps.addInheritable (
          "gravity:Inherited", "acceleration of gravity", DEFAULT_GRAVITY);
-      myProps.add ("integrator * *", "integration method ", DEFAULT_INTEGRATOR);
-      myProps.add (
-         "matrixSolver * *", "matrix solver for implicit integration ",
-         DEFAULT_MATRIX_SOLVER);
       myProps.add (
          "stabilization", "position stabilization method", DEFAULT_STABILIZATION);
       myProps.addInheritable (
@@ -159,6 +158,9 @@ TransformableGeometry, ScalableUnits {
       myProps.addInheritable (
          "penetrationTol:Inherited", "collision penetration tolerance",
          DEFAULT_PENETRATION_TOL);
+      myProps.addInheritable (
+         "rotaryLimitTol:Inherited", "rotary limit tolerance",
+         DEFAULT_ROTARY_LIMIT_TOL);
       myProps.add("staticTikhonovFactor", "Tikhonov regularization factor for static solves", 0);
       myProps.add("staticIncrements", "Number of load increments for incremental static solves", 20);
       myProps.addInheritable (
@@ -207,8 +209,6 @@ TransformableGeometry, ScalableUnits {
       myMaxBound = null;
       myExcitationColor = null;
       myMaxColoredExcitation = 1.0;
-      setMatrixSolver (DEFAULT_MATRIX_SOLVER);
-      setIntegrator (DEFAULT_INTEGRATOR);
       setMaxStepSize (0.01);
    }
    
@@ -283,9 +283,6 @@ TransformableGeometry, ScalableUnits {
 
       addFixed (myCollisionManager);         
  
-      setMatrixSolver (DEFAULT_MATRIX_SOLVER);
-      setIntegrator (DEFAULT_INTEGRATOR);
-      
       // set these to -1 so that they will be computed automatically
       // when their "get" methods are called.
       //myCollisionManager.setRigidPointTol (-1);
@@ -294,6 +291,29 @@ TransformableGeometry, ScalableUnits {
 
    protected void updateHardwiredLists() {
       // TODO
+   }
+
+   /**
+    * Queries whether frame marker rotational effects are added to
+    * the stiffness matrix.
+    *
+    * @return {@code true} if frame marker rotational are added to
+    * the stiffness matrix.
+    */
+   public boolean getAddFrameMarkerStiffness () {
+      return myAddFrameMarkerStiffness;
+   }
+
+   /**
+    * Sets whether frame marker rotational effects are added to the stiffness
+    * matrix. This is {@code false} by default. If enabled, it will cause the
+    * stiffness matrix to be asymmetric.
+    *
+    * @param enable if {@code true}, causes frame marker rotational to
+    * be added to the stiffness matrix.
+    */
+   public void setAddFrameMarkerStiffness (boolean enable) {
+      myAddFrameMarkerStiffness = enable;
    }
 
    /**
@@ -388,6 +408,37 @@ TransformableGeometry, ScalableUnits {
          tol = defaultTol;
       }
       return tol;
+   }
+
+   /**
+    * Sets the rotary limit tolerance for this MechModel.
+    *
+    * @param tol new rotary limit tolerance 
+    */
+   public void setRotaryLimitTol (double tol) {
+      myRotaryLimitTol = tol;
+      myRotaryLimitTolMode =
+         PropertyUtils.propagateValue (
+            this, "rotaryLimitTol", tol, myRotaryLimitTolMode);
+   }
+
+   /**
+    * Queries the rotary limit tolerance for this MechModel.
+    * 
+    * @return rotary limit tolerance 
+    */
+   public double getRotaryLimitTol () {
+      return myRotaryLimitTol;
+   }
+
+   public PropertyMode getRotaryLimitTolMode() {
+      return myRotaryLimitTolMode;
+   }
+
+   public void setRotaryLimitTolMode (PropertyMode mode) {
+      myRotaryLimitTolMode =
+         PropertyUtils.setModeAndUpdate (
+            this, "rotaryLimitTol", myRotaryLimitTolMode, mode);
    }
 
    public Color getExcitationColor() {
@@ -940,43 +991,8 @@ TransformableGeometry, ScalableUnits {
       return myCollisionManager;
    }
 
-   // ZZZ
-
-   public void setMatrixSolver (MatrixSolver method) {
-      myMatrixSolver = method;
-      if (mySolver != null) {
-         mySolver.setMatrixSolver (method);
-         myMatrixSolver = mySolver.getMatrixSolver();
-      }
-   }
-
-   public Object validateMatrixSolver (
-      MatrixSolver method, StringHolder errMsg) {
-      if (mySolver != null && !mySolver.hasMatrixSolver (method)) {
-         return PropertyUtils.correctedValue (getMatrixSolver(), "Solver not "
-         + method + " not available", errMsg);
-      }
-      else {
-         return PropertyUtils.validValue (method, errMsg);
-      }
-   }
-
-   public MatrixSolver getMatrixSolver() {
-      return myMatrixSolver;
-   }
-
-   public void setIntegrator (Integrator integrator) {
-      myIntegrationMethod = integrator;
-      if (mySolver != null) {
-         mySolver.setIntegrator (integrator);
-         if (mySolver.getIntegrator() != integrator) {
-            myIntegrationMethod = mySolver.getIntegrator();
-         }
-      }
-   }
-
    public Integrator getIntegrator() {
-      return myIntegrationMethod;
+      return myIntegrator;
    }
    
    public void setStaticTikhonovFactor(double eps) {
@@ -1601,6 +1617,24 @@ TransformableGeometry, ScalableUnits {
       }
    }
 
+   protected void recursivelyGetDynamicComponents (
+      CompositeComponent comp, List<DynamicComponent> comps) { 
+      
+      for (int i=0; i<comp.numComponents(); i++) {
+         ModelComponent c = comp.get (i);
+         if (c instanceof DynamicComponent) {
+            comps.add ((DynamicComponent)c);
+         }
+         else if (c instanceof MechSystemModel) {
+            ((MechSystemModel)c).getDynamicComponents (comps);
+         }
+         else if (c instanceof CompositeComponent) {
+            recursivelyGetDynamicComponents (
+               (CompositeComponent)c, comps);
+         }
+      }
+   }
+
    public void getDynamicComponents (
       List<DynamicComponent> active, 
       List<DynamicComponent> attached,
@@ -1609,6 +1643,10 @@ TransformableGeometry, ScalableUnits {
       recursivelyGetDynamicComponents (this, active, attached, parametric);
    }
 
+   public void getDynamicComponents (List<DynamicComponent> comps) {
+      recursivelyGetDynamicComponents (this, comps);
+   }
+ 
    protected void recursivelyGetConstrainers (
       CompositeComponent comp, List<Constrainer> list, int level) {
       
@@ -1940,10 +1978,16 @@ TransformableGeometry, ScalableUnits {
    public void render (Renderer renderer, int flags) {
    }
 
+   /**
+    * {@inheritDoc}
+    */
    public void transformGeometry (AffineTransform3dBase X) {
       TransformGeometryContext.transform (this, X, 0);      
    }
 
+   /**
+    * {@inheritDoc}
+    */
    public void transformGeometry (
       GeometryTransformer gtr, TransformGeometryContext context, int flags) {
       
@@ -1955,8 +1999,11 @@ TransformableGeometry, ScalableUnits {
       if (myMaxBound != null) {
          gtr.transformPnt (myMaxBound);
       }     
-   }   
+   }
 
+   /**
+    * {@inheritDoc}
+    */
    public void addTransformableDependencies (
       TransformGeometryContext context, int flags) {
       context.addTransformableDescendants (this, flags);
@@ -2283,5 +2330,116 @@ TransformableGeometry, ScalableUnits {
 
    RequestEnforceArticulationAction myRequestEnforceArticulationAction =
       new RequestEnforceArticulationAction();
+
+   public SparseBlockMatrix getActiveStiffnessMatrix() {
+      SparseBlockMatrix K = super.getActiveStiffnessMatrix();
+      if (myAddFrameMarkerStiffness) {
+         // add asymmetric component due to frame markers
+         for (FrameMarker mkr : frameMarkers()) {
+            int bi = mkr.getFrame().getSolveIndex();
+            Matrix6dBlock blk = (Matrix6dBlock)K.getBlock (bi, bi);
+            if (blk != null) {
+               Point3d lw = new Point3d(mkr.getLocation());
+               lw.transform (mkr.getFrame().getPose().R);
+               Vector3d f = mkr.getForce();
+               Matrix3d Krot = new Matrix3d();
+               Krot.outerProduct (lw, f);
+               Krot.m00 -= lw.dot(f);
+               Krot.m11 -= lw.dot(f);
+               Krot.m22 -= lw.dot(f);
+               blk.addSubMatrix33 (Krot);
+            }         
+         }
+      }
+      return K;
+   }
+
+   public SparseBlockMatrix getTrueStiffnessMatrix () {
+
+      boolean saveIgnoreCoriolis = PointSpringBase.myIgnoreCoriolisInJacobian;
+      boolean saveSymmetricJacobian = FrameSpring.mySymmetricJacobian;
+      boolean saveAddFrameMarkerStiffness = myAddFrameMarkerStiffness;
+      PointSpringBase.myIgnoreCoriolisInJacobian = false;
+      FrameSpring.mySymmetricJacobian = false;
+      myAddFrameMarkerStiffness = true;
+
+      SparseBlockMatrix K = getActiveStiffnessMatrix();
+
+      myAddFrameMarkerStiffness = saveAddFrameMarkerStiffness;
+      PointSpringBase.myIgnoreCoriolisInJacobian = saveIgnoreCoriolis;
+      FrameSpring.mySymmetricJacobian = saveSymmetricJacobian;
+
+      return K;
+   }
+
+   /**
+    * Returns the true active stiffness matrix with frame orientation
+    * expressed using yaw-pitch-roll coordinates. This increases
+    * the likelyhood that the matrix is symmetric.
+    * @param modifiers if not {@code null}, specifies a list
+    * of modifiers to apply to the true stiffness matrix before
+    * converting it to yaw-pitch-roll coordinates.
+    * 
+    * @return true active yaw-pitch-roll stiffness matrix
+    */
+   public SparseBlockMatrix getYPRStiffnessMatrix (
+      List<SolveMatrixModifier> modifiers) {
+
+      SparseBlockMatrix K = getTrueStiffnessMatrix();
+      VectorNd f = new VectorNd (getActiveVelStateSize());
+      getActiveForces (f);
+      ArrayList<DynamicComponent> comps = getActiveDynamicComponents();
+      if (modifiers != null) {
+         for (SolveMatrixModifier m : modifiers) {
+            m.modify (K, f, comps);
+         }
+      }
+      // convert to YPR formulation
+      YPRStiffnessUtils.convertStiffnessToYPR (K, f, comps);
+      return K;
+   }
+
+   /**
+    * Returns the regular active stiffness matrix used by the
+    * ArtiSynth solver. 
+    * @param modifiers if not {@code null}, specifies a list
+    * of modifiers to apply to the stiffness matrix.
+    * 
+    * @return regular active stiffness matrix
+    */
+   public SparseBlockMatrix getStiffnessMatrix (
+      List<SolveMatrixModifier> modifiers) {
+
+      boolean saveIgnoreCoriolis = PointSpringBase.myIgnoreCoriolisInJacobian;
+      boolean saveSymmetricJacobian = FrameSpring.mySymmetricJacobian;
+      boolean saveAddFrameMarkerStiffness = myAddFrameMarkerStiffness;
+      PointSpringBase.myIgnoreCoriolisInJacobian = true;
+      FrameSpring.mySymmetricJacobian = true;
+      myAddFrameMarkerStiffness = false;
+
+      SparseBlockMatrix K = getActiveStiffnessMatrix();
+
+      myAddFrameMarkerStiffness = saveAddFrameMarkerStiffness;
+      PointSpringBase.myIgnoreCoriolisInJacobian = saveIgnoreCoriolis;
+      FrameSpring.mySymmetricJacobian = saveSymmetricJacobian;
+
+      //System.out.println ("regular K, symmetric=" + K.isSymmetric(1e-4));
+
+      VectorNd f = new VectorNd (getActiveVelStateSize());
+      getActiveForces (f);
+      ArrayList<DynamicComponent> comps = getActiveDynamicComponents();
+      if (modifiers != null) {
+         for (SolveMatrixModifier m : modifiers) {
+            m.modify (K, f, comps);
+         }
+      }
+      //System.out.println ("after mods, symmetric=" + K.isSymmetric(1e-4));
+      // convert to YPR formulation
+      YPRStiffnessUtils.convertStiffnessToYPR (K, f, comps);
+      //System.out.println ("after YPR, symmetric=" + K.isSymmetric(1e-4));
+      return K;
+   }
+
+
 }
 

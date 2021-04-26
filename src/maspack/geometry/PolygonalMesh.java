@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -816,8 +817,54 @@ public class PolygonalMesh extends MeshBase {
       return addFace (new Vertex3d[] { v0, v1, v2 });
    }
 
-   public Face addFace(Vertex3d v0, Vertex3d v1, Vertex3d v2, Vertex3d v3) {
+   /**
+    * Adds a triangular face to this mesh.  The face is described by three
+    * vertex indices arranged in counter-clockwise order with respect to the
+    * face's normal.
+    * 
+    * @param idx0 first vertex index
+    * @param idx1 second vertex index
+    * @param idx2 third vertex index
+    * @throws IllegalArgumentException if any vertices are not contained within
+    * this mesh
+    * @return the created Face object
+    */
+   public Face addFace (int idx0, int idx1, int idx2) {
+      return addFace (new int[] { idx0, idx1, idx2 });
+   }
+
+   /**
+    * Adds a quad face to this mesh.  The face is described by four
+    * vertices arranged in counter-clockwise order with respect to the
+    * face's normal.
+    * 
+    * @param v0 first vertex
+    * @param v1 second vertex
+    * @param v2 third vertex
+    * @param v3 fourth vertex
+    * @throws IllegalArgumentException
+    * if any vertices are not contained within this mesh
+    * @return the created Face object
+    */
+   public Face addFace (Vertex3d v0, Vertex3d v1, Vertex3d v2, Vertex3d v3) {
       return addFace(new Vertex3d[] {v0,v1,v2,v3});
+   }
+
+   /**
+    * Adds a quad face to this mesh.  The face is described by four
+    * vertex indices arranged in counter-clockwise order with respect to the
+    * face's normal.
+    * 
+    * @param idx0 first vertex index
+    * @param idx1 second vertex index
+    * @param idx2 third vertex index
+    * @param idx3 fourth vertex index
+    * @throws IllegalArgumentException if any vertices are not contained within
+    * this mesh
+    * @return the created Face object
+    */
+   public Face addFace (int idx0, int idx1, int idx2, int idx3) {
+      return addFace (new int[] { idx0, idx1, idx2, idx3 });
    }
 
    /**
@@ -909,6 +956,43 @@ public class PolygonalMesh extends MeshBase {
          for (int i=0; i<myFaces.size(); i++) {
             Face f = myFaces.get(i);
             if (k < deleteIdxs.size() && i == deleteIdxs.get(k)) {
+               f.disconnect();
+               k++;
+            }
+            else {
+               f.setIndex (newFaceList.size());
+               newFaceList.add (f);
+            }
+         }
+         myFaces = newFaceList;
+         myTriQuadCountsValid = false;
+         adjustAttributesForRemovedFeatures (deleteIdxs);
+         notifyStructureChanged();
+         return deleteIdxs;
+      }
+      else {
+         return null;
+      }
+   }
+
+   /**
+    * Removes a set of faces from this mesh, as indicated by a collection.
+    *
+    * @param faces Collection of faces to remove
+    */
+   public ArrayList<Integer> removeFacesX (Collection<Face> faces) {
+      LinkedHashSet<Face> deleteFaces = new LinkedHashSet<>();
+      deleteFaces.addAll (faces);
+      ArrayList<Integer> deleteIdxs = new ArrayList<>();
+      
+      if (deleteFaces.size() > 0) {
+         ArrayList<Face> newFaceList =
+            new ArrayList<Face>(myFaces.size()-deleteFaces.size());
+         int k = 0;
+         for (int i=0; i<myFaces.size(); i++) {
+            Face f = myFaces.get(i);
+            if (deleteFaces.contains(f)) {
+               deleteIdxs.add (f.getIndex());
                f.disconnect();
                k++;
             }

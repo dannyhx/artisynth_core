@@ -19,7 +19,8 @@ public class _Debug_ThinShell extends GrowDemo {
       mEnableGrowth = false; 
       mEnableRemesh = false; 
       mEnablePlasticEmbedding = false; 
-      mEnableCollisionHandling = false;
+      
+      mEnableCollisionHandling = true;
    }
    
    /* --- Helper methods, which can overridden, for building --- */

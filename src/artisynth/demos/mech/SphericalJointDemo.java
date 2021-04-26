@@ -1,176 +1,86 @@
 package artisynth.demos.mech;
 
 import java.awt.Color;
+import java.io.IOException;
 
-import artisynth.core.modelbase.*;
-import artisynth.core.mechmodels.*;
-import artisynth.core.util.*;
+import artisynth.core.gui.ControlPanel;
+import artisynth.core.mechmodels.Frame;
+import artisynth.core.mechmodels.MechModel;
+import artisynth.core.mechmodels.RigidBody;
+import artisynth.core.mechmodels.SphericalJoint;
 import artisynth.core.workspace.RootModel;
-import artisynth.core.gui.*;
-import artisynth.core.driver.*;
-import maspack.geometry.*;
-import maspack.spatialmotion.*;
-import maspack.matrix.*;
-import maspack.render.*;
-import maspack.util.*;
-
-import java.io.*;
-import java.net.*;
-import java.util.*;
+import maspack.geometry.MeshFactory;
+import maspack.geometry.PolygonalMesh;
+import maspack.matrix.RigidTransform3d;
+import maspack.render.RenderProps;
 
 public class SphericalJointDemo extends RootModel {
-   protected MechModel myMechMod;
-
-   private static double inf = Double.POSITIVE_INFINITY;
-
-   protected RigidBody myLowerArm;
-   protected RigidBody myHand;
-
-   private double getHeight (RigidBody body) {
-      Point3d min = new Point3d (inf, inf, inf);
-      Point3d max = new Point3d (-inf, -inf, -inf);
-
-      body.updateBounds (min, max);
-      return max.z - min.z;
-   }
-
-   private Point3d getCenter (RigidBody body) {
-      Point3d min = new Point3d (inf, inf, inf);
-      Point3d max = new Point3d (-inf, -inf, -inf);
-
-      body.updateBounds (min, max);
-      Point3d center = new Point3d();
-      center.add (min, max);
-      center.scale (0.5);
-      return center;
-   }
-
-   public RigidBody addBody (String bodyName, String meshName)
-      throws IOException {
-      double density = 1000;
-
-      RigidBody body = new RigidBody (bodyName);
-      PolygonalMesh mesh =
-         new PolygonalMesh (new File (ArtisynthPath.getSrcRelativePath (
-            SphericalJointDemo.class, "geometry/" + meshName + ".obj")));
-      mesh.scale (0.1);
-      mesh.triangulate();
-      body.setMesh (mesh, null);
-      myMechMod.addRigidBody (body);
-      body.setInertiaFromDensity (density);
-      return body;
-   }
-
-   public SphericalJoint addSphericalJoint (
-      RigidBody bodyA, RigidBody bodyB, RigidTransform3d TDW) {
-      RigidTransform3d TCA = new RigidTransform3d();
-      RigidTransform3d XDB = new RigidTransform3d();
-
-      XDB.mulInverseLeft (bodyB.getPose(), TDW);
-      TCA.mulInverseLeft (bodyA.getPose(), TDW);
-      SphericalJoint joint = new SphericalJoint (bodyA, TCA, bodyB, XDB);
-      RenderProps.setPointStyle (joint, Renderer.PointStyle.SPHERE);
-      RenderProps.setPointColor (joint, Color.BLUE);
-      RenderProps.setPointRadius (joint, 0.025);
-      joint.setAxisLength (0.05);
-      myMechMod.addBodyConnector (joint);
-      return joint;
-   }
-
-   public SphericalRpyJoint addSphericalRpyJoint (
-      RigidBody bodyA, RigidBody bodyB, RigidTransform3d TDW) {
-      RigidTransform3d TCA = new RigidTransform3d();
-      RigidTransform3d XDB = new RigidTransform3d();
-
-      XDB.mulInverseLeft (bodyB.getPose(), TDW);
-      TCA.mulInverseLeft (bodyA.getPose(), TDW);
-      SphericalRpyJoint joint = new SphericalRpyJoint (bodyA, TCA, bodyB, XDB);
-      RenderProps.setPointStyle (joint, Renderer.PointStyle.SPHERE);
-      RenderProps.setPointColor (joint, Color.BLUE);
-      RenderProps.setPointRadius (joint, 0.025);
-      joint.setAxisLength (0.05);
-      myMechMod.addBodyConnector (joint);
-      return joint;
-   }
-
-   private FrameMarker addTipMarker (RigidBody tip) {
-      FrameMarker mkr = new FrameMarker ("tipMarker");
-      myMechMod.addFrameMarker (
-         mkr, tip, new Point3d (0, 0, -getHeight(tip)/2));
-
-      RenderProps.setPointStyle (mkr, Renderer.PointStyle.SPHERE);
-      RenderProps.setPointColor (mkr, Color.BLUE);
-      RenderProps.setPointRadius (mkr, 0.01);
-      return mkr;
-   }
-
-   private void setBodyPose (
-      RigidBody body, double x, double y, double z, double roll, double pitch,
-      double yaw) {
-      RigidTransform3d X = new RigidTransform3d();
-      X.p.set (x, y, z);
-      X.R.setRpy (Math.toRadians (roll),
-                  Math.toRadians (pitch),
-                  Math.toRadians (yaw));
-      body.setPose (X);
-   }
 
    public void build (String[] args) throws IOException {
 
-      myMechMod = new MechModel ("sphericalJoint");
-      myMechMod.setProfiling (false);
-      myMechMod.setGravity (0, 0, -9.8);
-      myMechMod.setFrameDamping (0.10);
-      myMechMod.setRotaryDamping (0.01);
-      myMechMod.setIntegrator (MechSystemSolver.Integrator.SymplecticEuler);
+      // create mech model and set rigid body damping parameters
+      MechModel mech = new MechModel ("mech");
+      mech.setFrameDamping (1.0);
+      mech.setRotaryDamping (0.1);
+      addModel (mech);
 
-      myLowerArm = addBody ("lowerArm", "lowerArm");
-      myHand = addBody ("hand", "hand");
+      double size = 0.5; // size parameter
 
-      double lowerArmZ = getHeight (myLowerArm) / 2 + getCenter (myLowerArm).z;
-      double handZ = -(getCenter (myHand).z + getHeight (myHand) / 2);
+      // create base - a cylinder rounded at the top
+      PolygonalMesh mesh = MeshFactory.createRoundedCylinder (
+         size/5, size, /*nslices=*/30, /*negs=*/1, /*flatBottom=*/true);
+      RigidBody base = RigidBody.createFromMesh (
+         "base", mesh, /*density=*/1000.0, /*scale=*/1.0);
+      base.setDynamic (false);
+      mech.addRigidBody (base);
 
-      setBodyPose (myLowerArm, 0, 0, lowerArmZ, 0, 0, 0);
-      setBodyPose (myHand, 0, 0, handZ, -90, 0, 0);
+      // create tip - a flat ellipsoid
+      RigidBody tip = RigidBody.createEllipsoid (
+         "tip", size/10, size/3, size/2, /*density=*/1000.0, /*nslices=*/30);
+      tip.setPose (new RigidTransform3d (0, 0, 1.25*size));
+      mech.addRigidBody (tip);
 
-      addTipMarker (myHand);
+      // Add a spherical joint between the tip and the base, with frames C and
+      // D initially coincident. Frame D is set (in world coordinates) with its
+      // origin at (0, 0, 0.75*size) and its axes aligned with world.
+      RigidTransform3d TDW =
+         new RigidTransform3d (0, 0, 0.75*size, 0, 0, 0);
+      SphericalJoint joint = new SphericalJoint (tip, base, TDW);
+      // set rotation ranges (in degrees)
+      joint.setMaxRotation (100);
+      joint.setMaxTilt (120); // will enable tilt limit over rotation limit
+      mech.addBodyConnector (joint);
 
-      RigidTransform3d X = new RigidTransform3d();
+      // rotate tip pose so that it will fall under gravity
+      RigidTransform3d TTW = new RigidTransform3d();
+      tip.getPose (TTW);
+      TTW.mulXyz (0, 0, -size/2);
+      TTW.mulRpy (0, Math.PI/4, 0);
+      TTW.mulXyz (0, 0, size/2);
+      tip.setPose (TTW);
 
-      myLowerArm.setDynamic (false);
+      // set rendering properties
+      joint.setAxisLength (0.75*size); // draw frame C
+      joint.setDrawFrameC (Frame.AxisDrawStyle.ARROW);
+      joint.setJointRadius (0.10*size); // draw ball around the joint
+      RenderProps.setFaceColor (joint, Color.BLUE); // set colors
+      RenderProps.setFaceColor (tip, new Color (0.5f, 1f, 1f));
 
-//       SphericalJoint joint = addSphericalJoint (myHand, myLowerArm, TDW);
-//       joint.setMaxRotation (100);
-//       TDW.p.set (0, 0, -getHeight (myHand));
-//       joint = addSphericalJoint (myHand2, myHand, TDW);
-//       joint.setMaxRotation (45);
-
-      RigidTransform3d TDW = new RigidTransform3d();
-      TDW.R.setRpy (0, 0, Math.PI/2);
-      SphericalRpyJoint joint = addSphericalRpyJoint (myLowerArm, myHand, TDW);
-      joint.setRollRange (-90, 90);
-      joint.setPitchRange (-45, 45);
-      joint.setYawRange (-90, 90);
-      joint.setRoll (-30);
-      joint.setYaw (-1);
-
-      addModel (myMechMod);
-
-      X.setIdentity();
-      X.R.setRpy (0, Math.toRadians(-180), 0);
-      myMechMod.transformGeometry (X);
-
+      // create control panel to interactively adjust properties
       ControlPanel panel = new ControlPanel();
-      panel.addWidget (myMechMod.getProperty("integrator"));
-      panel.addWidget (joint.getProperty("roll"));
-      panel.addWidget (joint.getProperty("pitch"));
-      panel.addWidget (joint.getProperty("yaw"));
-      panel.addWidget (joint.getProperty("rollRange"));
-      panel.addWidget (joint.getProperty("pitchRange"));
-      panel.addWidget (joint.getProperty("yawRange"));
-      panel.pack();
+      panel.addWidget (joint, "tilt");
+      panel.addWidget (joint, "maxTilt");
+      panel.addWidget (joint, "tiltLimited"); 
+      panel.addWidget (joint, "maxRotation");
+      panel.addWidget (joint, "rotationLimited");
+      panel.addWidget (joint, "drawFrameC");
+      panel.addWidget (joint, "drawFrameD");
+      panel.addWidget (joint, "axisLength");
+      panel.addWidget (joint, "jointRadius");
+      panel.addWidget (joint, "linearCompliance");
+      panel.addWidget (joint, "rotaryCompliance");
+      panel.addWidget (joint, "compliance");
+      panel.addWidget (joint, "damping");
       addControlPanel (panel);
-      Main.getMain().arrangeControlPanels (this);
-
    }
 }

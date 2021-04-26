@@ -56,7 +56,6 @@ import artisynth.core.mechmodels.ForceEffector;
 import artisynth.core.mechmodels.HasSlaveObjects;
 import artisynth.core.mechmodels.MechSystemBase;
 import artisynth.core.mechmodels.MechSystemSolver.Integrator;
-import artisynth.core.mechmodels.MechSystemSolver.MatrixSolver;
 import artisynth.core.mechmodels.Point;
 import artisynth.core.mechmodels.PointList;
 import artisynth.core.modelbase.ComponentChangeEvent;
@@ -82,13 +81,42 @@ public abstract class FemModel extends MechSystemBase
    protected PointList<FemMarker> myMarkers;
    protected ComponentList<DynamicAttachmentComp> myAttachments;
 
+   /**
+    * Specifies how FEM surface meshes should be rendered.
+    */
    public enum SurfaceRender {
+      /**
+       * No surface rendering
+       */
       None,
+
+      /**
+       * Rendered as a shaded surface, using the model's face rendering
+       * proporties.
+       */
       Shaded,
       // Fine,
+
+      /**
+       * Render as a color map showing the von Mises stress.
+       */
       Stress,
+
+      /**
+       * Render as a color map showing the von Mises strain.
+       */
       Strain,
+
+      /**
+       * Render as a color map showing the maximum absolute principal stress
+       * component.
+       */
       MAPStress,
+
+      /**
+       * Render as a color map showing the maximum absolute principal strain
+       * component.
+       */
       MAPStrain;
 
       public boolean usesStress() {
@@ -133,8 +161,6 @@ public abstract class FemModel extends MechSystemBase
    protected SparseNumberedBlockMatrix mySolveMatrix = null;
    protected boolean mySolveMatrixSymmetricP = true;
    //protected SparseBlockMatrix myMassMatrix = null;
-   protected MatrixSolver myMatrixSolver;
-   protected Integrator myIntegrator;
 
    protected boolean myStressesValidP = false;
    protected boolean myStiffnessesValidP = false;
@@ -164,9 +190,6 @@ public abstract class FemModel extends MechSystemBase
       SurfaceRender.None;
    protected static double DEFAULT_STIFFNESS_DAMPING = 0;
    protected static double DEFAULT_MASS_DAMPING = 2;
-   protected static Integrator DEFAULT_INTEGRATION =
-      Integrator.ConstrainedBackwardEuler;
-   protected static MatrixSolver DEFAULT_MATRIX_SOLVER = MatrixSolver.Pardiso;
    protected static Ranging DEFAULT_STRESS_PLOT_RANGING = Ranging.Auto;
    protected static DoubleInterval DEFAULT_STRESS_PLOT_RANGE = new DoubleInterval(0,1);
 
@@ -221,9 +244,6 @@ public abstract class FemModel extends MechSystemBase
       myProps.add (
          "stiffnessDamping * *", "damping on stiffness matrix",
          DEFAULT_STIFFNESS_DAMPING);
-      myProps.add ("integrator * *", "integration method ", DEFAULT_INTEGRATION);
-      myProps.add ("matrixSolver * *", "matrix solver ", DEFAULT_MATRIX_SOLVER);
-
       myProps.addReadOnly ("volume *", "volume of the model");
       myProps.addReadOnly ("numInverted", "number of inverted elements");
       myProps.addReadOnly ("mass *", "mass of the model");
@@ -238,6 +258,7 @@ public abstract class FemModel extends MechSystemBase
    }
 
    protected void setDefaultValues() {
+      super.setDefaultValues();
       myGravity = new Vector3d (DEFAULT_GRAVITY);
       myGravityMode = PropertyMode.Inherited;
       //myNu = DEFAULT_NU;
@@ -254,8 +275,6 @@ public abstract class FemModel extends MechSystemBase
       myStiffnessDamping = DEFAULT_STIFFNESS_DAMPING;
       myMassDamping = DEFAULT_MASS_DAMPING;
       setMaxStepSize (0.01);
-      setMatrixSolver (DEFAULT_MATRIX_SOLVER);
-      setIntegrator (DEFAULT_INTEGRATION);
       setMaterial (createDefaultMaterial());
    }
 
@@ -276,7 +295,6 @@ public abstract class FemModel extends MechSystemBase
       
       setRenderProps (createRenderProps());
       myMaxStepSize = 0.01;
-      mySolver.setIntegrator (Integrator.BackwardEuler);
       setImplicitIterations (20);
       setImplicitPrecision (0.01);
       setDefaultValues();
@@ -520,75 +538,6 @@ public abstract class FemModel extends MechSystemBase
       return myStiffnessDamping;
    }
 
-//   public synchronized void setPoissonsRatio (double nu) {
-//      myNu = nu;
-//      if (myMaterial.hasProperty ("PoissonsRatio")) {
-//         myMaterial.getProperty ("PoissonsRatio").set (nu);
-//      }
-//   }
-
-//   public double getPoissonsRatio() {
-//      if (myMaterial.hasProperty ("PoissonsRatio")) {
-//         return (Double)myMaterial.getProperty ("PoissonsRatio").get();
-//      }
-//      else {
-//         return myNu;
-//      }
-//   }
-
-   public void setIntegrator (Integrator method) {
-      myIntegrator = method;
-      if (mySolver != null) {
-         mySolver.setIntegrator (method);
-         myIntegrator = mySolver.getIntegrator();
-      }
-   }
-
-   public Integrator getIntegrator() {
-      return myIntegrator;
-   }
-
-   public void setMatrixSolver (MatrixSolver method) {
-      myMatrixSolver = method;
-      if (mySolver != null) {
-         mySolver.setMatrixSolver (method);
-         myMatrixSolver = mySolver.getMatrixSolver();
-      }
-   }
-
-   public Object validateMatrixSolver (
-      MatrixSolver method, StringHolder errMsg) {
-      String err = null;
-      if (mySolver != null && !mySolver.hasMatrixSolver (method)) {
-         err = "solver not available";
-         method = getMatrixSolver();
-      }
-      if (errMsg != null) {
-         errMsg.value = err;
-      }
-      return method;
-   }
-
-   public MatrixSolver getMatrixSolver() {
-      return myMatrixSolver;
-   }
-
-//   public synchronized void setYoungsModulus (double E) {
-//      myE = E;
-//      if (myMaterial.hasProperty ("YoungsModulus")) {
-//         myMaterial.getProperty ("YoungsModulus").set (E);
-//      }
-//   }
-
-//   public double getYoungsModulus() {
-//      if (myMaterial.hasProperty ("YoungsModulus")) {
-//         return (Double)myMaterial.getProperty ("YoungsModulus").get();
-//      }
-//      else {
-//         return myE;
-//      }
-//   }
-
    /**
     * Creates myAABBTree if it is null, or otherwise updates it.
     */
@@ -679,10 +628,6 @@ public abstract class FemModel extends MechSystemBase
       myMarkers.add (mkr);
       return status;
    }
-
-//   public void addMarker (FemMarker mkr) {
-//      myMarkers.add (mkr);
-//   }
 
    public boolean removeMarker (FemMarker mkr) {
       if (myMarkers.remove (mkr)) {
@@ -1002,6 +947,11 @@ public abstract class FemModel extends MechSystemBase
          attached.add (myMarkers.get(i));
       }
    }   
+   
+   public void getDynamicComponents (List<DynamicComponent> comps) {
+      comps.addAll (getNodes());
+      comps.addAll (myMarkers);
+   }
 
    public void getConstrainers (List<Constrainer> constrainers, int level) {
       constrainers.add (this);
@@ -1249,9 +1199,6 @@ public abstract class FemModel extends MechSystemBase
       }
       fem.setParticleDamping (myMassDamping);
       fem.setStiffnessDamping (myStiffnessDamping);
-
-      fem.setIntegrator (myIntegrator);
-      fem.setMatrixSolver (myMatrixSolver);
 
       fem.myMinBound = null;
       fem.myMaxBound = null;

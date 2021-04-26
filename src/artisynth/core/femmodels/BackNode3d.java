@@ -12,7 +12,7 @@ import artisynth.core.mechmodels.MotionTarget.TargetActivity;
 import artisynth.core.modelbase.*;
 import artisynth.core.util.*;
 
-public class BackNode3d extends DynamicComponentBase 
+public class BackNode3d extends Particle 
    implements MotionTargetComponent, CollidableDynamicComponent {
 
    @Override

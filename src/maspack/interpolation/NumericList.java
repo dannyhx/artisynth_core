@@ -71,6 +71,17 @@ public class NumericList
    }
 
    /**
+    * Sets the interpolation order for this list. The default is
+    * <code>Step</code>.
+    * 
+    * @param order
+    * new interpolation order;
+    */
+   public void setInterpolationOrder (Interpolation.Order order) {
+      myInterpolation.setOrder (order);
+   }
+
+   /**
     * Returns the interpolation method for this list.
     * 
     * @return interpolation method
@@ -340,7 +351,7 @@ public class NumericList
             last = (t <= tmid ? myHead : myTail);
          }
       }
-      if (last.t > t) { // last is abive t; try to move closer
+      if (last.t > t) { // last is above t; try to move closer
          while (last.t > t && last.prev != null) {
             last = last.prev;
          }
@@ -465,6 +476,13 @@ public class NumericList
          axis.scale (Math.sin(ang/2));
          qr.set (Math.cos(ang/2), axis);
       }
+      else if (v.size() == 7) {
+          // axis angle
+          Vector3d axis = new Vector3d (buf[3], buf[4], buf[5]);
+          double ang = Math.toRadians (buf[6]);
+          axis.scale (Math.sin(ang/2));
+          qr.set (Math.cos(ang/2), axis);
+       }
       else if (v.size() == 16) {
          RotationMatrix3d R = new RotationMatrix3d();
          R.set (buf[0], buf[1], buf[2],
@@ -500,6 +518,14 @@ public class NumericList
          buf[2] = axisAng.axis.z;
          buf[3] = Math.toDegrees (axisAng.angle);
       }
+      else if (v.size() == 7) {
+          AxisAngle axisAng = new AxisAngle();
+          q.getAxisAngle (axisAng);
+          buf[3] = axisAng.axis.x;
+          buf[4] = axisAng.axis.y;
+          buf[5] = axisAng.axis.z;
+          buf[6] = Math.toDegrees (axisAng.angle);
+      }
       else if (v.size() == 16) {
          RotationMatrix3d R = new RotationMatrix3d();
          R.set (q);
@@ -511,14 +537,22 @@ public class NumericList
 
    private void getPosition (VectorNd v, Vector3d pos) {
       double[] buf = v.getBuffer();
-      if (v.size() == 16) {
+      if (v.size() == 7) {
+          pos.set (buf[0], buf[1], buf[2]);
+      }
+      else if (v.size() == 16) {
          pos.set (buf[3], buf[7], buf[11]);
       }
    }
 
    private void setPosition (VectorNd v, Vector3d pos) {
       double[] buf = v.getBuffer();
-      if (v.size() == 16) {
+      if (v.size() == 7) {
+          buf[0] = pos.x;
+          buf[1] = pos.y;
+          buf[2] = pos.z;
+      }
+      else if (v.size() == 16) {
          buf[3] = pos.x;
          buf[7] = pos.y;
          buf[11] = pos.z;
@@ -759,7 +793,7 @@ public class NumericList
       // change interpolation if necessary to make it compatible with the data
       switch (order) {
          case SphericalLinear: {
-            if (size != 4 && size != 16) {
+            if (size != 4 && size != 7 && size != 16) {
                order = Order.Linear; 
             }
             break;
@@ -772,7 +806,7 @@ public class NumericList
          }
          case SphericalCubic: {
             if (prev.prev == null && next.next == null) {
-               if (size != 4 && size != 16) {
+               if (size != 4 && size != 7 && size != 16) {
                   order = Order.Linear; 
                }
                else {
@@ -780,7 +814,7 @@ public class NumericList
                }
             }
             else {
-               if (size != 4 && size != 16) {
+               if (size != 4 && size != 7 && size != 16) {
                   order = Order.Cubic;
                }
             }          
@@ -800,7 +834,7 @@ public class NumericList
          }
          case SphericalLinear: {
             interpLinearRotation (prev, v, t);
-            if (size == 16) {
+            if (size == 7 || size == 16) {
                interpLinearPosition (prev, v, t);
             }
             break;
@@ -815,7 +849,7 @@ public class NumericList
          }
          case SphericalCubic: {
             interpCubicRotation (prev, v, t);
-            if (size == 16) {
+            if (size == 7 || size == 16) {
                interpCubicPosition (prev, v, t);
             }
             break;
@@ -913,6 +947,18 @@ public class NumericList
          knot.myList = null;
       }
       myTail = myHead = myLast = null;
+      myMinMaxValid = false;
+   }
+   
+   /**
+    * Uniformly scales all the values in this list
+    * 
+    * @param s scale factor
+    */
+   public void scale (double s) {
+      for (NumericListKnot knot = myHead; knot != null; knot = knot.next) {
+         knot.v.scale (s);
+      }      
       myMinMaxValid = false;
    }
 
@@ -1054,8 +1100,14 @@ public class NumericList
    /**
     * Returns a deep copy of this numeric list.
     */
-   public Object clone() throws CloneNotSupportedException {
-      NumericList l = (NumericList)super.clone();
+   public Object clone() {
+      NumericList l = null;
+      try {
+         l = (NumericList)super.clone();
+      }
+      catch (CloneNotSupportedException e) {
+         throw new InternalErrorException ("NumericList not clonable");
+      }
       l.myLast = l.myHead = l.myTail = null;
       l.myMinMaxValid = false;
       l.a1 = new VectorNd (0);

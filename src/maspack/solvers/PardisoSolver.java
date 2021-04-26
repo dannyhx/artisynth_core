@@ -401,9 +401,8 @@ public class PardisoSolver implements DirectSolver {
    private static void doLoadLibraries() {
       try {
          NativeLibraryManager.setFlags (NativeLibraryManager.VERBOSE);
-         // PardisoJNI.1.0 is an MKL 10 library that is sometimes more reliable
-         //String pardisoLibrary = "PardisoJNI.1.0";
-         String pardisoLibrary = "PardisoJNI.11.1.2.1"; // uses MKL 11.1.2
+         //String pardisoLibrary = "PardisoJNI.11.1.2.1"; // uses MKL 11.1.2
+         String pardisoLibrary = "PardisoJNI.2021.1"; // uses MKL 2021.1
          switch (NativeLibraryManager.getSystemType()) {
             case Linux32:
             case Linux64: {
@@ -416,10 +415,9 @@ public class PardisoSolver implements DirectSolver {
                break;
             }
             case MacOS64: {
-               // advance loading won't work on MacOS. Instead, we rely
-               // on changing the install name for libiomp5.dylib in
-               // libPardisoJNI.1.0 to @loader_path/libiomp5.dylib 
-               //NativeLibraryManager.load ("iomp5");
+               // Advance loading of iomp5 now appears to work on the Mac. This
+               // helps solve issues with libPardisoJNI not finding it.
+               NativeLibraryManager.load ("iomp5");
                break;
             }
          }

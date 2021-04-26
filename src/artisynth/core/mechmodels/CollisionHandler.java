@@ -17,7 +17,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import artisynth.core.femmodels.BackNode3d;
 import artisynth.core.femmodels.FemNode3d;
+import artisynth.core.femmodels.PointFem3dAttachment;
 import artisynth.core.mechmodels.CollisionBehavior.Method;
 import artisynth.core.mechmodels.CollisionManager.BehaviorSource;
 import artisynth.core.mechmodels.CollisionManager.ColliderType;
@@ -598,12 +600,15 @@ public class CollisionHandler extends ConstrainerBase
    protected boolean vertexAttachedToCollidable (
       Vertex3d vtx, CollidableBody collidable0, CollidableBody collidable1) {
       ArrayList<ContactMaster> masters = new ArrayList<ContactMaster>();
-      collidable0.getVertexMasters (masters, vtx);
+      collidable0.collectVertexMasters (masters, vtx, "");
       // vertex is considered attached if 
-      // (a) all masters are completely attached to collidable1, or
-      // (b) all masters are actually contained in collidable1
-      for (int i=0; i<masters.size(); i++) {
-         DynamicComponent comp = masters.get(i).myComp;
+      // (a) all master components are completely attached to collidable1, or
+      // (b) all master components are actually contained in collidable1
+      HashSet<DynamicComponent> dcomps = new HashSet<>();
+      for (ContactMaster cm : masters) {
+         cm.collectMasterComponents (dcomps, /*activeOnly=*/false);
+      }
+      for (DynamicComponent comp : dcomps) {
          if (!isCompletelyAttached (comp, collidable0, collidable1) &&
              !isContainedIn (comp, collidable1)) {
             return false;
@@ -611,7 +616,6 @@ public class CollisionHandler extends ConstrainerBase
       }
       return true;
    }
-
 
    protected HashSet<Vertex3d> computeAttachedVertices (
       CollidableBody collidable0, CollidableBody collidable1) {
@@ -699,7 +703,7 @@ public class CollisionHandler extends ConstrainerBase
       // }
       
       // DANCOLEDIT: here - computeVertexPenetrationConstraints()
-      
+
       for (PenetratingPoint cpp : points) {
          ContactPoint pnt0, pnt1;
          pnt0 = new ContactPoint (cpp.vertex);
@@ -769,11 +773,6 @@ public class CollisionHandler extends ConstrainerBase
             if (-dist > maxpen) {
                maxpen = -dist;
             }
-
-            // if (artisynth.core.driver.Main.getMain().getTime() == 0.44) {
-            //    System.out.println (" nrml="+cons.myNormal);
-            //    System.out.println (" dist="+cons.myDistance);
-            // }
          }
       }
       return maxpen;
@@ -935,13 +934,17 @@ public class CollisionHandler extends ConstrainerBase
       myUnilaterals.clear();
       
       // DANCOLEDIT - computeVertexPenetrationUnilateralConstraints()
-      
+
+      // Given a blueprint of collisions...
       if (info != null) {
          for (int m=0; m<2; m++) {
             CollidableBody col0 = (m==0) ? collidable0 : collidable1;
             CollidableBody col1 = (m==0) ? collidable1 : collidable0; 
-            
+
+            // For each proposed collision instance with respect to model m.
+            // i.e. A vertex from model m is touching a face.
             for (PenetratingPoint cpp : info.getPenetratingPoints(m)) {
+               // Create a constraint for it.
                ContactConstraint c = new ContactConstraint();
                c.m = m;
                 
@@ -960,7 +963,7 @@ public class CollisionHandler extends ConstrainerBase
                }
                
                c.setNormal (cpp.getNormal ());
-               c.assignMasters (col0, col1);
+               c.assignMasters (col0, col1);  // Creates the VertexContactMasters.
                c.myContactArea = -1.0;
 
                // maxpen should be positive. maxpen is used to check if it
@@ -987,6 +990,7 @@ public class CollisionHandler extends ConstrainerBase
 
          // Handle edge-edge collisions
          if (getMethod() == CollisionBehavior.Method.VERTEX_EDGE_PENETRATION) {
+            // For each proposed edge-edge collision between model m=0 and m=1
             for (EdgeEdgeContact eec : info.getEdgeEdgeContacts ()) {
                ContactConstraint c = new ContactConstraint();
                c.m = 0;
@@ -1038,9 +1042,6 @@ public class CollisionHandler extends ConstrainerBase
             
             for (ContactConstraint cc : myUnilaterals) {
                
-               if (! isUnilateralHaveShellMaster(cc))
-                  continue;
-               
                // Initialize duplicate unilateral
                ContactConstraint cc_back = new ContactConstraint();
                cc_back.setNormal ( cc.getNormal () );
@@ -1058,58 +1059,29 @@ public class CollisionHandler extends ConstrainerBase
                cc_back.myCpnt0 = new ContactPoint();
                cc_back.myCpnt0.set (
                   cc.myCpnt0.getPoint (), cc.myCpnt0.myVtxs, cc.myCpnt0.myWgts);
+               cc_back.myCpnt0.isBack = true;
                
                cc_back.myCpnt1 = new ContactPoint();
                cc_back.myCpnt1.set (
                   cc.myCpnt1.getPoint (), cc.myCpnt1.myVtxs, cc.myCpnt1.myWgts);
+               cc_back.myCpnt1.isBack = true;
+               
                
                // Duplicate unilateral's ContactMasters.
                // Each cpnt has its own set of masters (either 1 or 3 nodes).
                // However, all masters are grouped into a single array.
                
-               for (ContactMaster cm : cc.getMasters ()) {
-                  // If master is a rigidBody point, just add it the 
-                  // backnode constraint's list of masters.
-                  if (! isShellMaster (cm)) {  
-                     cc_back.myMasters.add (cm);
-                     continue;
-                  }
-                  
-                  // Otherwise, master is a femNode. Simply make a 
-                  // backNode version of the master and add it to the list of
-                  // masters.
-                  
-                  CollidableDynamicComponent cmComp = cm.myComp;
-                  FemNode3d cmNode = (FemNode3d)cmComp;
-                  
-                  ContactMaster cm_back = new ContactMaster( 
-                     cmNode.getBackNode (), 
-                     cm.myWeight, 
-                     (cm.myCpnt == cc.myCpnt0) ? cc_back.myCpnt0 : cc_back.myCpnt1
-                  );
-                  
-                  cm_back.myCpnt.isBack = true;
-                  
-                  // Adjust cpnt's position to align with backnode, relative to
-                  // front node.
-                  
-                  Vector3d front2back = new Vector3d();
-                  front2back.sub (
-                     cmNode.getBackNode().getPosition (), cmNode.getPosition ());
-                  
-                  cm.myCpnt.myPoint.add (front2back);
-                  
-                  // Add duplicate contact master.
-                  
-                  cc_back.myMasters.add ( cm_back );
-               }
-
+               // DAN21: masters are now associated with ContactMasters 
+               // directly rather than assigned its child cpnts. 
+               
+               cc_back.assignMastersWithCtx (cc.col0, cc.col1, "BackNode");
+                      
                unilateralsToAdd.add (cc_back);
-            }
-            
+               
+            } // For each unilateral constraint to be duplicated.
             myUnilaterals.addAll (unilateralsToAdd);
-         } // End of unilateral to backnode copying 
-      }
+         } // isCopyUnilateralsToBackNodes
+      } // info != null
       
       for (ContactConstraint cc : myUnilaterals) {
          // Imminent: Tell `getUnilateralInfo()` that it doesn't have to account
@@ -1149,22 +1121,7 @@ public class CollisionHandler extends ConstrainerBase
       return maxpen;
    }
    
-   protected boolean isUnilateralHaveShellMaster(ContactConstraint unilateral) {
-      for (ContactMaster cm : unilateral.getMasters ()) {
-         if (isShellMaster(cm))
-            return true;
-      }
-      
-      return false;
-   }
    
-   protected boolean isShellMaster(ContactMaster cm) {
-      CollidableDynamicComponent cmComp = cm.myComp;
-      
-      return (cmComp instanceof FemNode3d && 
-              ((FemNode3d)cmComp).getBackNode () != null);
-   }
-
    double computeContourRegionConstraints (
       ContactInfo info, CollidableBody collidable0, CollidableBody collidable1) {
 
@@ -1251,7 +1208,6 @@ public class CollisionHandler extends ConstrainerBase
          System.out.println (" " + c.toString(fmtStr));
       }
       it = myBilaterals1.values().iterator();
-      System.out.println ("mesh1");
       while (it.hasNext()) {
          ContactConstraint c = it.next();
          System.out.println (" " + c.toString(fmtStr));
@@ -1286,9 +1242,7 @@ public class CollisionHandler extends ConstrainerBase
    private void getConstraintComponents (
       HashSet<DynamicComponent> set, Collection<ContactConstraint> contacts) {
       for (ContactConstraint cc : contacts) {
-         for (ContactMaster cm : cc.getMasters()) {
-            set.add (cm.myComp);
-         }
+         cc.collectMasterComponents (set, /*activeOnly=*/false);
       }
    }
    
