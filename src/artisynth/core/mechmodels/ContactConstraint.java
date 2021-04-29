@@ -355,6 +355,10 @@ public class ContactConstraint {
       clearMasters();
       assignMasters (myMasters0, collidable0, 1, myCpnt0, ctx);
       assignMasters (myMasters1, collidable1, 1, myCpnt1, ctx);
+      
+      // DAN21 
+      this.col0 = collidable0;
+      this.col1 = collidable1;
    }
 
    public ArrayList<ContactMaster> getAllMasters() {

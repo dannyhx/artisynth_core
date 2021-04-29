@@ -26,6 +26,7 @@ import artisynth.core.mechmodels.CollisionManager.ColliderType;
 import artisynth.core.mechmodels.MechSystem.ConstraintInfo;
 import artisynth.core.mechmodels.MechSystem.FrictionInfo;
 import artisynth.demos.growth.collision.CollisionDetector;
+import artisynth.demos.growth.collision.CollisionHandlerCD;
 import artisynth.demos.growth.util.MeshUtil;
 import maspack.collision.ContactInfo;
 import maspack.collision.ContactPlane;
@@ -1042,6 +1043,12 @@ public class CollisionHandler extends ConstrainerBase
             
             for (ContactConstraint cc : myUnilaterals) {
                
+//               if (!CollisionHandlerCD.
+//                   IsCollisionConstraintInvolveShellNode (cc)) 
+//               {
+//                  continue;
+//               }
+               
                // Initialize duplicate unilateral
                ContactConstraint cc_back = new ContactConstraint();
                cc_back.setNormal ( cc.getNormal () );
@@ -1065,8 +1072,7 @@ public class CollisionHandler extends ConstrainerBase
                cc_back.myCpnt1.set (
                   cc.myCpnt1.getPoint (), cc.myCpnt1.myVtxs, cc.myCpnt1.myWgts);
                cc_back.myCpnt1.isBack = true;
-               
-               
+              
                // Duplicate unilateral's ContactMasters.
                // Each cpnt has its own set of masters (either 1 or 3 nodes).
                // However, all masters are grouped into a single array.
@@ -1076,6 +1082,8 @@ public class CollisionHandler extends ConstrainerBase
                
                cc_back.assignMastersWithCtx (cc.col0, cc.col1, "BackNode");
                       
+               CollisionHandlerCD.AlignContactPointsToBackNodes (cc_back);
+               
                unilateralsToAdd.add (cc_back);
                
             } // For each unilateral constraint to be duplicated.

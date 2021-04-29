@@ -1862,6 +1862,8 @@ implements CollidableBody, PointAttachable {
          PointParticleAttachment ppab = new PointParticleAttachment(nodeb, null);
          
          mlist.add (ppab);
+         
+         return;
       } else if (ctx != "") {
          throw new AssertionError("Unsupported ctx.");
       }
