@@ -62,6 +62,9 @@ public class ShellPatch extends RootModel {
    
    /* --- FEM physical properties --- */
    
+   /** Use membrane? */
+   protected boolean m_isMembrane = false;
+   
    /** Overall density of shell patch. */
    protected double m_density = 100;
    
@@ -298,7 +301,7 @@ public class ShellPatch extends RootModel {
    
    protected ShellTriElement createElement(FemNode3d n0, FemNode3d n1,
    FemNode3d n2, double thickness) {
-      ShellTriElement ele = new ShellTriElement(n0, n1, n2, thickness);
+      ShellTriElement ele = new ShellTriElement(n0, n1, n2, thickness, this.m_isMembrane);
       return ele;
    }
    

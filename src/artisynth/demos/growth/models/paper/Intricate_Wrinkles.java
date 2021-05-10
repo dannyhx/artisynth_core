@@ -56,7 +56,7 @@ public class Intricate_Wrinkles extends GrowDemo {
       super.build_post ();
    }
    
-   public void advanceCustom(double t0, double t1, int flags) { 
+   public void advanceCustom(double t0, double t1, int flags) {
       if (t0 < 0.01) {
          Main.getMain ().getViewer ().setEye (
             new Point3d(0, 0, 2.01888));

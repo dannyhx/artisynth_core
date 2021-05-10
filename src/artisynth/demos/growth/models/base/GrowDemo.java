@@ -443,7 +443,7 @@ public class GrowDemo extends ShellPatch {
       return new GrowTriElement(
          (GrowNode3d)n0, 
          (GrowNode3d)n1,
-         (GrowNode3d)n2, thickness);
+         (GrowNode3d)n2, thickness, this.m_isMembrane);
    }
    
    public boolean shouldBeFrozen(int idx) {

@@ -1034,7 +1034,9 @@ public class CollisionHandler extends ConstrainerBase
          
          // Duplicate unilaterals for BackNodes
          
-         boolean isCopyUnilateralsToBackNodes = true;
+         boolean isCol0HasBackNode = CollisionHandlerCD.IsCollidableBodyHasBackNodes (collidable0);
+         boolean isCol1HasBackNode = CollisionHandlerCD.IsCollidableBodyHasBackNodes (collidable1);
+         boolean isCopyUnilateralsToBackNodes = isCol0HasBackNode || isCol1HasBackNode;
          
          if (isCopyUnilateralsToBackNodes) {
 

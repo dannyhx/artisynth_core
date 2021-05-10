@@ -14,6 +14,8 @@ import maspack.properties.PropertyList;
 /** Extension of FemNode3d to account for growth. */
 public class GrowNode3d extends FemNode3d {
    
+   public boolean m_isMembrane = false;
+   
    // --- Backup of the world-space. --- //
    
    public Point3d m_WS_front_pos = new Point3d();
@@ -51,13 +53,24 @@ public class GrowNode3d extends FemNode3d {
    public GrowNode3d (Point3d p, VectorNd chems) {
       super(p);
       mChems = chems;
+      
       setDirectorActive(true);
    }
 
+   public GrowNode3d (Point3d p, VectorNd chems, boolean isMembrane) {
+      super(p);
+      mChems = chems;
+      
+      if (!isMembrane)
+         setDirectorActive(true);
+   }
+   
    public GrowNode3d (double x, double y, double z, VectorNd chems) {
       super(x,y,z); 
       mChems = chems;
-      setDirectorActive(true);
+      
+      if (!m_isMembrane)
+         setDirectorActive(true);
    }
    
 
@@ -135,19 +148,17 @@ public class GrowNode3d extends FemNode3d {
       int ecnt = 0;
 
       for (FemElement e : this.getAdjacentShellElements ()) {
-         if (e.getElementClass() == ElementClass.SHELL) {
-            ShellElement3d se = (ShellElement3d)e;
+         ShellElement3d se = (ShellElement3d)e;
 
-            Vector3d d = new Vector3d();
-            se.computeRestNodeNormal (d, this);
-            
-            // Scale by angle rather than area
-            double scale = getAngle(this, (ShellTriElement)se);
-            
-            dir.scaledAdd (scale, d);
-            thickness += se.getDefaultThickness();
-            ecnt++;
-         }
+         Vector3d d = new Vector3d();
+         se.computeRestNodeNormal (d, this);
+         
+         // Scale by angle rather than area
+         double scale = getAngle(this, (ShellTriElement)se);
+         
+         dir.scaledAdd (scale, d);
+         thickness += se.getDefaultThickness();
+         ecnt++;
       }
       if (ecnt > 0) {
          dir.normalize();

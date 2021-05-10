@@ -28,24 +28,24 @@ public class GrowLinearMaterialCache extends LinearMaterialCache {
       return new GrowDeformedPoint();
    }
   
-   public void clearInitialStiffness() {
-      for (int i=0; i<nnodes*nnodes; i++) {
-         K00[i].setZero();
-      }
-      for (int i=0; i<nnodes; ++i) {
-         f0[i].setZero();
-      }
-      if (hasShellData()) {
-         for (int i=0; i<nnodes*nnodes; i++) {
-            K01[i].setZero();
-            K10[i].setZero();
-            K11[i].setZero();
-         }
-         for (int i=0; i<nnodes; ++i) {
-            f1[i].setZero();
-         }
-      }
-   }
+//   public void clearInitialStiffness() {
+//      for (int i=0; i<nnodes*nnodes; i++) {
+//         K00[i].setZero();
+//      }
+//      for (int i=0; i<nnodes; ++i) {
+//         f0[i].setZero();
+//      }
+//      if (hasShellData()) {
+//         for (int i=0; i<nnodes*nnodes; i++) {
+//            K01[i].setZero();
+//            K10[i].setZero();
+//            K11[i].setZero();
+//         }
+//         for (int i=0; i<nnodes; ++i) {
+//            f1[i].setZero();
+//         }
+//      }
+//   }
    
    public void addInitialShellStiffness (
    ShellElement3d e, FemMaterial mat, double weight) {

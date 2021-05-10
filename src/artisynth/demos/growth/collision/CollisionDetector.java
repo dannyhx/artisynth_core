@@ -276,7 +276,7 @@ public class CollisionDetector {
          return null;
       
       ContactInfo cinfo = new ContactInfo(smi0.myMesh, smi1.myMesh);
-      
+
       if (myDebug)
          System.out.println ("Computing penetration points for m=0"); 
       ArrayList<PenetratingPoint> pentPts0 = findPenetratingPoints(smi0, smi1);

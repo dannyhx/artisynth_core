@@ -3,8 +3,11 @@ package artisynth.demos.growth.collision;
 import java.util.ArrayList;
 
 import artisynth.core.femmodels.BackNode3d;
+import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.femmodels.FemMeshComp;
+import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
+import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.mechmodels.CollidableBody;
 import artisynth.core.mechmodels.ContactConstraint;
 import artisynth.core.mechmodels.ContactMaster;
@@ -16,6 +19,17 @@ import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
 
 public class CollisionHandlerCD {
+   public static boolean IsCollidableBodyHasBackNodes(CollidableBody col) {
+      if (col instanceof FemMeshComp) {
+         FemModel3d model = ((FemMeshComp)col).getFem ();
+         FemNode3d node = model.getNode (0);
+         
+         return node.getBackNode () != null;
+      }
+      
+      return false;
+   }
+   
    public static boolean IsCollisionConstraintInvolveShellNode(
       ContactConstraint cc) 
    {
