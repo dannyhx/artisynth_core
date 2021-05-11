@@ -30,34 +30,11 @@ public class _Debug_ThinShell extends GrowDemo {
       m_isMembrane = true;
       
       mEnableDiffusion = true;
-      mEnableGrowth = false; 
+      mEnableGrowth = true; 
       mEnableRemesh = false; 
-      mEnablePlasticEmbedding = false; 
+      mEnablePlasticEmbedding = true; 
       
       mEnableCollisionHandling = true;
-   }
-   
-   
-   
-   protected void build_utils() {
-      
-      // For each model...
-      mMeshChems = new MeshChemicals[M];
-      for (int m=0; m<M; m++) {
-         // Create a per-node morphogen stash.
-         mMeshChems[m] = new MeshChemicals(mFemModel[m].numNodes (), mNumChemTypes);
-         
-         // Pass morphogen references to each node.
-         for (int n = 0; n < mFemModel[m].numNodes (); n++) {
-            GrowNode3d gNode = (GrowNode3d)mFemModel[m].getNode (n);
-            gNode.mChems = mMeshChems[m].getVtxChems (n);
-         }
-      }
-      
-      // Initialize the components of growth.
-      
-      mDiffusion = new Diffusion(mMesh[0], mMeshChems[0], 
-         new int[] {mChemTypeToDiffuse});
    }
    
    protected FemModel3d createFemModel() {
@@ -167,56 +144,56 @@ public class _Debug_ThinShell extends GrowDemo {
 //         System.out.println ("Remesh solve (ms): " + (end-start));
 //      }
 //      
-//      // Convert fraction of morphogen into plastic strain.
-//      if (mEnableGrowth) {
-//         start = System.currentTimeMillis ();
-//         
-//         for (int m=0; m<M; m++) {
-//            if (! mFemModel[m].getDynamicsEnabled ()) 
-//               continue;
-//            
-//            mMorphogen2GrowthTensor.setTarget (mFemModel[m]);
-//            
-//            if (! mMaintainResidualStrain)
-//               mMorphogen2GrowthTensor.unapplyGrowthTensors ();
-//            
-//            mMorphogen2GrowthTensor.updatePolarityDirection(mPolDir);
-//            mMorphogen2GrowthTensor.activateFractionOfMorphogen (mChemCvtRate, 
-//               mIsActivatePAR, mIsActivatePER, mIsActivateNOR);
-//            mMorphogen2GrowthTensor.computeIntegrationGrowthTensors ();
-//            mMorphogen2GrowthTensor.applyGrowthTensors (); 
-//            mMorphogen2GrowthTensor.clearActivatedMorphogen ();   
-//         }
-//         
-//         end = System.currentTimeMillis ();
-//         System.out.println ("Tensor solve (ms): " + (end-start));
-//      }
-//      
-//      // Plastic Embedding
-//      if (mEnablePlasticEmbedding) {
-//         start = System.currentTimeMillis ();
-//         
-//         for (int m=0; m<M; m++) {
-//            if (! mFemModel[m].getDynamicsEnabled ()) 
-//               continue;
-//            
-//            // Use this instead if simulating both reference and world-space.
-//   //         mPlasticEmbedder.setTarget (mFemModel);
-//   //         mPlasticEmbedder.advance (t0, t1);
-//   //         mPlasticEmbedder.preadvance (); 
-//            
-//            mPlasticEmbedder.setTarget (mFemModel[m]);
-//            mPlasticEmbedder.copyWorldSpaceToReferenceSpace ();
-//         }
-//         
-//         end = System.currentTimeMillis ();
-//         System.out.println ("PlasticEmbedding solve (ms): " + (end-start));
-//      }
-//      else {
-////         mMorphogen2GrowthTensor.unapplyGrowthTensors ();
-////         mPlasticEmbedder.backupWorldSpace ();
-////         mPlasticEmbedder.worldSpaceMode ();
-//      }
+      // Convert fraction of morphogen into plastic strain.
+      if (mEnableGrowth) {
+         start = System.currentTimeMillis ();
+         
+         for (int m=0; m<M; m++) {
+            if (! mFemModel[m].getDynamicsEnabled ()) 
+               continue;
+            
+            mMorphogen2GrowthTensor.setTarget (mFemModel[m]);
+            
+            if (! mMaintainResidualStrain)
+               mMorphogen2GrowthTensor.unapplyGrowthTensors ();
+            
+            mMorphogen2GrowthTensor.updatePolarityDirection(mPolDir);
+            mMorphogen2GrowthTensor.activateFractionOfMorphogen (mChemCvtRate, 
+               mIsActivatePAR, mIsActivatePER, mIsActivateNOR);
+            mMorphogen2GrowthTensor.computeIntegrationGrowthTensors ();
+            mMorphogen2GrowthTensor.applyGrowthTensors (); 
+            mMorphogen2GrowthTensor.clearActivatedMorphogen ();   
+         }
+         
+         end = System.currentTimeMillis ();
+         System.out.println ("Tensor solve (ms): " + (end-start));
+      }
+      
+      // Plastic Embedding
+      if (mEnablePlasticEmbedding) {
+         start = System.currentTimeMillis ();
+         
+         for (int m=0; m<M; m++) {
+            if (! mFemModel[m].getDynamicsEnabled ()) 
+               continue;
+            
+            // Use this instead if simulating both reference and world-space.
+   //         mPlasticEmbedder.setTarget (mFemModel);
+   //         mPlasticEmbedder.advance (t0, t1);
+   //         mPlasticEmbedder.preadvance (); 
+            
+            mPlasticEmbedder.setTarget (mFemModel[m]);
+            mPlasticEmbedder.copyWorldSpaceToReferenceSpace ();
+         }
+         
+         end = System.currentTimeMillis ();
+         System.out.println ("PlasticEmbedding solve (ms): " + (end-start));
+      }
+      else {
+//         mMorphogen2GrowthTensor.unapplyGrowthTensors ();
+//         mPlasticEmbedder.backupWorldSpace ();
+//         mPlasticEmbedder.worldSpaceMode ();
+      }
 //      
 //      updateNodesColor();
 //      

@@ -1,5 +1,6 @@
 package artisynth.demos.growth;
 
+import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
@@ -15,6 +16,7 @@ import maspack.matrix.Vector3d;
 public class PlasticEmbedder {
    
    protected FemModel3d mFemModel;
+   protected Boolean mHasBackNodes;
    
    public PlasticEmbedder() {
    }
@@ -70,10 +72,12 @@ public class PlasticEmbedder {
          GrowNode3d gNode = (GrowNode3d)node; 
        
          gNode.setRestPosition ( gNode.getPosition () );        
-         gNode.setBackRestPosition ( gNode.getBackPosition () ); 
-         
          gNode.setVelocity ( Vector3d.ZERO );
-         gNode.setBackVelocity ( Vector3d.ZERO );
+         
+         if (hasBackNode()) {
+            gNode.setBackRestPosition ( gNode.getBackPosition () ); 
+            gNode.setBackVelocity ( Vector3d.ZERO );
+         }
       }
       
       ComponentChangeEvent compEvt = new ComponentChangeEvent(
@@ -91,13 +95,14 @@ public class PlasticEmbedder {
          GrowNode3d gNode = (GrowNode3d)node; 
          
          gNode.m_WS_front_pos.set ( gNode.getPosition () );
-         gNode.m_WS_back_pos.set ( gNode.getBackPosition () );
-         
-         gNode.m_WS_front_restPos.set ( gNode.getRestPosition () );
-         gNode.m_WS_back_restPos.set ( gNode.getBackRestPosition () );
-         
+         gNode.m_WS_front_restPos.set ( gNode.getRestPosition () );         
          gNode.m_WS_front_vel.set ( gNode.getVelocity () );
-         gNode.m_WS_back_vel.set ( gNode.getBackVelocity () );
+         
+         if (hasBackNode()) {
+            gNode.m_WS_back_pos.set ( gNode.getBackPosition () );
+            gNode.m_WS_back_restPos.set ( gNode.getBackRestPosition () );
+            gNode.m_WS_back_vel.set ( gNode.getBackVelocity () );
+         }
       }
    }
    
@@ -119,17 +124,19 @@ public class PlasticEmbedder {
          
          // Rest (unoptimized)
          gNode.setRestPosition ( gNode.m_WS_front_restPos );
-         gNode.setBackRestPosition ( gNode.m_WS_back_restPos );
          
          // Cur (soon-to-be optimized result)
          gNode.setPosition ( gNode.m_WS_front_restPos );
-         gNode.setBackPosition ( gNode.m_WS_back_restPos );
-         
+ 
          gNode.setVelocity ( gNode.m_ES_front_vel );
-         gNode.setBackVelocity ( gNode.m_ES_back_vel );
-         
          gNode.setVelocity ( Vector3d.ZERO );
-         gNode.setBackVelocity ( Vector3d.ZERO );
+         
+         if (hasBackNode()) {
+            gNode.setBackRestPosition ( gNode.m_WS_back_restPos );
+            gNode.setBackPosition ( gNode.m_WS_back_restPos );
+            gNode.setBackVelocity ( gNode.m_ES_back_vel );
+            gNode.setBackVelocity ( Vector3d.ZERO );
+         }
       }
       
       ShellUtil.invalidateFem (mFemModel);   
@@ -149,25 +156,39 @@ public class PlasticEmbedder {
          /* --- Backup Embedded-Space velocity and force --- */
          
          gNode.m_ES_front_vel.set( gNode.getVelocity () );
-         gNode.m_ES_back_vel.set( gNode.getBackVelocity () );
          
          /*--- Use World-Space --- */
          
          // Copy the current DoF (i.e. energy-minimized embedded space) to 
          // the rest DoF (i.e. material space for world space).
          gNode.setRestPosition ( gNode.getPosition () );        
-         gNode.setBackRestPosition ( gNode.getBackPosition () ); 
 
          // Restore the current DoF of the world space.
          gNode.setPosition ( gNode.m_WS_front_pos );
-         gNode.setBackPosition ( gNode.m_WS_back_pos );
          
          // Restore world-space velocity and force.  
          // DANTEST. This wasn't included originally.
          gNode.setVelocity ( gNode.m_WS_front_vel );
-         gNode.setBackVelocity ( gNode.m_WS_back_vel );
+         
+         if (hasBackNode()) {
+            gNode.m_ES_back_vel.set( gNode.getBackVelocity () );
+            gNode.setBackRestPosition ( gNode.getBackPosition () ); 
+            gNode.setBackPosition ( gNode.m_WS_back_pos );
+            gNode.setBackVelocity ( gNode.m_WS_back_vel );
+         }
       }
       
       ShellUtil.invalidateFem (mFemModel);
+   }
+   
+   // --- Secondary Functions
+   
+   protected boolean hasBackNode() {
+      if (this.mHasBackNodes == null) {
+         this.mHasBackNodes = (
+         mFemModel.getShellElement (0).getElementClass () == ElementClass.SHELL);
+      }
+      
+      return this.mHasBackNodes;
    }
 }
