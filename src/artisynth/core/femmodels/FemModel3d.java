@@ -66,6 +66,7 @@ import artisynth.core.util.IntegerToken;
 import artisynth.core.util.ScalableUnits;
 import artisynth.core.util.ScanToken;
 import artisynth.core.util.StringToken;
+import artisynth.demos.growth.util.HingeUtil;
 import maspack.geometry.AABBTree;
 import maspack.geometry.BVFeatureQuery;
 import maspack.geometry.BVNode;
@@ -3166,7 +3167,7 @@ PointAttachable, ConnectableBody {
          softIncomp = IncompMethod.OFF;
       }
       
-      FemDeformedPoint dpnt = new FemDeformedPoint();
+      FemDeformedPoint dpnt = createFemDeformedPoint();
       SymmetricMatrix3d sigma = new SymmetricMatrix3d();
       Matrix3d invJ = new Matrix3d();
       
@@ -3497,7 +3498,7 @@ PointAttachable, ConnectableBody {
       e.setInverted(false); // will check this below
             
       StiffnessWarper3d warper = e.getStiffnessWarper(1.0); // internally updates
-      FemDeformedPoint dpnt = new FemDeformedPoint();         
+      FemDeformedPoint dpnt = createFemDeformedPoint();         
       // if there is cached linear material, then apply
       if (!warper.isCacheEmpty()) {
 
@@ -3676,7 +3677,7 @@ PointAttachable, ConnectableBody {
       e.setInverted(false); // will check this below
             
       StiffnessWarper3d warper = e.getStiffnessWarper(1.0); // internally updates
-      FemDeformedPoint dpnt = new FemDeformedPoint();
+      FemDeformedPoint dpnt = createFemDeformedPoint();
 
       // if there is cached linear material, then apply
       if (!warper.isCacheEmpty()) {
@@ -3760,6 +3761,8 @@ PointAttachable, ConnectableBody {
             myNumInverted++;
          }
 
+         double t = pt.getCoords().z;
+         VectorNd Ns = pt.getShapeWeights ();
          double dv = detJ*pt.getWeight()*e.getDefaultThickness();
          Vector3d[] dNs = pt.getGNs();
 
@@ -3797,10 +3800,14 @@ PointAttachable, ConnectableBody {
             int bi = nodei.getSolveIndex();
                
             // Add stress (pt.sigma) to node force
-            FemUtilities.addMembraneStressForce(
-               nodei.myInternalForce, 
-               sigma, dv, dNs[i].x, dNs[i].y, invJ);
-
+//            FemUtilities.addMembraneStressForce(
+//               nodei.myInternalForce, 
+//               sigma, dv, dNs[i].x, dNs[i].y, invJ);
+            // DAN21
+            FemUtilities.addMembraneStressForceWithNormal(
+                nodei.myInternalForce, 
+                sigma, dv, dNs[i].x, dNs[i].y, invJ, t, Ns.get(i));
+            
             if (D != null) {
                if (bi != -1) {
                   for (int j = 0; j < e.myNodes.length; j++) {
@@ -5867,7 +5874,13 @@ PointAttachable, ConnectableBody {
       return idx;
    }
 
+   protected FemDeformedPoint createFemDeformedPoint() {
+      return new FemDeformedPoint();
+   }
+   
 }
+
+
 
 /**
 

@@ -434,7 +434,7 @@ public class GrowDemo extends ShellPatch {
    }
    
    protected GrowNode3d createNode(Point3d pt) {
-      return new GrowNode3d(pt, new VectorNd(mNumChemTypes));
+      return new GrowNode3d(pt, new VectorNd(mNumChemTypes), m_isMembrane);
    }
    
    protected GrowTriElement createElement(FemNode3d n0, FemNode3d n1,
@@ -443,7 +443,7 @@ public class GrowDemo extends ShellPatch {
       return new GrowTriElement(
          (GrowNode3d)n0, 
          (GrowNode3d)n1,
-         (GrowNode3d)n2, thickness, this.m_isMembrane);
+         (GrowNode3d)n2, thickness, m_isMembrane);
    }
    
    public boolean shouldBeFrozen(int idx) {

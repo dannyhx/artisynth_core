@@ -2,6 +2,7 @@ package artisynth.core.femmodels;
 
 import maspack.matrix.*;
 import artisynth.core.materials.DeformedPointBase;
+import artisynth.demos.growth.util.HingeUtil;
 import artisynth.core.femmodels.FemElement.ElementClass;
 
 public class FemDeformedPoint extends DeformedPointBase {
@@ -93,7 +94,7 @@ public class FemDeformedPoint extends DeformedPointBase {
       setR (R);
 
       myRestPosValid = false;
-      mySpatialPosValid = false;
+      mySpatialPosValid = false;      
    }
    
    public void setFromRestPoint (

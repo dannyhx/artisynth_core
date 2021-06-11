@@ -1,9 +1,12 @@
 package artisynth.demos.growth;
 
 import artisynth.core.femmodels.FemDeformedPoint;
+import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.IntegrationData3d;
 import artisynth.core.femmodels.IntegrationPoint3d;
+import artisynth.core.femmodels.ShellTriElement;
+import artisynth.demos.growth.util.HingeUtil;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.RotationMatrix3d;
 
@@ -29,6 +32,15 @@ public class GrowDeformedPoint extends FemDeformedPoint {
       
       myF.mulInverse (gid.getFp ());  
       myDetF = myF.determinant ();
+      
+      // DAN21
+      if (elem.getElementClass () == ElementClass.MEMBRANE) {
+         Matrix3d E = HingeUtil.computeStrain ((ShellTriElement)elem);
+         E.setSymmetric (E);
+         myF.setIdentity ();
+         myF.add(E); 
+         myDetF = myF.determinant ();
+      }
    }
 
    public void setFromRestPoint (

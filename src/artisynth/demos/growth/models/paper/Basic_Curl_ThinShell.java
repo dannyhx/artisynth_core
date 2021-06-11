@@ -10,22 +10,8 @@ import maspack.matrix.VectorNd;
 
 public class Basic_Curl_ThinShell extends Basic_Curl {
 
-   /* --- Helper methods, which can overridden, for building --- */
-   
-   protected FemModel3d createFemModel() {
-      return new GrowModel3d();
-   }
-   
-   protected GrowNode3d createNode(Point3d pt) {
-      return new GrowNode3d(pt, new VectorNd(mNumChemTypes));
-   }
-   
-   protected GrowTriElement createElement(FemNode3d n0, FemNode3d n1,
-   FemNode3d n2, double thickness)
-   {
-      return new GrowTriElement(
-         (GrowNode3d)n0, 
-         (GrowNode3d)n1,
-         (GrowNode3d)n2, thickness, true);
+   protected void build_pre() {
+      super.build_pre();
+      m_isMembrane = false;
    }
 }

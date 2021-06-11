@@ -1,3 +1,4 @@
+            // Should point away from edge.
 package artisynth.demos.growth;
 
 import artisynth.core.materials.LinearMaterial;

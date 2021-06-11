@@ -868,4 +868,30 @@ public class FemUtilities {
       f.y += fu.y*dv;
       f.z += fu.z*dv;
    }
+   
+   public static void addMembraneStressForceWithNormal (
+      Vector3d f, SymmetricMatrix3d sig, double dv, 
+      double dNdr, double dNds, Matrix3d invJ, double t, double N) {
+
+      Vector3d gct0 = new Vector3d (invJ.m00, invJ.m01, invJ.m02);
+      Vector3d gct1 = new Vector3d (invJ.m10, invJ.m11, invJ.m12);
+      Vector3d gct2 = new Vector3d (invJ.m20, invJ.m21, invJ.m22);
+      
+      Vector3d gradM = new Vector3d();
+      gradM.scaledAdd(dNdr, gct0);
+      gradM.scaledAdd(dNds, gct1);
+      
+      Vector3d gradMu = new Vector3d();
+      gradMu.scaledAdd (1+t, gradM);
+//      gradMu.scaledAdd (N, gct2);
+//      gradMu.scale (0.5);
+      
+      Vector3d fu = new Vector3d(gradMu);
+      sig.mul(fu);
+      
+      // Increment displacement force. 
+      f.x += fu.x*dv;
+      f.y += fu.y*dv;
+      f.z += fu.z*dv;
+   }
 }

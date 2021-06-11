@@ -14,7 +14,7 @@ import maspack.properties.PropertyList;
 /** Extension of FemNode3d to account for growth. */
 public class GrowNode3d extends FemNode3d {
    
-   public boolean m_isMembrane = false;
+   public boolean mIsMembrane = false;
    
    // --- Backup of the world-space. --- //
    
@@ -50,6 +50,14 @@ public class GrowNode3d extends FemNode3d {
       setDirectorActive(true);
    }
    
+   public GrowNode3d(boolean isMembrane) {
+      super();
+      mIsMembrane = isMembrane;
+      
+      if (!mIsMembrane)
+         setDirectorActive(true);
+   }
+   
    public GrowNode3d (Point3d p, VectorNd chems) {
       super(p);
       mChems = chems;
@@ -60,8 +68,9 @@ public class GrowNode3d extends FemNode3d {
    public GrowNode3d (Point3d p, VectorNd chems, boolean isMembrane) {
       super(p);
       mChems = chems;
+      mIsMembrane = isMembrane;
       
-      if (!isMembrane)
+      if (!mIsMembrane)
          setDirectorActive(true);
    }
    
@@ -69,7 +78,7 @@ public class GrowNode3d extends FemNode3d {
       super(x,y,z); 
       mChems = chems;
       
-      if (!m_isMembrane)
+      if (!mIsMembrane)
          setDirectorActive(true);
    }
    

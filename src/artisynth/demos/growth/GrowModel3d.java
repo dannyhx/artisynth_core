@@ -1,5 +1,6 @@
 package artisynth.demos.growth;
 
+import artisynth.core.femmodels.FemDeformedPoint;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.IntegrationPoint3d;
@@ -84,5 +85,9 @@ public class GrowModel3d extends FemModel3d {
       }
       
       return nodalFgs;
+   }
+   
+   protected FemDeformedPoint createFemDeformedPoint() {
+      return new GrowDeformedPoint();
    }
 }

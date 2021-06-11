@@ -300,7 +300,7 @@ public class GrowRemesher extends ShellRemesher {
       GrowTriElement ele = new GrowTriElement(
          (GrowNode3d)n0, 
          (GrowNode3d)n1,
-         (GrowNode3d)n2, thickness);
+         (GrowNode3d)n2, thickness, !this.mHasBackNode);
       
       isEleModified = true;
       ele.setMaterial (mFemModel.getMaterial ());
@@ -309,7 +309,7 @@ public class GrowRemesher extends ShellRemesher {
    }
    
    protected GrowNode3d createNode() {
-      GrowNode3d node = new GrowNode3d();
+      GrowNode3d node = new GrowNode3d(!mHasBackNode);
       mSizingField.addVertexSF (new Matrix3d());
       
       node.mChems = new VectorNd( mMeshChems.getNumChemTypes () );

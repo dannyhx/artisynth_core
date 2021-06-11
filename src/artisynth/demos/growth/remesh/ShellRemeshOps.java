@@ -8,6 +8,7 @@ import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.ShellTriElement;
+import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.mechmodels.CollidableDynamicComponent;
 import artisynth.core.mechmodels.CollisionHandler;
 import artisynth.core.mechmodels.ContactConstraint;
@@ -45,15 +46,23 @@ public class ShellRemeshOps extends RemeshOps {
    // CSNCMT
    protected ContactConstraintAgg mCCAgg;
    
+   protected boolean mHasBackNode;
+   
    public ShellRemeshOps(PolygonalMesh mesh, FemModel3d femModel) {
       super(mesh);
       mFemModel = femModel;
       mShellThickness = mFemModel.getShellElement (0).getDefaultThickness ();
+      
+      mHasBackNode = 
+         femModel.getShellElement (0).getElementClass () == ElementClass.SHELL;
    }
    
    protected void setTarget(PolygonalMesh mesh, FemModel3d femModel) {
       super.setTarget (mesh);
       mFemModel = femModel;
+      
+      mHasBackNode = 
+         femModel.getShellElement (0).getElementClass () == ElementClass.SHELL;
    }
    
    // CSNCMT
@@ -173,7 +182,7 @@ public class ShellRemeshOps extends RemeshOps {
    /** Create a standalone element that contains 3 given nodes. */
    protected ShellTriElement createElement(FemNode3d n0, FemNode3d n1,
    FemNode3d n2, double thickness) {
-      return new ShellTriElement(n0, n1, n2, thickness);
+      return new ShellTriElement(n0, n1, n2, thickness, !mHasBackNode);
    };
    
    /** Create a standalone and uninitialized node. */
@@ -192,9 +201,11 @@ public class ShellRemeshOps extends RemeshOps {
       buf.dput (node.getPosition ());
       buf.dput (node.getVelocity ());
    
-      buf.dput (node.getBackRestPosition ());
-      buf.dput (node.getBackPosition ());
-      buf.dput (node.getBackVelocity ());
+      if (mHasBackNode) {
+         buf.dput (node.getBackRestPosition ());
+         buf.dput (node.getBackPosition ());
+         buf.dput (node.getBackVelocity ());
+      }
 
       return buf;
    }
@@ -216,14 +227,16 @@ public class ShellRemeshOps extends RemeshOps {
       buf.dget (tmpVec);
       node.setVelocity (tmpVec);
 
-      buf.dget (tmpPnt);
-      node.setBackRestPosition (tmpPnt);
-      
-      buf.dget (tmpPnt);
-      node.setBackPosition (tmpPnt);
+      if (mHasBackNode) {
+         buf.dget (tmpPnt);
+         node.setBackRestPosition (tmpPnt);
+         
+         buf.dget (tmpPnt);
+         node.setBackPosition (tmpPnt);
 
-      buf.dget (tmpVec);
-      node.setBackVelocity (tmpVec);
+         buf.dget (tmpVec);
+         node.setBackVelocity (tmpVec);
+      }
    }
    
    /** Given the attributes of two nodes, linearly interpolate the attributes.
@@ -272,6 +285,9 @@ public class ShellRemeshOps extends RemeshOps {
       // CSNCMT
       for (CollisionHandler colHdlr : mCCAgg.myColHdlrs) {
          for (boolean isBackNode : new boolean[] {false, true}) {
+            if (isBackNode && !mHasBackNode) {
+               continue;
+            }
 
             LinkedList<ContactConstraint> n0_ccs = 
                getFilteredContactConstraints(colHdlr, nodeA, isBackNode);
@@ -399,7 +415,7 @@ public class ShellRemeshOps extends RemeshOps {
                         int ppaIdx = 0;
                         for (ContactMaster vcm_cm : vcm_cms) {
                            if (vcm_cm instanceof PointParticleAttachment) {
-                              PointParticleAttachment ppa = (PointParticleAttachment)cm;
+                              PointParticleAttachment ppa = (PointParticleAttachment)vcm_cm;
                               Particle particle = ppa.myParticle;
                               
                               if (particle == node) {
@@ -526,7 +542,7 @@ public class ShellRemeshOps extends RemeshOps {
                   
                   for (ContactMaster vcm_cm : vcm_cms) {
                      if (vcm_cm instanceof PointParticleAttachment) {
-                        PointParticleAttachment ppa = (PointParticleAttachment)cm;
+                        PointParticleAttachment ppa = (PointParticleAttachment)vcm_cm;
                         Particle particle = ppa.myParticle;
                         
                         if (!isBackNode && particle == node || isBackNode && particle == backNode) {

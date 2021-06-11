@@ -1,13 +1,16 @@
 package artisynth.demos.growth.util;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 
 import artisynth.core.femmodels.FemModel3d;
+import artisynth.core.femmodels.FemNode;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.IntegrationData3d;
 import artisynth.core.femmodels.IntegrationPoint3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.ShellTriElement;
+import artisynth.core.modelbase.ModelComponent;
 import artisynth.core.modelbase.ModelComponentBase;
 import artisynth.demos.growth.GrowIntegrationData3d;
 import maspack.matrix.Matrix3d;
@@ -64,6 +67,22 @@ public class ShellUtil {
       }
    }
    
+   public static Point3d getCentroid(ShellTriElement ele, boolean isRest) {
+      Point3d centroid = new Point3d();
+      
+      FemNode[] nodes = ele.getNodes();
+      for (int i = 0; i < nodes.length; i++) {
+         if (isRest) {
+            centroid.add (nodes[i].getRestPosition());
+         } else {
+            centroid.add (nodes[i].getPosition());
+         }
+      }
+      centroid.scale (1.0 / nodes.length);
+      
+      return centroid; 
+   }
+   
    /**
     * Get the world-space area of a triangle that is specified using 3 nodes.
     * 
@@ -86,6 +105,7 @@ public class ShellUtil {
          );
       }
    }
+   
    
    /**
     * Get the average plastic deformation gradient across the integration 
@@ -313,5 +333,13 @@ public class ShellUtil {
             node.setBackPosition (newPos);
          else 
             node.setBackRestPosition (newPos);
+   }
+   
+   // Name
+   
+   public static int getIndex(ModelComponent comp) {
+      String prefix = (comp instanceof FemNode3d) ? "MyNode_#" : "MyEle_#";
+      String idxStr = comp.getName ().substring (prefix.length ());
+      return Integer.parseInt (idxStr);
    }
 }
