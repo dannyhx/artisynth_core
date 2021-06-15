@@ -515,54 +515,23 @@ public class MathUtil {
    }
    
    /**
-    * Given a triangle in 3D space, get the 2D vector of one of its edges.
+    * Given a triangle in 3D space and a 3D vector that's along the plane of
+    * the triangle, return the vector in tangent coordinates (x,y).
     * 
-    * @param tri
-    * @param i
-    * @param j
-    * @return
+    * Origin is tri[0], e1 basis (i.e. tangent x axis) is origin to tri[1] 
+    * normalized, and e2 basis (i.e. tangent y axis) is cross product of 
+    * triangle normal and e1. 
     */
-   public static Point2d trianglePointTo2D(Point3d[] tri, Point3d p) {
-      /*
-      https://stackoverflow.com/questions/23472048/projecting-3d-points-to-2d-plane 
-       
-      Point to project onto plane:  r_P = (x,y,z)
-      Plane normal: n   = (nx,ny,nz)
-      Origin:       r_O = (ox,oy,oz) 
-      
-      Plane coord axes: e_1 = (ex_1,ey_1,ez_1)
-                        e_2 = (ex_2,ey_2,ez_2)
-      
-      Must satisfy:
-         r_P = r_O + t_1 * e_1 + t_2 * e_2 + s*n
-         
-      t_1,t_2 = Your 2D coordinates of the point using e_1 and e_2 axes.
-      s = normal separation (distance) between plane and point.
-      
-      // Formula.
-      
-      s = n . r_P-r_O
-      t_1 = e_1 . r_P-r_O 
-      t_2 = e_2 . r_P-r_O
-      
-      // Assumptions:
-       
-      Plane point is Tri 1 
-      Origin is Tri 0.
-      e_1 is Tri 0 to 2.
-      e_2 is Tri 0 to 3. 
-      */
-      Point3d planeOrigin = tri[0];
-      Point3d pointRel = (Point3d)new Point3d(p).sub (planeOrigin);
+   public static Vector2d vec3dToTangentCoords(Point3d[] tri, Vector3d v) {
       Vector3d nrm = MathUtil.getNormal (tri[0], tri[1], tri[2]);
       
       Vector3d e1 = new Vector3d(tri[1]).sub(tri[0]).normalize ();
       Vector3d e2 = new Vector3d(nrm).cross (e1);
       
-      double t1 = e1.dot (pointRel);
-      double t2 = e2.dot (pointRel);
+      double t1 = e1.dot (v);
+      double t2 = e2.dot (v);
       
-      return new Point2d(t1, t2);
+      return new Vector2d(t1, t2);
    }
    
    

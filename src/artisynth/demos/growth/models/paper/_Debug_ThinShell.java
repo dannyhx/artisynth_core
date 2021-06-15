@@ -1,9 +1,11 @@
 package artisynth.demos.growth.models.paper;
 
+import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.materials.FemMaterial;
 import artisynth.core.materials.LinearMaterial;
 import artisynth.core.materials.MooneyRivlinMaterial;
 import artisynth.core.materials.NeoHookeanMaterial;
+import artisynth.core.mechmodels.PointList;
 import artisynth.demos.growth.GrowChemical;
 import artisynth.demos.growth.GrowColorer;
 import artisynth.demos.growth.GrowModel3d;
@@ -13,6 +15,9 @@ import artisynth.demos.growth.Morphogen2GrowthTensor;
 import artisynth.demos.growth.PlasticEmbedder;
 import artisynth.demos.growth.diffusion.Diffusion;
 import artisynth.demos.growth.diffusion.MeshChemicals;
+import artisynth.demos.growth.models.base.ShellPatch;
+import maspack.geometry.MeshFactory;
+import maspack.geometry.PolygonalMesh;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
@@ -53,13 +58,27 @@ public class _Debug_ThinShell extends Basic_Base {
       //
       
       m_shellThickness = 0.001;
-      m_youngsModulus = 1e4;
+      m_youngsModulus = 1e3;
       mSizeMin = 0.05;
       mSizeMax = mSizeMin*5;
       mDiffusionTimestepScale = 0.01;
       mPauseEveryInterval = 999.00; 
       
+//      ShellPatch.m_particleDamping = 10;
+      
    }
+   
+//   protected void build_modelSkeleton() {
+//      mMesh = new PolygonalMesh[M];
+//      
+//      PolygonalMesh m = new PolygonalMesh();
+//      m.addVertex (0, 0, 0); 
+//      m.addVertex (1, 0, 0); 
+//      m.addVertex (1, 1, 0);
+//      m.addFace (0, 1, 2);
+//      
+//      mMesh[0] = m;
+//   }
    
    protected void build_modelProperties() {
       super.build_modelProperties();
@@ -118,4 +137,15 @@ public class _Debug_ThinShell extends Basic_Base {
    
    /** -- Engine Loop -- **/
 
+   
+   public void advanceCustom(double t0, double t1, int flags) {
+      super.advanceCustom (t0, t1, flags);
+//      if (t0 == 0.00) {
+//         PointList<FemNode3d> nodes = this.mFemModel[0].getNodes ();
+//         nodes.get (0).setRestPosition (new Point3d(0,0,0));
+//         nodes.get (1).setRestPosition (new Point3d(-1,0,0));
+//         nodes.get (2).setRestPosition (new Point3d(-1,1,0));
+//         System.out.println ("Switched");
+//      }
+   }
 }

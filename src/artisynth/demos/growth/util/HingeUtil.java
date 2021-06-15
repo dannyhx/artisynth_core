@@ -4,8 +4,10 @@ import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.ShellTriElement;
 import artisynth.demos.growth.def.NeighborElement;
+import maspack.matrix.Matrix2d;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.Point3d;
+import maspack.matrix.Vector2d;
 import maspack.matrix.Vector3d;
 
 public class HingeUtil {
@@ -18,48 +20,47 @@ public class HingeUtil {
    }
    
    public static Matrix3d computeMembraneStrain(ShellTriElement ele) {
-      Vector3d eleNORRest = ShellUtil.getNormal (ele, true);
-      Matrix3d eleStrain = new Matrix3d();
-      
+      Vector3d eleNOR = ShellUtil.getNormal (ele, false);
+      Matrix2d eleStrain = new Matrix2d();
+
       // For each of the 3 adjacent faces of the element, 
       // calculate the edge lengths and t vectors.
       
       double[] ls = new double[3];
       double[] lrs = new double[3];
-      Vector3d[] ts = new Vector3d[3];
+      Vector2d[] ts = new Vector2d[3];
       
       int e = 0;
       for (NeighborElement neigh : HingeUtil.adjacentFaces (ele)) {
          // 2 nodes of the edge.
          FemNode3d nodeH = neigh.edgeNodes[0];
          FemNode3d nodeT = neigh.edgeNodes[1];
-         Point3d nodeHPosWorld = nodeH.getPosition ();
-         Point3d nodeTPosWorld = nodeT.getPosition (); 
+         Point3d nodeHPos = nodeH.getLocalPosition ();
+         Point3d nodeTPos = nodeT.getLocalPosition (); 
          Point3d nodeHPosRest = nodeH.getRestPosition ();
          Point3d nodeTPosRest = nodeT.getRestPosition (); 
          
          // Edge vector and length.
-         Vector3d edgeVecWorld = new Vector3d(nodeHPosWorld).sub (nodeTPosWorld);
+         Vector3d edgeVec = new Vector3d(nodeHPos).sub (nodeTPos);
          Vector3d edgeVecRest = new Vector3d(nodeHPosRest).sub (nodeTPosRest);
-         double l = edgeVecWorld.norm(); 
+         double l = edgeVec.norm(); 
          double lr = edgeVecRest.norm (); 
          
-         // t vector. Perpendicular to triangle normal and edge.
-         Vector3d edgeVecRestUnit = new Vector3d(edgeVecRest).normalize();
-         Point3d edgeCenterRest = (Point3d)new Point3d(nodeTPosRest).
-            scaledAdd (0.5, edgeVecRest);
-         Vector3d t = new Vector3d(eleNORRest).cross(edgeVecRestUnit); 
-         HingeUtil.ensureExteriorVecT (ele, edgeCenterRest, t, true);
-         
+         // t vector. Perpendicular to triangle normal and edge. Use
+         // world-space coordinates, which dictate the force directions.
+         Vector3d edgeVecUnit = new Vector3d(edgeVec).normalize();
+         Point3d edgeCenter = (Point3d)new Point3d(nodeTPos).
+            scaledAdd (0.5, edgeVec);
+         Vector3d t = new Vector3d(eleNOR).cross(edgeVecUnit); 
+         HingeUtil.ensureExteriorVecT (ele, edgeCenter, t, false);
+
          // Append results.
          ls[e] = l;
          lrs[e] = lr;
-         ts[e] = t;
+         ts[e] = new Vector2d(t.x, t.y);
          
          e++;
       }
-      
-      // 
       
       e = 0;
       for (NeighborElement neigh : HingeUtil.adjacentFaces (ele)) {
@@ -70,24 +71,16 @@ public class HingeUtil {
          
          double s = lrs[e] * lrs[e] - ls[e] * ls[e];
          
-//         if (
-//            (h == 0 && t == 1 || h == 1 && t == 0) || 
-//            (h == 2 && t == 3 || h == 3 && t == 2) ||
-//            (h == 1 && t == 2 || h == 2 && t == 1)
-//         ) {
-//            s = -0.1;
-//         }
+         Vector2d tj = ts[(e+1) % 3];
+         Vector2d tk = ts[(e+2) % 3];
          
-         Vector3d tj = ts[(e+1) % 3];
-         Vector3d tk = ts[(e+2) % 3];
-         
-         Matrix3d op1 = new Matrix3d();
+         Matrix2d op1 = new Matrix2d();
          op1.outerProduct (tj, tk);
          
-         Matrix3d op2 = new Matrix3d();
+         Matrix2d op2 = new Matrix2d();
          op2.outerProduct (tk, tj);
          
-         Matrix3d opSum = new Matrix3d(); 
+         Matrix2d opSum = new Matrix2d(); 
          opSum.add (op1);
          opSum.add (op2);
          
@@ -99,7 +92,10 @@ public class HingeUtil {
       double area = ShellUtil.area(ele.getNodes (), true); 
       eleStrain.scale (1./(8*area*area));
       
-      return eleStrain;
+      Matrix3d eleStrain3d = new Matrix3d();
+      eleStrain3d.setSubMatrix (0, 0, eleStrain);
+      
+      return eleStrain3d;
    }
    
    public static Matrix3d computeBendingStrain(ShellTriElement ele) {

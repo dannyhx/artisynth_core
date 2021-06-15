@@ -230,7 +230,7 @@ public class IntegrationPoint3d {
 
             J.m00 = jc0.x; J.m01 = jc1.x; J.m02 = jc2.x; 
             J.m10 = jc0.y; J.m11 = jc1.y; J.m12 = jc2.y; 
-            J.m20 = jc0.z; J.m21 = jc1.z; J.m22 = jc2.z; 
+            J.m20 = jc0.z; J.m21 = jc1.z; J.m22 = jc2.z;
             break;
          }
          default: {

@@ -3,18 +3,20 @@ package artisynth.demos.growth.util.test;
 import artisynth.demos.growth.util.MathUtil;
 import maspack.matrix.Point2d;
 import maspack.matrix.Point3d;
+import maspack.matrix.Vector2d;
+import maspack.matrix.Vector3d;
 
 public class MathUtilTest {
    
    protected void test_trianglePointTo2D() {
       Point3d[] tri = new Point3d[] {
-          new Point3d(1,1,7),
-          new Point3d(4,1,7), 
-          new Point3d(1,4,7)};
+          new Point3d(0,0,0),
+          new Point3d(1,1,0), 
+          new Point3d(-1,1,0)};
                                   
-      Point2d p2d = MathUtil.trianglePointTo2D (tri, new Point3d(2,1,7));
+      Vector2d vec2d = MathUtil.vec3dToTangentCoords (tri, new Vector3d(0,1,0).normalize ());
       
-      System.out.println (p2d);
+      System.out.println (vec2d);
    }
    
    
