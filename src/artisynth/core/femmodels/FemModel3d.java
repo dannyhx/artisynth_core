@@ -66,6 +66,8 @@ import artisynth.core.util.IntegerToken;
 import artisynth.core.util.ScalableUnits;
 import artisynth.core.util.ScanToken;
 import artisynth.core.util.StringToken;
+import artisynth.demos.growth.thinshell.EdgeDataMap;
+import artisynth.demos.growth.thinshell.ThinShellAux;
 import artisynth.demos.growth.util.HingeUtil;
 import maspack.geometry.AABBTree;
 import maspack.geometry.BVFeatureQuery;
@@ -271,6 +273,10 @@ PointAttachable, ConnectableBody {
 
    static float[] myInvertedColor = new float[] { 1f, 0f, 0f};
 
+   // Only applicable for thin-shell elements.
+   public EdgeDataMap myEdgeDataMap;
+   public ThinShellAux myThinShellAux;
+   
    public static PropertyList myProps =
       new PropertyList(FemModel3d.class, FemModel.class);
 
@@ -2895,6 +2901,10 @@ PointAttachable, ConnectableBody {
             }
          }
       }     
+      
+      if (myThinShellAux != null) {
+         myThinShellAux.addBendingForceAndStiffness ();
+      }
 
       // incompressibility
       if ((softIncomp == IncompMethod.NODAL) && 
@@ -3795,18 +3805,19 @@ PointAttachable, ConnectableBody {
             ks = addAuxStressAndTangent (sigma, D, auxmats, dpnt, pt, dt, ks);
          }
 
+         
          for (int i = 0; i < e.myNodes.length; i++) {
             FemNode3d nodei = (FemNode3d) e.myNodes[i];
             int bi = nodei.getSolveIndex();
                
             // Add stress (pt.sigma) to node force
-//            FemUtilities.addMembraneStressForce(
-//               nodei.myInternalForce, 
-//               sigma, dv, dNs[i].x, dNs[i].y, invJ);
+            FemUtilities.addMembraneStressForce(
+               nodei.myInternalForce, 
+               sigma, dv, dNs[i].x, dNs[i].y, invJ);
             // DAN21
-            FemUtilities.addMembraneStressForceWithNormal(
-                nodei.myInternalForce, 
-                sigma, dv, dNs[i].x, dNs[i].y, invJ, t, Ns.get(i));
+//            FemUtilities.addMembraneStressForceWithNormal(
+//                nodei.myInternalForce, 
+//                sigma, dv, dNs[i].x, dNs[i].y, invJ, t, Ns.get(i));
             
             if (D != null) {
                if (bi != -1) {

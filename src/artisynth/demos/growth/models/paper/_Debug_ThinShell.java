@@ -1,26 +1,10 @@
 package artisynth.demos.growth.models.paper;
 
-import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.materials.FemMaterial;
-import artisynth.core.materials.LinearMaterial;
-import artisynth.core.materials.MooneyRivlinMaterial;
 import artisynth.core.materials.NeoHookeanMaterial;
-import artisynth.core.mechmodels.PointList;
 import artisynth.demos.growth.GrowChemical;
-import artisynth.demos.growth.GrowColorer;
 import artisynth.demos.growth.GrowModel3d;
 import artisynth.demos.growth.GrowNode3d;
-import artisynth.demos.growth.GrowRemesher;
-import artisynth.demos.growth.Morphogen2GrowthTensor;
-import artisynth.demos.growth.PlasticEmbedder;
-import artisynth.demos.growth.diffusion.Diffusion;
-import artisynth.demos.growth.diffusion.MeshChemicals;
-import artisynth.demos.growth.models.base.ShellPatch;
-import maspack.geometry.MeshFactory;
-import maspack.geometry.PolygonalMesh;
-import maspack.geometry.Vertex3d;
-import maspack.matrix.Point3d;
-import maspack.matrix.Vector3d;
 
 public class _Debug_ThinShell extends Basic_Base {
    
@@ -38,11 +22,11 @@ public class _Debug_ThinShell extends Basic_Base {
       
       //
       
-      mMeshX = 1;
+      mMeshX = 5;
       mMeshY = 1;
       
-      mMeshXDiv = 1;
-      mMeshYDiv = 1;
+      mMeshXDiv = 25;
+      mMeshYDiv = 5;
       
 //       mMeshX = 5;
 //       mMeshY = 1;

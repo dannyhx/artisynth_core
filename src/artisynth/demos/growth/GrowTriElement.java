@@ -39,9 +39,6 @@ public class GrowTriElement extends ShellTriElement {
     *  point of the element. (6 x numIntegPts). */
    protected MatrixNd mStrainAtIntegPts;
  
-   /** Indexed by 0,1,2 of element's corresponding polygonal mesh face. */
-   protected double[] mRestHingeAngles = new double[3];
-   
    
    
    /* --- Constructor --- */

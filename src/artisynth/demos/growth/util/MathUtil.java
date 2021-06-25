@@ -431,6 +431,36 @@ public class MathUtil {
       M.m10 = M.m01;
    }
    
+   public static double dihedralAngle(
+      Point3d edgeHead, Point3d edgeTail, Vector3d n0, Vector3d n1) 
+   {
+      Vector3d edge = new Vector3d(edgeHead).sub (edgeTail).normalize ();
+
+      Vector3d n0xn1 = new Vector3d(n0).cross (n1);
+      
+      double cosine = n0.dot (n1); 
+      double sine = n0xn1.dot (edge);
+      
+      double theta = Math.atan2 (sine, cosine);
+      return theta;
+   }
+   
+   /**
+    * Get the shortest distance between a point and an edge.
+    * 
+    * @param a Tail 
+    * @param a Head 
+    */
+   public static double distanceBetweenPointAndLine(Point3d x, Point3d a, Point3d b) {
+      Vector3d e = new Vector3d(b).sub (a);
+      Vector3d xa = new Vector3d(x).sub(a);
+      
+      Vector3d xp = new Vector3d(e).scale (e.dot (xa)/e.dot (e));
+      
+      Vector3d xa_xp = new Vector3d(xa).sub (xp);
+      return Math.max(xa_xp.norm (), 1e-3*e.norm());
+   }
+   
    /////////////
    // Average
    /////////////
@@ -561,6 +591,51 @@ public class MathUtil {
          return true;
       }
    }
+   
+   /**
+    * physics.cpp/barycentric_weights
+    * 
+    * @param a
+    * @param b
+    * @param c
+    * @return
+    */
+   public static Vector2d barycentricWeights(Point3d x, Point3d a, Point3d b) {
+      Vector3d e = new Point3d(b).sub (a);
+      Vector3d xa = new Point3d(x).sub (a);
+      
+      double t = e.dot (xa) / e.dot (e); 
+      
+      return new Vector2d(1-t, t);
+   }
+   
+   public static VectorNd matToVec_colMajor(DenseMatrixBase M) {
+      int m = M.rowSize();
+      int n = M.colSize();
+      
+      VectorNd V = new VectorNd(m*n);
+      
+      for (int i = 0; i < m; i++) { 
+         for (int j = 0; j < n; j++) {
+            V.set(i + j*m, M.get(i,j)); 
+         }
+      }
+      
+      return V; 
+   }
+   
+   public static MatrixNd vecToMat_colMajor(VectorNd V, int m, int n) {
+      MatrixNd M = new MatrixNd(m, n);
+      
+      for (int i = 0; i < m; i++) {
+         for (int j = 0; j < n; j++) {
+            M.set(i, j, V.get (i + j*m));
+         }
+      }
+      
+      return M; 
+   }
+
    
    ////////////////
    // Interpolation 

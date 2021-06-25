@@ -5,6 +5,7 @@ import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.IntegrationPoint3d;
 import artisynth.core.femmodels.ShellElement3d;
+import artisynth.demos.growth.thinshell.EdgeDataMap;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
 import maspack.render.Renderer;

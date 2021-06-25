@@ -13,6 +13,7 @@ import artisynth.core.femmodels.ShellTriElement;
 import artisynth.core.modelbase.ModelComponent;
 import artisynth.core.modelbase.ModelComponentBase;
 import artisynth.demos.growth.GrowIntegrationData3d;
+import artisynth.demos.growth.def.NeighborElement;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
@@ -342,4 +343,6 @@ public class ShellUtil {
       String idxStr = comp.getName ().substring (prefix.length ());
       return Integer.parseInt (idxStr);
    }
+   
+
 }

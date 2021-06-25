@@ -21,49 +21,45 @@ public class HingeUtil {
    
    public static Matrix3d computeMembraneStrain(ShellTriElement ele) {
       Vector3d eleNOR = ShellUtil.getNormal (ele, false);
-      Matrix2d eleStrain = new Matrix2d();
+      Matrix3d eleStrain = new Matrix3d();
 
       // For each of the 3 adjacent faces of the element, 
       // calculate the edge lengths and t vectors.
       
+      NeighborElement[] adjFaces = HingeUtil.adjacentFaces (ele);
+      
       double[] ls = new double[3];
       double[] lrs = new double[3];
-      Vector2d[] ts = new Vector2d[3];
+      Vector3d[] ts = new Vector3d[3];
       
       int e = 0;
-      for (NeighborElement neigh : HingeUtil.adjacentFaces (ele)) {
+      for (NeighborElement neigh : adjFaces) {
          // 2 nodes of the edge.
          FemNode3d nodeH = neigh.edgeNodes[0];
          FemNode3d nodeT = neigh.edgeNodes[1];
          Point3d nodeHPos = nodeH.getLocalPosition ();
          Point3d nodeTPos = nodeT.getLocalPosition (); 
-         Point3d nodeHPosRest = nodeH.getRestPosition ();
-         Point3d nodeTPosRest = nodeT.getRestPosition (); 
          
          // Edge vector and length.
          Vector3d edgeVec = new Vector3d(nodeHPos).sub (nodeTPos);
-         Vector3d edgeVecRest = new Vector3d(nodeHPosRest).sub (nodeTPosRest);
+         Vector3d edgeVecRest = new Vector3d(
+            nodeH.getRestPosition ()).sub (nodeT.getRestPosition ());
          double l = edgeVec.norm(); 
          double lr = edgeVecRest.norm (); 
          
-         // t vector. Perpendicular to triangle normal and edge. Use
-         // world-space coordinates, which dictate the force directions.
-         Vector3d edgeVecUnit = new Vector3d(edgeVec).normalize();
-         Point3d edgeCenter = (Point3d)new Point3d(nodeTPos).
-            scaledAdd (0.5, edgeVec);
-         Vector3d t = new Vector3d(eleNOR).cross(edgeVecUnit); 
-         HingeUtil.ensureExteriorVecT (ele, edgeCenter, t, false);
+         Vector3d t = HingeUtil.computeVecT (
+            ele, eleNOR, edgeVec, nodeTPos, false);
 
          // Append results.
          ls[e] = l;
          lrs[e] = lr;
-         ts[e] = new Vector2d(t.x, t.y);
+         ts[e] = new Vector3d(t.x, t.y, 0);
          
          e++;
       }
       
       e = 0;
-      for (NeighborElement neigh : HingeUtil.adjacentFaces (ele)) {
+      for (NeighborElement neigh : adjFaces) {
          FemNode3d nodeH = neigh.edgeNodes[0];
          FemNode3d nodeT = neigh.edgeNodes[1];
          int h = ShellUtil.getIndex (nodeH);
@@ -71,20 +67,17 @@ public class HingeUtil {
          
          double s = lrs[e] * lrs[e] - ls[e] * ls[e];
          
-         Vector2d tj = ts[(e+1) % 3];
-         Vector2d tk = ts[(e+2) % 3];
+         Vector3d tj = ts[(e+1) % 3];
+         Vector3d tk = ts[(e+2) % 3];
          
-         Matrix2d op1 = new Matrix2d();
+         Matrix3d op1 = new Matrix3d();
          op1.outerProduct (tj, tk);
          
-         Matrix2d op2 = new Matrix2d();
+         Matrix3d op2 = new Matrix3d();
          op2.outerProduct (tk, tj);
          
-         Matrix2d opSum = new Matrix2d(); 
-         opSum.add (op1);
-         opSum.add (op2);
-         
-         eleStrain.scaledAdd (s, opSum);
+         eleStrain.scaledAdd (s, op1);
+         eleStrain.scaledAdd (s, op2);
          
          e++;
       }
@@ -92,15 +85,13 @@ public class HingeUtil {
       double area = ShellUtil.area(ele.getNodes (), true); 
       eleStrain.scale (1./(8*area*area));
       
-      Matrix3d eleStrain3d = new Matrix3d();
-      eleStrain3d.setSubMatrix (0, 0, eleStrain);
-      
-      return eleStrain3d;
+      return eleStrain;
    }
    
    public static Matrix3d computeBendingStrain(ShellTriElement ele) {
-      Vector3d eleNORWorld = ShellUtil.getNormal(ele, false);
-      Vector3d eleNORRest = ShellUtil.getNormal (ele, true);
+      Vector3d eleNOR = ShellUtil.getNormal(ele, false);
+      Vector3d eleNORRest = ShellUtil.getNormal(ele, true);
+      
       Matrix3d eleStrain = new Matrix3d();
       
       // For each of the 3 adjacent faces of the element.
@@ -112,57 +103,67 @@ public class HingeUtil {
          // 2 nodes of the edge.
          FemNode3d nodeH = neigh.edgeNodes[0];
          FemNode3d nodeT = neigh.edgeNodes[1];
-         Point3d nodeHPosRest = nodeH.getRestPosition ();
-         Point3d nodeTPosRest = nodeT.getRestPosition ();
+         Point3d nodeHPos = nodeH.getPosition ();
+         Point3d nodeTPos = nodeT.getPosition ();
          
          // Adjacent face.
          ShellTriElement oEle = neigh.ele;
-         Vector3d oEleNORWorld = ShellUtil.getNormal (oEle, false);
+         Vector3d oEleNOR = ShellUtil.getNormal (oEle, false);
          Vector3d oEleNORRest = ShellUtil.getNormal (oEle, true);
          
-         // Average normal of the 2 faces.
-         Vector3d edgeNormalRestUnit = new Vector3d(eleNORRest).add(oEleNORRest).normalize ();
-         
          // Edge direction.
-         Vector3d edgeVecRest = new Vector3d(nodeHPosRest).sub (nodeTPosRest);
-         Vector3d edgeVecRestUnit = new Vector3d(edgeVecRest).normalize ();
+         Vector3d edgeVec = new Vector3d(nodeHPos).sub (nodeTPos);
          
          // Perpendicular of the average normal and edge direction. 
-         Vector3d t = new Vector3d().cross (edgeNormalRestUnit, edgeVecRestUnit);
-         t.normalize ();
-         
-         // Perpendicular should point away from triangle.
-         Point3d edgeCenterRest = (Point3d) new Point3d(nodeTPosRest).
-            scaledAdd (0.5, edgeVecRest);
-         HingeUtil.ensureExteriorVecT (ele, edgeCenterRest, t, true);
+         Vector3d t = HingeUtil.computeVecT (
+            ele, eleNOR, edgeVec, nodeTPos, false);
+         t.z = 0;
                                  
          // t outer product.
-         Matrix3d txtt = new Matrix3d(); 
-         txtt.outerProduct (t, t);
+         Matrix3d edgeStrain = new Matrix3d(); 
+         edgeStrain.outerProduct (t, t);
   
          // Calculate angle between the two normals in world space.
-         double ang = eleNORWorld.angle (oEleNORWorld);
+         double ang = eleNOR.angle (oEleNOR);
+         double angRest = eleNORRest.angle (oEleNORRest);
+//         System.out.printf ("Angle: %.2f, RestAngle: %.2f\n", ang * Math.PI, angRest * Math.PI);
          
          // Monotonic function. 
          double phi = 2 * Math.tan (ang);
+         double phiRest = 2 * Math.tan (angRest);
+         
+         double deltaPhi = phiRest - phi;
+//         System.out.printf ("DeltaPhi: %.2f\n", deltaPhi);
             
          // Edge strain.
-         Matrix3d edgeStrain = new Matrix3d();
-         edgeStrain.scaledAdd (phi, txtt);
-         edgeStrain.scale (1 / edgeVecRest.norm ());
+         edgeStrain.scale (deltaPhi * (1 / edgeVec.norm ()));
          
          // Add edge strain to element strain.
          eleStrain.add (edgeStrain);
       }
       
-      double eleAreaRest = ShellUtil.area(ele.getNodes (), true);
-      eleStrain.scale (0.5 * (1./eleAreaRest));
+      double eleArea = ShellUtil.area(ele.getNodes (), true);
+      eleStrain.scale (0.5 * (1./eleArea));
+      
+      eleStrain.mul (eleNOR);
       
       return eleStrain;
    }
    
+   protected static Vector3d computeVecT(
+      ShellTriElement ele, Vector3d nrm, Vector3d edgeVec, Point3d edgeNodeTPos, 
+      boolean isRest) 
+   {
+      Vector3d edgeVecUnit = new Vector3d(edgeVec).normalize();
+      Point3d edgeCenter = (Point3d)new Point3d(edgeNodeTPos).
+         scaledAdd (0.5, edgeVec);
+      Vector3d t = new Vector3d(nrm).cross(edgeVecUnit); 
+      HingeUtil.ensureExteriorVecT (ele, edgeCenter, t, isRest);
 
-   public static void ensureExteriorVecT(
+      return t; 
+   }
+
+   protected static void ensureExteriorVecT(
       ShellTriElement ele, Point3d edgeCenter, Vector3d t, boolean isRest) 
    {
       Point3d centroid = ShellUtil.getCentroid (ele, isRest);
@@ -202,6 +203,10 @@ public class HingeUtil {
       ShellTriElement ele, FemNode3d n1, FemNode3d n2) 
    {
       for (ShellElement3d adjEle : n1.getAdjacentShellElements ()) {
+         if (adjEle == ele) {
+            continue;
+         }
+         
          int numSharedNodes = 0;
          for (FemNode3d adjNode : adjEle.getNodes ()) {
             if (adjNode == n1 || adjNode == n2) {

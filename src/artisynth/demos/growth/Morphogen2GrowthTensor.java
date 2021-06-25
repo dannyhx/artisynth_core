@@ -396,7 +396,7 @@ public class Morphogen2GrowthTensor {
             // Perpendicular should point away from triangle.
             Point3d edgeCenter = (Point3d) new Point3d(nodeTPos).
                scaledAdd (0.5, edgeVec);
-            HingeUtil.ensureExteriorVecT (gEle, edgeCenter, t, useRest);
+//            HingeUtil.ensureExteriorVecT (gEle, edgeCenter, t, useRest);
                                     
             Matrix3d txtt = new Matrix3d(); 
             txtt.outerProduct (t, t);

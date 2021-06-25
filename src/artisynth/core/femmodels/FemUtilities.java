@@ -883,6 +883,8 @@ public class FemUtilities {
       
       Vector3d gradMu = new Vector3d();
       gradMu.scaledAdd (1+t, gradM);
+      
+      // Z-component.
 //      gradMu.scaledAdd (N, gct2);
 //      gradMu.scale (0.5);
       

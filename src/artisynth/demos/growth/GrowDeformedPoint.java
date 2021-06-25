@@ -34,13 +34,13 @@ public class GrowDeformedPoint extends FemDeformedPoint {
       myDetF = myF.determinant ();
       
       // DAN21
-      if (elem.getElementClass () == ElementClass.MEMBRANE) {
-         Matrix3d E = HingeUtil.computeStrain ((ShellTriElement)elem);
-         E.setSymmetric (E);
-         myF.setIdentity ();
-         myF.add(E); 
-         myDetF = myF.determinant ();
-      }
+//      if (elem.getElementClass () == ElementClass.MEMBRANE) {
+//         Matrix3d E = HingeUtil.computeStrain ((ShellTriElement)elem);
+//         E.setSymmetric (E);
+//         myF.setIdentity ();
+//         myF.add(E); 
+//         myDetF = myF.determinant ();
+//      }
    }
 
    public void setFromRestPoint (

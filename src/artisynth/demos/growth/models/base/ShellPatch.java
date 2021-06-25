@@ -11,6 +11,8 @@ import artisynth.core.gui.ControlPanel;
 import artisynth.core.materials.LinearMaterial;
 import artisynth.core.mechmodels.MechModel;
 import artisynth.core.workspace.RootModel;
+import artisynth.demos.growth.thinshell.EdgeDataMap;
+import artisynth.demos.growth.thinshell.ThinShellAux;
 import maspack.geometry.Face;
 import maspack.geometry.MeshFactory;
 import maspack.geometry.PolygonalMesh;
@@ -192,6 +194,12 @@ public class ShellPatch extends RootModel {
             ele.setName ("MyEle_#" + f);
             mFemModel[m].addShellElement(ele);
          }
+         
+         if (this.m_isMembrane) {
+            mFemModel[m].myEdgeDataMap = EdgeDataMap.createFromMesh (mMesh[m]);
+            mFemModel[m].myThinShellAux = new ThinShellAux(mFemModel[m], mMesh[m]);
+         }
+
          
          mMechModel.addModel (mFemModel[m]);
       }

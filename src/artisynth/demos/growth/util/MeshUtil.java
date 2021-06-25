@@ -443,18 +443,6 @@ public class MeshUtil {
       return null;
    }
    
-   public static Vertex3d getOppositeVertex(HalfEdge boundaryEdge) {
-      Face boundaryFace = boundaryEdge.getFace ();
-      for (int e = 0; e < 3; e++) {
-         HalfEdge curEdge = boundaryFace.getEdge (e);
-         if (curEdge == boundaryEdge) {
-            continue;
-         }
-         return getOtherVertex(boundaryEdge, curEdge);
-      }
-      return null;
-   }
-   
    public static HalfEdge getOtherEdge(HalfEdge he, Face face) {
       if (he.getFace ().idx == face.idx) {
          return he.opposite;
