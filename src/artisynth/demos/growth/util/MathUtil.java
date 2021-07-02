@@ -25,6 +25,30 @@ public class MathUtil {
 
    public static final double ELIPSON = 1e-6;
    
+   public static void max(DenseMatrixBase A, DenseMatrixBase B, DenseMatrixBase C) {
+      int m = A.rowSize();   
+      int n = B.colSize();  
+      
+      if (B.rowSize () != m || B.colSize() != n) { 
+         throw new RuntimeException(
+            "Matrices A and B do not have matching dimensions.");
+      }
+      
+      if (C.rowSize () != m || C.colSize() != n) { 
+         throw new RuntimeException(
+            "Matrices A and C do not have matching dimensions.");
+      }
+      
+      for (int r = 0; r < m; r++) {
+         for (int c = 0; c < n; c++) {
+            double a = A.get (r, c);
+            double b = B.get (r, c);
+            
+            C.set(r, c, Math.max(a,b));
+         }
+      }
+   }
+   
    public static boolean isInRange(double x, double min, double max) {
       return (x > min && x < max); 
    }
@@ -96,6 +120,21 @@ public class MathUtil {
             mtx.set (r,c, a[r]*b[c] );
          }
       }
+   }
+   
+   public static MatrixNd outerProduct(VectorNd a, VectorNd b) {
+      MatrixNd M = new MatrixNd(a.size (), b.size());
+      
+      double[] aBuf = a.getBuffer ();
+      double[] bBuf = b.getBuffer ();
+      
+      if (aBuf.length != a.size () || bBuf.length != b.size ()) {
+         throw new RuntimeException("Unexpected buffer size.");
+      }
+      
+      MathUtil.outerProduct (aBuf, bBuf, M);
+      
+      return M;
    }
    
    public static double[] toArray(VectorBase vec) {
@@ -636,6 +675,23 @@ public class MathUtil {
       return M; 
    }
 
+   public static MatrixNd kronecker(DenseMatrixBase A, DenseMatrixBase B) {
+      int m = A.rowSize();
+      int n = A.colSize();
+      
+      int p = B.rowSize();
+      int q = B.colSize();
+      
+      MatrixNd C = new MatrixNd(m*p, n*q);
+      
+      for (int i = 0; i < m; i++)
+         for (int j = 0; j < n; j++)
+             for (int k = 0; k < p; k++)
+                 for (int l = 0; l < q; l++)
+                    C.set(i*p+k, j*q+l, A.get(i,j) * B.get(k,l));
+      
+      return C;
+   }
    
    ////////////////
    // Interpolation 
