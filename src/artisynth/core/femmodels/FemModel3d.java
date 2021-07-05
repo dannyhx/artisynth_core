@@ -2891,7 +2891,8 @@ PointAttachable, ConnectableBody {
             computeShellStressAndStiffness(e, mat, amats, D);
          }
          else {
-            computeMembraneStressAndStiffness(e, mat, amats, D);
+            if (myThinShellAux == null) 
+               computeMembraneStressAndStiffness(e, mat, amats, D);
          }
          if (checkTangentStability) {
             double s = checkMatrixStability(D);
@@ -2903,6 +2904,7 @@ PointAttachable, ConnectableBody {
       }     
       
       if (myThinShellAux != null) {
+         myThinShellAux.addStretchingForceAndStiffness ();
          myThinShellAux.addBendingForceAndStiffness ();
       }
 

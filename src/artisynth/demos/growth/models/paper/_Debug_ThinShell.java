@@ -5,6 +5,7 @@ import artisynth.core.materials.NeoHookeanMaterial;
 import artisynth.demos.growth.GrowChemical;
 import artisynth.demos.growth.GrowModel3d;
 import artisynth.demos.growth.GrowNode3d;
+import maspack.geometry.PolygonalMesh;
 
 public class _Debug_ThinShell extends Basic_Base {
    
@@ -13,8 +14,8 @@ public class _Debug_ThinShell extends Basic_Base {
       
       m_isMembrane = true;
       
-      mEnableDiffusion = false;
-      mEnableGrowth = false; 
+      mEnableDiffusion = true;
+      mEnableGrowth = true; 
       mEnableRemesh = false; 
       mEnablePlasticEmbedding = false; 
       
@@ -22,17 +23,19 @@ public class _Debug_ThinShell extends Basic_Base {
       
       //
       
-      mMeshX = 5;
-      mMeshY = 1;
+//      mMeshX = 25;
+//      mMeshY = 5;
+//      
+//      mMeshXDiv = 25;
+//      mMeshYDiv = 5;
       
-      mMeshXDiv = 25;
-      mMeshYDiv = 5;
+       mMeshX = 1;
+       mMeshY = 1;
+       
+       mMeshXDiv = 1;
+       mMeshYDiv = 1;
       
-//       mMeshX = 5;
-//       mMeshY = 1;
-//       
-//       mMeshXDiv = 25;
-//       mMeshYDiv = 5;
+      morphogenSrcDuration = 0.01;
       
       //
       
@@ -54,8 +57,8 @@ public class _Debug_ThinShell extends Basic_Base {
    
 //   protected void build_modelSkeleton() {
 //      mMesh = new PolygonalMesh[M];
-//      
 //      PolygonalMesh m = new PolygonalMesh();
+//      
 //      m.addVertex (0, 0, 0); 
 //      m.addVertex (1, 0, 0); 
 //      m.addVertex (1, 1, 0);
@@ -113,7 +116,7 @@ public class _Debug_ThinShell extends Basic_Base {
       for (int v = 0; v < mMesh[0].numVertices (); v++) {
          if ( isMorphogenSrcNode(v) && t0 < morphogenSrcDuration) {
             GrowNode3d gNode = (GrowNode3d)mFemModel[0].getNode (v);
-            gNode.mChems.set (GrowChemical.PAR.mIdx, 20);
+            gNode.mChems.set (GrowChemical.PER.mIdx, 0.5);
          }
       }
    }

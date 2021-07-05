@@ -661,7 +661,7 @@ public class GrowDemo extends ShellPatch {
             mMorphogen2GrowthTensor.updatePolarityDirection(mPolDir);
             mMorphogen2GrowthTensor.activateFractionOfMorphogen (mChemCvtRate, 
                mIsActivatePAR, mIsActivatePER, mIsActivateNOR);
-            mMorphogen2GrowthTensor.computeIntegrationGrowthTensors ();
+            mMorphogen2GrowthTensor.computeGrowthTensors ();
             mMorphogen2GrowthTensor.applyGrowthTensors (); 
             mMorphogen2GrowthTensor.clearActivatedMorphogen ();   
          }

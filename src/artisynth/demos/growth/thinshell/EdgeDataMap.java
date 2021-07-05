@@ -85,11 +85,11 @@ public class EdgeDataMap {
    
    //
    
-   protected static boolean isRealHalfEdge(HalfEdge edge) {
+   public static boolean isRealHalfEdge(HalfEdge edge) {
       return (edge.head.getIndex () < edge.tail.getIndex ()); 
    }
    
-   protected static HalfEdge getRealHalfEdge(HalfEdge edge) {
+   public static HalfEdge getRealHalfEdge(HalfEdge edge) {
       if (edge.opposite != null && 
           edge.head.getIndex () > edge.tail.getIndex ()) 
       {

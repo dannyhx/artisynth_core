@@ -4,7 +4,10 @@ import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.FemElement.ElementClass;
+import artisynth.demos.growth.thinshell.EdgeDataMap;
+import artisynth.demos.growth.thinshell.EdgeDataMap.EdgeData;
 import artisynth.demos.growth.util.HingeUtil;
+import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
@@ -155,6 +158,10 @@ public class Morphogen2GrowthTensor {
    /**
     * For each element, compute its growth tensor, which is dependent on
     * the morphogen concentration of its nodes.
+    * 
+    * Growth tensor: M[i][j]
+    * i => PAR, PER, NOR 
+    * j => node index.
     */
    protected void createElementGrowthTensors() {
       for (ShellElement3d ele : mFemModel.getShellElements ()) {
@@ -242,6 +249,9 @@ public class Morphogen2GrowthTensor {
    /**
     * For each element, interpolate its rotated growth tensor to the 
     * each integration point.
+    * 
+    * This is only required for solid-shells, or more generally, 
+    * non-reduced elements.
     */
    protected void interpolateElementGrowthTensors() {
       for (ShellElement3d ele : mFemModel.getShellElements ()) {
@@ -263,18 +273,14 @@ public class Morphogen2GrowthTensor {
    }
    
    /** Convenient method to calculate integration growth tensors. */
-   public void computeIntegrationGrowthTensors() {
+   public void computeGrowthTensors() {
       createFrames();
-      
-      if (isBendingMorphogenHack && 
-      mFemModel.getShellElement (0).getElementClass () == ElementClass.MEMBRANE) {
-         createElementBendingGrowthTensors();
-      } else {
-         createElementGrowthTensors();
-      }
-      
+      createElementGrowthTensors();
       rotateElementGrowthTensors();
-      interpolateElementGrowthTensors();
+      
+      if (mFemModel.myThinShellAux == null) {
+         interpolateElementGrowthTensors();
+      }
    }
    
    
@@ -290,32 +296,53 @@ public class Morphogen2GrowthTensor {
       for (ShellElement3d ele : mFemModel.getShellElements ()) {
          GrowTriElement gEle = (GrowTriElement) ele;
          
-         GrowIntegrationData3d[] idata = gEle.getIntegrationData ();
-                                     
-         if (gEle.getPlasticDeformation () == null) {
-            gEle.setPlasticDeformation (Matrix3d.IDENTITY);
-         }
-         
-         for (int k = 0; k < idata.length; k++) {
-            // Convert stored strain 6-vector into 3x3 sym strain matrix.
-    
-            double[] strainVect = new double[numStrainComp()];
-            gEle.mStrainAtIntegPts.getColumn (k, strainVect);
-            
-            Matrix3d strainMtx = vecToMtx3d(strainVect);
-            
-            // Custom
-            if (isBendingMorphogenHack && k < 3) {
-               // ok
-            } 
-            else if (isBendingMorphogenHack && k < 6) {
-               strainMtx.setZero ();
-            } 
-            else if (isBendingMorphogenHack) {
-               strainMtx.negate ();
+         if (mFemModel.myThinShellAux == null) {
+            GrowIntegrationData3d[] idata = gEle.getIntegrationData ();
+            for (int k = 0; k < idata.length; k++) {
+               // Convert stored strain 6-vector into 3x3 sym strain matrix.
+       
+               double[] strainVect = new double[numStrainComp()];
+               gEle.mStrainAtIntegPts.getColumn (k, strainVect);
+               
+               Matrix3d strainMtx = vecToMtx3d(strainVect);
+               
+               // Custom
+               if (isBendingMorphogenHack && k < 3) {
+                  // Apply strain as usual to top-surface.
+               } 
+               else if (isBendingMorphogenHack && k < 6) {
+                  // Do not apply strain to mid-surface.
+                  strainMtx.setZero ();
+               } 
+               else if (isBendingMorphogenHack) {
+                  // Negate strain to bottom-surface to simulate bending.
+                  strainMtx.negate ();
+               }
+               
+               idata[k].addFp (strainMtx);
+            }
+         } else {
+            if (gEle.getPlasticDeformation () == null) {
+               gEle.setPlasticDeformation (Matrix3d.IDENTITY);
             }
             
-            idata[k].addFp (strainMtx);
+            // Average the strain across the nodes, and consider that as the
+            // element's strain.
+            
+            Matrix3d avgStrain = new Matrix3d(); 
+            double[] S = new double[numStrainComp()];
+            for (int n = 0; n < gEle.numNodes (); n++) {
+               gEle.mRotatedElementGrowthStrains.getRow (n,S); 
+               Matrix3d nodeStrain = vecToMtx3d (S);
+               avgStrain.add(nodeStrain); 
+            }
+            avgStrain.scale(1.0 / gEle.numNodes ());
+            
+            if (isBendingMorphogenHack) {
+               this._applyGrowthTensorAsBendingStrain (gEle, avgStrain);
+            } else {
+               gEle.getPlasticDeformation().add(avgStrain);
+            }
          }
       }
       
@@ -344,123 +371,55 @@ public class Morphogen2GrowthTensor {
    
    /* --- Membrane Bending --- */
    
-   protected void createElementBendingGrowthTensors() {
-      int eleIdx = 0;
-      for (ShellElement3d ele : mFemModel.getShellElements ()) {
-         GrowTriElement gEle = (GrowTriElement) ele;
-         
-         int f = Integer.valueOf (gEle.getName ().substring (gEle.getName ().length () - 1));
-         Face face = mMesh.getFace (f);
-         
-         boolean useRest = true;
-         
-         Vector3d elePAR = new Vector3d(gEle.mPolDir).normalize ();
-         Vector3d eleNOR = ShellUtil.getNormal (gEle, useRest);
-         Vector3d elePER = new Vector3d().cross (eleNOR, elePAR).normalize ();
+   protected void _applyGrowthTensorAsBendingStrain(
+      GrowTriElement gEle, Matrix3d strain)
+   {
+      int f = Integer.valueOf (gEle.getName ().substring (gEle.getName ().length () - 1));
+      Face face = mMesh.getFace (f);
+      
+      Vector3d elePAR = new Vector3d(gEle.mPolDir).normalize ();
+      Vector3d eleNOR = ShellUtil.getNormal (gEle, true);
+      Vector3d elePER = new Vector3d().cross (eleNOR, elePAR).normalize ();
 
-         MatrixNd eleStrain = new MatrixNd(gEle.numNodes (), GrowChemical.NUM_TYPES);
+      // For each of the 3 adjacent faces of the element.
+      for (int e = 0; e < 3; e++) {
+         HalfEdge edge = face.getEdge (e);
          
-         // For each of the 3 adjacent faces of the element.
-         for (int e = 0; e < 3; e++) {
-            HalfEdge edge = face.getEdge (e);
-            
-            if (edge.opposite == null) {
-               continue;
-            }
-            
-            // 2 nodes of the edge.
-            Vertex3d vtxH = edge.getHead ();
-            Vertex3d vtxT = edge.getTail ();
-            GrowNode3d nodeH = (GrowNode3d)mFemModel.getNode (vtxH.getIndex ()); 
-            GrowNode3d nodeT = (GrowNode3d)mFemModel.getNode (vtxT.getIndex ());
-            Point3d nodeHPos = ShellUtil.getPosition (nodeH, true, !useRest);
-            Point3d nodeTPos = ShellUtil.getPosition (nodeT, true, !useRest);
-            
-            // Adjacent face.
-            int oFace = edge.getOppositeFace ().getIndex (); 
-            GrowTriElement oEle = (GrowTriElement) this.mFemModel.getShellElement (oFace);
-            Vector3d oEleNOR = ShellUtil.getNormal (oEle, useRest);
-            
-            // Average normal of the 2 faces.
-            Vector3d edgeNormalUnit = new Vector3d(eleNOR).add(oEleNOR).normalize ();
-            
-            // Edge direction.
-            Vector3d edgeVec = new Vector3d(nodeHPos).sub (nodeTPos);
-            Vector3d edgeVecUnit = new Vector3d(edgeVec).normalize ();
-            
-            // Perpendicular of the average normal and edge direction. 
-            
-            Vector3d t = new Vector3d().cross (edgeNormalUnit, edgeVecUnit);
-            t.normalize ();
-            
-            // Perpendicular should point away from triangle.
-            Point3d edgeCenter = (Point3d) new Point3d(nodeTPos).
-               scaledAdd (0.5, edgeVec);
-//            HingeUtil.ensureExteriorVecT (gEle, edgeCenter, t, useRest);
-                                    
-            Matrix3d txtt = new Matrix3d(); 
-            txtt.outerProduct (t, t);
-     
-            // Compute scaler of outer product.
-            
-            // Simulate hinge strain existence.
-            // PAR morphogen will only affect edges that are parallel 
-            // with mPolDir.
-            // PER morphogen will only affect edges that are parallel 
-            // with cross-product of mPolDir and element's normal.
-            
-            double alignPctPAR = Math.abs (t.dot (elePAR));
-            double alignPctPER = Math.abs (t.dot (elePER));
-            alignPctPER = 0;
-            
-            double chemPAR_H = nodeH.getGrowChem (GrowChemical.PAR);
-            double chemPER_H = nodeH.getGrowChem (GrowChemical.PER); 
-            
-            double chemPAR_T = nodeT.getGrowChem (GrowChemical.PAR);
-            double chemPER_T = nodeT.getGrowChem (GrowChemical.PER); 
-            
-            // Simulated angle offset.
-            double chemAngPAR = alignPctPAR * (chemPAR_H + chemPAR_T);
-            double chemAngPER = alignPctPER * (chemPER_H + chemPER_T);
-            double chemAng = (chemAngPAR + chemAngPER) / 180;
-            
-            // Pass angle offset to monotonic function.
-            double phi = 2 * Math.tan (chemAng);
-            
-            System.out.printf ("t vector for edge (%s, %s): %s. AlignPctPAR/PER: %.2f, %.2f\n", 
-               gEle.getName (), 
-               oEle.getName (),
-               t.toString ("%.2f"), 
-               alignPctPAR, 
-               alignPctPER
-            );
-
-            
-            Matrix3d edgeStrain = new Matrix3d();
-            edgeStrain.scaledAdd (phi, txtt);
-            edgeStrain.scale (1 / edgeVec.norm ());
-            
-            // Sum
-            eleStrain.add (edgeStrain);
+         if (edge.opposite == null) {
+            continue;
          }
          
-         // Scale the strain
+         // 2 nodes of the edge.
+         Vertex3d vH = edge.getHead ();
+         Vertex3d vT = edge.getTail ();
+         GrowNode3d nH = (GrowNode3d)mFemModel.getNode (vH.getIndex ()); 
+         GrowNode3d nT = (GrowNode3d)mFemModel.getNode (vT.getIndex ());
+         Point3d uH = nH.getRestPosition ();
+         Point3d uT = nT.getRestPosition ();
          
-         double area = gEle.getArea ();
-         eleStrain.scale (0.5 * area); 
+         // Edge direction.
+         Vector3d edgeDir = new Vector3d(uH).sub (uT);
+         edgeDir.normalize ();
          
-         // Save.
-  
-         if (eleIdx == 1) {
-//            eleStrain.setZero ();
-         } else {
-
-         }
-
+         // How much does X and Y axes align with edge's direction?
+         // 0.0 to 1.0.
+         double alignPctX = parallelFrac(edgeDir, Vector3d.X_UNIT);
+         double alignPctY = parallelFrac(edgeDir, Vector3d.Y_UNIT);
          
-         gEle.mElementGrowthTensor = eleStrain; 
-           
-         eleIdx++;
+         double concX = Math.max(0, strain.get (0, 0));
+         double concY = Math.max(0, strain.get (1, 1));
+         
+         // 1 concentration = PI/2 radians.
+         
+         double angleInc = 0;
+         angleInc += alignPctX * concX * (Math.PI/2);
+         angleInc += alignPctY * concY * (Math.PI/2);
+         angleInc /= 2.0; // Opposite edge will also contribute.
+         
+         EdgeData edgeData = this.mFemModel.myEdgeDataMap.get (edge);
+         edgeData.mRestTheta += angleInc;
+         
+//         System.out.printf ("mRestTheta: %.2f, concX: %.2f\n", edgeData.mRestTheta, concX);
       }
    }
 
@@ -508,6 +467,30 @@ public class Morphogen2GrowthTensor {
       return mIntegExtrapolationMatrixCache;
    }
    
+   /** 
+    * From 0 to 1, how parallel are the two vectors?
+    */
+   protected double parallelFrac(Vector3d A, Vector3d B) {
+      // -PI to PI
+      double ang = MathUtil.vectorPairAngle (A, B);
+      
+      // 0 to PI
+      // 0    -> PI/2 (parallel to perpendicular).
+      // PI/2 -> PI   (perpendicular to parallel).
+      ang = Math.abs(ang);
+      
+      // 0 -> PI/2 (perpendicular to parallel)
+      if (ang < Math.PI/2) {
+         ang = Math.PI/2 - ang; 
+      } else {
+         ang = ang - Math.PI/2;
+      }
+      
+      // 0 to 1 scale.
+      ang = ang / (Math.PI/2); 
+      
+      return ang; 
+   }
    
    /* --- Test --- */
    

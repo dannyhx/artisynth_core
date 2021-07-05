@@ -19,9 +19,17 @@ public class MathUtilTest {
       System.out.println (vec2d);
    }
    
+   protected void test_vectorAnglePair() {
+      Vector3d A = new Vector3d(1,0,0);
+      Vector3d B = new Vector3d(0.49,-0.49,0);
+      
+      double ang = MathUtil.vectorPairAngle(A,B);
+      
+      System.out.println (ang * (180/Math.PI));
+   }
    
    public static void main(String[] args) {
       MathUtilTest t = new MathUtilTest();
-      t.test_trianglePointTo2D ();
+      t.test_vectorAnglePair ();
    }
 }

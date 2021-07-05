@@ -54,7 +54,7 @@ public class _Debug_Diffusion_Main extends _Debug_Diffusion_Base {
          // Convert morphogen to strain
          mMorphogen2GrowthTensor.activateFractionOfMorphogen (0.1, 
             mIsActivatePAR, mIsActivatePER, mIsActivateNOR);
-         mMorphogen2GrowthTensor.computeIntegrationGrowthTensors ();
+         mMorphogen2GrowthTensor.computeGrowthTensors ();
          mMorphogen2GrowthTensor.applyGrowthTensors (); 
          
          // Remesh 

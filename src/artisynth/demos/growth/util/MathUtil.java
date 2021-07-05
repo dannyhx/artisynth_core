@@ -391,7 +391,7 @@ public class MathUtil {
       double b_c = b.distance (c);
       
       double minLen = min(min(a_b, a_c),b_c);
-      double maxLen = max(max(a_b, a_c),b_c);
+      double maxLen = Math.max(Math.max(a_b, a_c),b_c);
       
       return maxLen / minLen;
    }
@@ -482,6 +482,13 @@ public class MathUtil {
       
       double theta = Math.atan2 (sine, cosine);
       return theta;
+   }
+   
+   public static double vectorPairAngle(Vector3d A, Vector3d B) {
+      double dot = A.dot (B); 
+      Vector3d cross = new Vector3d(A).cross (B);
+      
+      return Math.atan2(cross.norm (), dot);
    }
    
    /**
@@ -724,11 +731,11 @@ public class MathUtil {
    }
 
    public static void main(String[] args) {
-      Vector3d A = new Vector3d(-0.23,-0.88,2);
-      Vector3d B = new Vector3d(-1,0,0);
+      Vector3d A = new Vector3d(1,0,0);
+      Vector3d B = new Vector3d(0,1,0);
       
-      Vector3d C = vectorProjection (A, B);
+      double ang = vectorPairAngle(A,B);
       
-      System.out.println (C);
+      System.out.println (ang *Math.PI);
    }
 }

@@ -85,9 +85,9 @@ public class ThinShellAux {
    protected void initAltMaterial(String matName) {
       if (matName == "default") {
          // elastic modulus
-         double Y = 1e4;
-         double thickness = 1e-4;
-         this.mAltPoisson = 0;
+         double Y = 1e6;  
+         double thickness = 1e-2;  // 1e-2 for working bending
+         this.mAltPoisson = 0.25;
          
          double A = Y / (1 - Math.pow(this.mAltPoisson, 2));
          this.mAltStretching = A * thickness;
@@ -345,8 +345,13 @@ public class ThinShellAux {
          nodes[2].getPosition ()
       };
       
-      Matrix3d Fg = ele.getPlasticDeformation ();
-      F.mul (Fg);
+      // 1 - (Fg - 1) = Simulated Deformation.
+      Matrix3d E = new Matrix3d(Matrix3d.IDENTITY);
+      E.scale (2);
+      E.sub (ele.getPlasticDeformation ());
+      
+      // F * E (i.e. F * Fg)
+      F.mul (E);
       
       Matrix3d G = new Matrix3d();
       G.mulTransposeLeft (F, F);
@@ -354,15 +359,13 @@ public class ThinShellAux {
       G.scale(0.5);
       
       Matrix3d Y = new Matrix3d();
-      Y.mul(invDm, Fg);
+      Y.mul(invDm, E);
       
       // Rows of Y.
       Vector3d Yr0 = new Vector3d();
       Vector3d Yr1 = new Vector3d();
-      Vector3d Yr2 = new Vector3d();
       Y.getRow (0, Yr0);
       Y.getRow (1, Yr1);
-      Y.getRow (2, Yr2);
       
       Vector3d _Yr0_Yr1 = new Vector3d();
       _Yr0_Yr1.scaledAdd(-1, Yr0);
@@ -395,17 +398,17 @@ public class ThinShellAux {
       
       MatrixNd[] DDs = new MatrixNd[] {DD0, DD1, DD2};
       
-      // Store node positions into single 9-vec.
+      // Store node positions into single 9-vector.
       VectorNd X = new VectorNd(9);
       for (int i = 0; i < 9; i++) {
          X.set(i, xs[i/3].get (i%3));
       }
+      
       VectorNd[] fs = new VectorNd[] {
         new VectorNd(3), 
         new VectorNd(3), 
         new VectorNd(3)
       };
-      
       DD0.mul (fs[0], X);   // fs[0] = DD0 * X
       DD1.mul (fs[1], X); 
       DD2.mul (fs[2], X); 
@@ -471,7 +474,8 @@ public class ThinShellAux {
 //         grad_f.scale(-a);
          throw new RuntimeException("Review code before running.");
       } else {
-         double gf = -a * this.mAltStretching;
+         // Original specifies for negative a, but causes oscillation problem.
+         double gf = a * this.mAltStretching;
          
          Matrix3d Gc = new Matrix3d(); 
          MathUtil.max(G, Matrix3d.ZERO, Gc);
@@ -762,9 +766,5 @@ public class ThinShellAux {
       return d; 
    }
    
-   public static void main (String[] args) {
-      // TODO Auto-generated method stub
-
-   }
 
 }
