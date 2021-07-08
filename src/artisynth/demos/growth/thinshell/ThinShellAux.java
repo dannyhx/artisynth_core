@@ -295,7 +295,9 @@ public class ThinShellAux {
       Point3d x2 = oppNode0.getPosition ();
       Point3d x3 = oppNode1.getPosition ();
       
-      double theta = MathUtil.dihedralAngle (x0, x1, n0, n1);
+      double theta = ShellUtil.getDihedralAngle (this.mModel, edge, false);
+      double restTheta = ShellUtil.getDihedralAngle (this.mModel, edge, true);
+      restTheta += mModel.myEdgeDataMap.get (edge).mAngStrain;
       
       double h0 = MathUtil.distanceBetweenPointAndLine (x2, x0, x1) ;
       double h1 = MathUtil.distanceBetweenPointAndLine (x3, x0, x1) ;
@@ -322,7 +324,6 @@ public class ThinShellAux {
       MatrixNd dtheta_op = MathUtil.outerProduct (dtheta, dtheta);
       dtheta_op.scale (-coeff * 0.5);
       
-      double restTheta = mModel.myEdgeDataMap.get (edge).mRestTheta;
       dtheta.scale (-coeff * (theta - restTheta) * 0.5);
       
 //      System.out.printf ("w_f0: %.2f\n", w_f0.norm());

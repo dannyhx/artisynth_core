@@ -57,6 +57,10 @@ public class PlasticEmbedder {
          ((GrowTriElement)ele).useResidualPlasticStrain ();
       }
       
+      if (mFemModel.myThinShellAux != null) {
+         mFemModel.myEdgeDataMap.useResidualPlasticStrain (mFemModel);
+      }
+      
       concludeReferenceSpaceAdvance();
       
       ComponentChangeEvent compEvt = new ComponentChangeEvent(Code.STRUCTURE_CHANGED);
@@ -82,6 +86,10 @@ public class PlasticEmbedder {
          ((GrowTriElement)ele).useResidualPlasticStrain ();
       }
       
+      if (mFemModel.myThinShellAux != null) {
+         mFemModel.myEdgeDataMap.useResidualPlasticStrain (mFemModel);
+      }
+      
       for (FemNode3d node : mFemModel.getNodes ()) {
          GrowNode3d gNode = (GrowNode3d)node; 
        
@@ -91,13 +99,6 @@ public class PlasticEmbedder {
          if (hasBackNode()) {
             gNode.setBackRestPosition ( gNode.getBackPosition () ); 
             gNode.setBackVelocity ( Vector3d.ZERO );
-         }
-      }
-      
-      if (mFemModel.myThinShellAux != null) {
-         for (HalfEdge edge : EdgeDataMap.getMeshRealHalfEdges (mMesh)) {
-            double curAng = ShellUtil.getDihedralAngle (mFemModel, edge, false);
-            mFemModel.myEdgeDataMap.get (edge).mRestTheta = curAng;
          }
       }
       
@@ -123,16 +124,6 @@ public class PlasticEmbedder {
             gNode.m_WS_back_pos.set ( gNode.getBackPosition () );
             gNode.m_WS_back_restPos.set ( gNode.getBackRestPosition () );
             gNode.m_WS_back_vel.set ( gNode.getBackVelocity () );
-         }
-      }
-      
-      // Note that backing up the world positions will implicitly 
-      // backup the world dihedral angles.
-      // But the rest dihedral angles should still be backed up.
-      if (mFemModel.myThinShellAux != null) {
-         for (HalfEdge edge : EdgeDataMap.getMeshRealHalfEdges (mMesh)) {
-            EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
-            edgeData.m_WS_restTheta = edgeData.mRestTheta;
          }
       }
    }
@@ -167,13 +158,6 @@ public class PlasticEmbedder {
             gNode.setBackPosition ( gNode.m_WS_back_restPos );
             gNode.setBackVelocity ( gNode.m_ES_back_vel );
             gNode.setBackVelocity ( Vector3d.ZERO );
-         }
-      }
-      
-      if (mFemModel.myThinShellAux != null) {
-         for (HalfEdge edge : EdgeDataMap.getMeshRealHalfEdges (mMesh)) {
-            EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
-            edgeData.mRestTheta = edgeData.m_WS_restTheta;
          }
       }
       
@@ -213,14 +197,6 @@ public class PlasticEmbedder {
             gNode.setBackRestPosition ( gNode.getBackPosition () ); 
             gNode.setBackPosition ( gNode.m_WS_back_pos );
             gNode.setBackVelocity ( gNode.m_WS_back_vel );
-         }
-      }
-      
-      // Copy energy-minimized embedded edges to the rest edges.
-      if (mFemModel.myThinShellAux != null) {
-         for (HalfEdge edge : EdgeDataMap.getMeshRealHalfEdges (mMesh)) {
-            double curAng = ShellUtil.getDihedralAngle (mFemModel, edge, false);
-            mFemModel.myEdgeDataMap.get (edge).mRestTheta = curAng;
          }
       }
       

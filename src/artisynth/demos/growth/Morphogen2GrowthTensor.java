@@ -350,6 +350,8 @@ public class Morphogen2GrowthTensor {
          }
       }
       
+      applied = true;
+      
       ShellUtil.invalidateFem (mFemModel);
    }
    
@@ -375,6 +377,7 @@ public class Morphogen2GrowthTensor {
    
    /* --- Membrane Bending --- */
    
+   boolean applied = false;
    protected void _applyGrowthTensorAsBendingStrain(
       GrowTriElement gEle, Matrix3d strain)
    {
@@ -430,12 +433,11 @@ public class Morphogen2GrowthTensor {
          
          EdgeData edgeData = this.mFemModel.myEdgeDataMap.get (edge);
 //         edgeData.mRestTheta += angleInc;
-         if (new Point3d(uH).add(uT).scale(0.5).y > 0 && alignPctX > 0.90) {
-            edgeData.mRestTheta = Math.PI / 4;
+         if (new Point3d(uH).add(uT).scale(0.5).y > 0 && alignPctX > 0.90 && !applied) {
+            edgeData.mAngStrain = Math.PI / 4;
          }
          
 //       System.out.printf ("Edge [%d-%d], ", h, t);
-        
          
 //         System.out.printf ("Edge [%d-%d]: alignPctX: %.2f, alignPctY: %.2f, mRestTheta: %.2f, angleInc: %.2f, midpt-y: %.2f\n", 
 //            h, t, alignPctX, alignPctY, edgeData.mRestTheta, angleInc, new Point3d(uH).add(uT).scale (0.5).y );
@@ -489,7 +491,7 @@ public class Morphogen2GrowthTensor {
    /** 
     * From 0 to 1, how parallel are the two vectors?
     */
-   protected double parallelFrac(Vector3d A, Vector3d B) {
+   protected static double parallelFrac(Vector3d A, Vector3d B) {
       // -PI to PI
       double ang = MathUtil.vectorPairAngle (A, B);
       

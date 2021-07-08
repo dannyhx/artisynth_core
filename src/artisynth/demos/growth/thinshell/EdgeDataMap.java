@@ -2,7 +2,9 @@ package artisynth.demos.growth.thinshell;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
 
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.ShellElement3d;
@@ -20,8 +22,7 @@ import maspack.matrix.Point3d;
 public class EdgeDataMap {
    
    public class EdgeData {
-      public double mRestTheta;
-      public double m_WS_restTheta;
+      public double mAngStrain;
    }
    
    protected HashMap<HalfEdge,EdgeData> mMap;
@@ -42,17 +43,7 @@ public class EdgeDataMap {
                continue;
             }
             
-            EdgeData data = edm.create (edge);
-            
-            Face edgeFace = edge.getFace ();
-            Face edgeFaceOpp = edge.getOppositeFace ();
-            Point3d x0 = edge.head.getPosition ();
-            Point3d x1 = edge.tail.getPosition ();
-            
-            data.mRestTheta = MathUtil.dihedralAngle (
-               x0, x1, edgeFace.getNormal (), edgeFaceOpp.getNormal ());
-            
-//            data.mRestTheta = 1.00;
+            edm.create (edge);
          }
       }
       
@@ -110,21 +101,20 @@ public class EdgeDataMap {
    /* --- Utils --- */
    
    
-   public static LinkedList<HalfEdge> getMeshRealHalfEdges(PolygonalMesh mesh) {
-      LinkedList<HalfEdge> rv = new LinkedList<HalfEdge>();
-      
-      for (Face face : mesh.getFaces ()) {
-         for (int e = 0; e < 3; e++) {
-            HalfEdge edge = face.getEdge (e);
-            if (!isRealHalfEdge(edge) || edge.opposite == null) {
-               continue;
-            }
-            
-            rv.add(edge);
-         }
-      }
-      
-      return rv; 
+   public void useResidualPlasticStrain(FemModel3d model) {
+      for (Map.Entry<HalfEdge, EdgeData> entry : this.mMap.entrySet()) {
+         HalfEdge edge = entry.getKey();
+         EdgeData edgeData = entry.getValue();
+         
+         double ang = ShellUtil.getDihedralAngle (model, edge, false);
+         double angRest = ShellUtil.getDihedralAngle (model, edge, true);
+         
+         // Amount of deformation actually occurred, between t0 and t1.
+         double angOcc = ang - angRest;
+         
+         // Remaining deformation to expect.
+         edgeData.mAngStrain -= angOcc;
+     }
    }
 }
 
