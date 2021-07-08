@@ -14,6 +14,7 @@ import artisynth.core.modelbase.ModelComponent;
 import artisynth.core.modelbase.ModelComponentBase;
 import artisynth.demos.growth.GrowIntegrationData3d;
 import artisynth.demos.growth.def.NeighborElement;
+import maspack.geometry.HalfEdge;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
@@ -344,5 +345,25 @@ public class ShellUtil {
       return Integer.parseInt (idxStr);
    }
    
+   // MathUtil
+   
+   public static double getDihedralAngle(FemModel3d model, HalfEdge edge, boolean isRest) {
+      int f = edge.getFace ().getIndex ();
+      int fo = edge.getOppositeFace().getIndex(); 
+      
+      ShellTriElement ele = (ShellTriElement)model.getShellElement (f);
+      ShellTriElement eleOpp = (ShellTriElement)model.getShellElement (fo);
+      
+      Vector3d eleNrm = ShellUtil.getNormal (ele, isRest);
+      Vector3d eleOppNrm = ShellUtil.getNormal (eleOpp, isRest);
+      
+      FemNode3d headNode = model.getNode (edge.getHead ().getIndex ());
+      FemNode3d tailNode = model.getNode (edge.getTail ().getIndex ());
+      
+      Point3d hPos = ShellUtil.getPosition (headNode, true, !isRest);
+      Point3d tPos = ShellUtil.getPosition (tailNode, true, !isRest);
+      
+      return MathUtil.dihedralAngle (hPos, tPos, eleNrm, eleOppNrm);
+   }
 
 }

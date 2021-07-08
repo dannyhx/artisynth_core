@@ -198,6 +198,8 @@ public class ShellPatch extends RootModel {
          if (this.m_isMembrane) {
             mFemModel[m].myEdgeDataMap = EdgeDataMap.createFromMesh (mMesh[m]);
             mFemModel[m].myThinShellAux = new ThinShellAux(mFemModel[m], mMesh[m]);
+            mFemModel[m].myThinShellAux.setAltMaterial (
+               m_youngsModulus, m_poissonsRatio, m_shellThickness);
          }
 
          

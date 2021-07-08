@@ -350,14 +350,14 @@ public class GrowDemo extends ShellPatch {
       mDiffusion = new Diffusion(mMesh[0], mMeshChems[0], 
          new int[] {mChemTypeToDiffuse});
       mMorphogen2GrowthTensor = new Morphogen2GrowthTensor(
-         (GrowModel3d)mFemModel[0]);
+         (GrowModel3d)mFemModel[0], mMesh[0]);
       mRemesher = new GrowRemesher(mMesh[0], mFemModel[0], 
          mSizeMin, mSizeMax, mAspectMin, mRefineAngle, mRefineCompression,
          mRefineVelocity, mRefineMorphogen, mMeshChems[0]);
       mGrowColorer = new GrowColorer(this, (GrowModel3d)mFemModel[0], mShowColorBar);
       
       mPlasticEmbedder = new PlasticEmbedder();
-      mPlasticEmbedder.setTarget (mFemModel[0]);
+      mPlasticEmbedder.setTarget (mFemModel[0], mMesh[0]);
    }
    
    protected void build_renderConfig() {   

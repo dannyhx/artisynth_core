@@ -21,19 +21,30 @@ public class _Debug_ThinShell extends Basic_Base {
       
       mEnableCollisionHandling = false;
       
-      //
+      // If half the area, then bending is more volatile.
       
-//      mMeshX = 25;
-//      mMeshY = 5;
-//      
-//      mMeshXDiv = 25;
-//      mMeshYDiv = 5;
+//      mMeshX = 12.5;
+//      mMeshY = 2.5;
+      mMeshX = 25;
+      mMeshY = 6;
+         
+      mMeshXDiv = 25;
+      mMeshYDiv = 6;
       
-       mMeshX = 1;
-       mMeshY = 1;
+//       mMeshX = 25;
+//       mMeshY = 5;
+//       
+//       mMeshXDiv = 50;
+//       mMeshYDiv = 10;
+      
+//      mMeshX = 1;
+//      mMeshY = 1;
        
-       mMeshXDiv = 1;
-       mMeshYDiv = 1;
+//      mMeshX = .1;
+//      mMeshY = .1;
+      
+//      mMeshXDiv = 1;
+//      mMeshYDiv = 1;
       
       morphogenSrcDuration = 0.01;
       
@@ -64,6 +75,8 @@ public class _Debug_ThinShell extends Basic_Base {
 //      m.addVertex (1, 1, 0);
 //      m.addFace (0, 1, 2);
 //      
+//      m.scale (0.1);
+//      
 //      mMesh[0] = m;
 //   }
    
@@ -90,12 +103,6 @@ public class _Debug_ThinShell extends Basic_Base {
       mRendCfg.mNodeRadius = 0.05;
    }
    
-   protected void build_utils() {
-      super.build_utils ();
-
-      mMorphogen2GrowthTensor.setTarget ((GrowModel3d)mFemModel[0], mMesh[0]);
-   }
-   
    protected void build_post() {
       super.build_post ();
       mMorphogen2GrowthTensor.isBendingMorphogenHack = true;
@@ -116,7 +123,10 @@ public class _Debug_ThinShell extends Basic_Base {
       for (int v = 0; v < mMesh[0].numVertices (); v++) {
          if ( isMorphogenSrcNode(v) && t0 < morphogenSrcDuration) {
             GrowNode3d gNode = (GrowNode3d)mFemModel[0].getNode (v);
-            gNode.mChems.set (GrowChemical.PER.mIdx, 0.5);
+            gNode.mChems.set (GrowChemical.PAR.mIdx, 0.1);
+            
+//            gNode.setVelocity (0, 0, 1);
+//            break;
          }
       }
    }

@@ -1,8 +1,14 @@
 package artisynth.demos.growth.thinshell;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 
+import artisynth.core.femmodels.FemModel3d;
+import artisynth.core.femmodels.ShellElement3d;
+import artisynth.demos.growth.GrowTriElement;
 import artisynth.demos.growth.util.MathUtil;
+import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
 import maspack.geometry.PolygonalMesh;
@@ -15,6 +21,7 @@ public class EdgeDataMap {
    
    public class EdgeData {
       public double mRestTheta;
+      public double m_WS_restTheta;
    }
    
    protected HashMap<HalfEdge,EdgeData> mMap;
@@ -99,5 +106,25 @@ public class EdgeDataMap {
       return edge; 
    }
    
+   
+   /* --- Utils --- */
+   
+   
+   public static LinkedList<HalfEdge> getMeshRealHalfEdges(PolygonalMesh mesh) {
+      LinkedList<HalfEdge> rv = new LinkedList<HalfEdge>();
+      
+      for (Face face : mesh.getFaces ()) {
+         for (int e = 0; e < 3; e++) {
+            HalfEdge edge = face.getEdge (e);
+            if (!isRealHalfEdge(edge) || edge.opposite == null) {
+               continue;
+            }
+            
+            rv.add(edge);
+         }
+      }
+      
+      return rv; 
+   }
 }
 

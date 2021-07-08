@@ -4,9 +4,17 @@ import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
+import artisynth.core.femmodels.ShellTriElement;
 import artisynth.core.modelbase.ComponentChangeEvent;
 import artisynth.core.modelbase.ComponentChangeEvent.Code;
+import artisynth.demos.growth.thinshell.EdgeDataMap;
+import artisynth.demos.growth.thinshell.EdgeDataMap.EdgeData;
+import artisynth.demos.growth.util.MathUtil;
+import artisynth.demos.growth.util.MeshUtil;
 import artisynth.demos.growth.util.ShellUtil;
+import maspack.geometry.Face;
+import maspack.geometry.HalfEdge;
+import maspack.geometry.PolygonalMesh;
 import maspack.matrix.Vector3d;
 
 /**
@@ -16,6 +24,7 @@ import maspack.matrix.Vector3d;
 public class PlasticEmbedder {
    
    protected FemModel3d mFemModel;
+   protected PolygonalMesh mMesh;
    protected Boolean mHasBackNodes;
    
    public PlasticEmbedder() {
@@ -23,6 +32,11 @@ public class PlasticEmbedder {
    
    public void setTarget(FemModel3d femModel) {
       mFemModel = femModel;
+   }
+   
+   public void setTarget(FemModel3d femModel, PolygonalMesh mesh) {
+      mFemModel = femModel;
+      mMesh = mesh; 
    }
    
    // --- Primary Functions ---
@@ -80,6 +94,13 @@ public class PlasticEmbedder {
          }
       }
       
+      if (mFemModel.myThinShellAux != null) {
+         for (HalfEdge edge : EdgeDataMap.getMeshRealHalfEdges (mMesh)) {
+            double curAng = ShellUtil.getDihedralAngle (mFemModel, edge, false);
+            mFemModel.myEdgeDataMap.get (edge).mRestTheta = curAng;
+         }
+      }
+      
       ComponentChangeEvent compEvt = new ComponentChangeEvent(
          Code.STRUCTURE_CHANGED);
       mFemModel.componentChanged (compEvt);
@@ -102,6 +123,16 @@ public class PlasticEmbedder {
             gNode.m_WS_back_pos.set ( gNode.getBackPosition () );
             gNode.m_WS_back_restPos.set ( gNode.getBackRestPosition () );
             gNode.m_WS_back_vel.set ( gNode.getBackVelocity () );
+         }
+      }
+      
+      // Note that backing up the world positions will implicitly 
+      // backup the world dihedral angles.
+      // But the rest dihedral angles should still be backed up.
+      if (mFemModel.myThinShellAux != null) {
+         for (HalfEdge edge : EdgeDataMap.getMeshRealHalfEdges (mMesh)) {
+            EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
+            edgeData.m_WS_restTheta = edgeData.mRestTheta;
          }
       }
    }
@@ -136,6 +167,13 @@ public class PlasticEmbedder {
             gNode.setBackPosition ( gNode.m_WS_back_restPos );
             gNode.setBackVelocity ( gNode.m_ES_back_vel );
             gNode.setBackVelocity ( Vector3d.ZERO );
+         }
+      }
+      
+      if (mFemModel.myThinShellAux != null) {
+         for (HalfEdge edge : EdgeDataMap.getMeshRealHalfEdges (mMesh)) {
+            EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
+            edgeData.mRestTheta = edgeData.m_WS_restTheta;
          }
       }
       
@@ -175,6 +213,14 @@ public class PlasticEmbedder {
             gNode.setBackRestPosition ( gNode.getBackPosition () ); 
             gNode.setBackPosition ( gNode.m_WS_back_pos );
             gNode.setBackVelocity ( gNode.m_WS_back_vel );
+         }
+      }
+      
+      // Copy energy-minimized embedded edges to the rest edges.
+      if (mFemModel.myThinShellAux != null) {
+         for (HalfEdge edge : EdgeDataMap.getMeshRealHalfEdges (mMesh)) {
+            double curAng = ShellUtil.getDihedralAngle (mFemModel, edge, false);
+            mFemModel.myEdgeDataMap.get (edge).mRestTheta = curAng;
          }
       }
       

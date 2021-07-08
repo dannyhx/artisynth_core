@@ -6,6 +6,7 @@ import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.IntegrationPoint3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.demos.growth.thinshell.EdgeDataMap;
+import artisynth.demos.growth.util.ShellUtil;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
 import maspack.render.Renderer;
@@ -73,8 +74,7 @@ public class GrowModel3d extends FemModel3d {
                
                if (a != 0) {
                   // "MyNode_#33" -> 33 begins at string index 8         
-                  int nodeGlobalIdx = Integer.parseInt ( 
-                     gEle.getNodes ()[en].getName ().substring (8) );    
+                  int nodeGlobalIdx = ShellUtil.getIndex (gEle.getNodes ()[en]);
                   nodalFgs[nodeGlobalIdx].scaledAdd (
                      a/node.numAdjacentElements(), 
                      idata[k].getFp () != null 

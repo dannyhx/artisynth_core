@@ -50,9 +50,9 @@ public class ThinShellAux {
     */
    public ThinShellAux(FemModel3d model, PolygonalMesh mesh) {
       if (this.mIsDDE) {
-         this.initDDEMaterial ("ribbon");
+         this.setDDEMaterial ("ribbon");
       } else {
-         this.initAltMaterial ("default");
+         this.setAltMaterial ("default");
       }
       
       this.mMatWeakening = 0;
@@ -62,7 +62,7 @@ public class ThinShellAux {
       this.refreshIndirectNodeNeighbors ();
    }
    
-   protected void initDDEMaterial(String matName) {
+   protected void setDDEMaterial(String matName) {
       this.mMatDDEStretchingSamples = new double[0][0][0][0];
       this.mMatDDEBending = new MatrixNd(3, 5);
       
@@ -82,7 +82,7 @@ public class ThinShellAux {
       }
    }
    
-   protected void initAltMaterial(String matName) {
+   protected void setAltMaterial(String matName) {
       if (matName == "default") {
          // elastic modulus
          double Y = 1e6;  
@@ -91,12 +91,21 @@ public class ThinShellAux {
          
          double A = Y / (1 - Math.pow(this.mAltPoisson, 2));
          this.mAltStretching = A * thickness;
-         this.mAltBending = A / 12 * Math.pow(thickness, 3); 
+         this.mAltBending = A / 12 * Math.pow(thickness, 3);
       } else {
          throw new RuntimeException("Unsupported material.");
       }
    }
    
+   public void setAltMaterial(
+      double youngsModulus, double poissonsRatio, double thickness) 
+   {
+      this.mAltPoisson = poissonsRatio;
+      
+      double A = youngsModulus / (1 - Math.pow(poissonsRatio, 2));
+      this.mAltStretching = A * thickness;
+      this.mAltBending = A / 12 * Math.pow(thickness, 3);
+   }
    
    /* --- Primary Methods --- */
    
@@ -291,6 +300,9 @@ public class ThinShellAux {
       double h0 = MathUtil.distanceBetweenPointAndLine (x2, x0, x1) ;
       double h1 = MathUtil.distanceBetweenPointAndLine (x3, x0, x1) ;
       
+      h0 = 0.9; 
+      h1 = 0.9;
+      
       Vector2d w_f0 = MathUtil.barycentricWeights (x2, x0, x1);
       Vector2d w_f1 = MathUtil.barycentricWeights (x3, x0, x1); 
       
@@ -312,6 +324,8 @@ public class ThinShellAux {
       
       double restTheta = mModel.myEdgeDataMap.get (edge).mRestTheta;
       dtheta.scale (-coeff * (theta - restTheta) * 0.5);
+      
+//      System.out.printf ("w_f0: %.2f\n", w_f0.norm());
       
       return new Pair<MatrixNd,VectorNd>(dtheta_op, dtheta);
    }

@@ -51,6 +51,10 @@ public class Morphogen2GrowthTensor {
       setTarget(femModel);
    }
    
+   public Morphogen2GrowthTensor(FemModel3d femModel, PolygonalMesh mesh) {
+      setTarget(femModel, mesh);
+   }
+   
    public void setTarget(FemModel3d femModel) {
       mFemModel = femModel;
    }
@@ -374,13 +378,13 @@ public class Morphogen2GrowthTensor {
    protected void _applyGrowthTensorAsBendingStrain(
       GrowTriElement gEle, Matrix3d strain)
    {
-      int f = Integer.valueOf (gEle.getName ().substring (gEle.getName ().length () - 1));
+      int f = ShellUtil.getIndex (gEle);
       Face face = mMesh.getFace (f);
       
       Vector3d elePAR = new Vector3d(gEle.mPolDir).normalize ();
       Vector3d eleNOR = ShellUtil.getNormal (gEle, true);
       Vector3d elePER = new Vector3d().cross (eleNOR, elePAR).normalize ();
-
+      
       // For each of the 3 adjacent faces of the element.
       for (int e = 0; e < 3; e++) {
          HalfEdge edge = face.getEdge (e);
@@ -392,8 +396,10 @@ public class Morphogen2GrowthTensor {
          // 2 nodes of the edge.
          Vertex3d vH = edge.getHead ();
          Vertex3d vT = edge.getTail ();
-         GrowNode3d nH = (GrowNode3d)mFemModel.getNode (vH.getIndex ()); 
-         GrowNode3d nT = (GrowNode3d)mFemModel.getNode (vT.getIndex ());
+         int h = vH.getIndex (); 
+         int t = vT.getIndex ();
+         GrowNode3d nH = (GrowNode3d)mFemModel.getNode (h); 
+         GrowNode3d nT = (GrowNode3d)mFemModel.getNode (t);
          Point3d uH = nH.getRestPosition ();
          Point3d uT = nT.getRestPosition ();
          
@@ -406,6 +412,12 @@ public class Morphogen2GrowthTensor {
          double alignPctX = parallelFrac(edgeDir, Vector3d.X_UNIT);
          double alignPctY = parallelFrac(edgeDir, Vector3d.Y_UNIT);
          
+         if (alignPctX < 0.98) 
+            alignPctX = 0; 
+         
+         if (alignPctY < 0.98)
+            alignPctY = 0;
+         
          double concX = Math.max(0, strain.get (0, 0));
          double concY = Math.max(0, strain.get (1, 1));
          
@@ -417,9 +429,16 @@ public class Morphogen2GrowthTensor {
          angleInc /= 2.0; // Opposite edge will also contribute.
          
          EdgeData edgeData = this.mFemModel.myEdgeDataMap.get (edge);
-         edgeData.mRestTheta += angleInc;
+//         edgeData.mRestTheta += angleInc;
+         if (new Point3d(uH).add(uT).scale(0.5).y > 0 && alignPctX > 0.90) {
+            edgeData.mRestTheta = Math.PI / 4;
+         }
          
-//         System.out.printf ("mRestTheta: %.2f, concX: %.2f\n", edgeData.mRestTheta, concX);
+//       System.out.printf ("Edge [%d-%d], ", h, t);
+        
+         
+//         System.out.printf ("Edge [%d-%d]: alignPctX: %.2f, alignPctY: %.2f, mRestTheta: %.2f, angleInc: %.2f, midpt-y: %.2f\n", 
+//            h, t, alignPctX, alignPctY, edgeData.mRestTheta, angleInc, new Point3d(uH).add(uT).scale (0.5).y );
       }
    }
 
@@ -492,14 +511,7 @@ public class Morphogen2GrowthTensor {
       return ang; 
    }
    
-   /* --- Test --- */
-   
-   public static void main(String[] args) {
-      Vector3d a = new Vector3d(0,0,1).normalize ();
-      
-      Matrix3d outer = new Matrix3d();
-      outer.outerProduct (a, a);
-      System.out.println (outer);
-   }
+
+
   
 }
