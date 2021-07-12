@@ -350,8 +350,6 @@ public class Morphogen2GrowthTensor {
          }
       }
       
-      applied = true;
-      
       ShellUtil.invalidateFem (mFemModel);
    }
    
@@ -377,7 +375,6 @@ public class Morphogen2GrowthTensor {
    
    /* --- Membrane Bending --- */
    
-   boolean applied = false;
    protected void _applyGrowthTensorAsBendingStrain(
       GrowTriElement gEle, Matrix3d strain)
    {
@@ -420,9 +417,10 @@ public class Morphogen2GrowthTensor {
          
          if (alignPctY < 0.98)
             alignPctY = 0;
-         
-         double concX = Math.max(0, strain.get (0, 0));
-         double concY = Math.max(0, strain.get (1, 1));
+
+         // Stretching along X = bending along Y
+         double concX = Math.max(0, strain.get (1, 1));
+         double concY = Math.max(0, strain.get (0, 0));
          
          // 1 concentration = PI/2 radians.
          
@@ -433,8 +431,8 @@ public class Morphogen2GrowthTensor {
          
          EdgeData edgeData = this.mFemModel.myEdgeDataMap.get (edge);
 //         edgeData.mRestTheta += angleInc;
-         if (new Point3d(uH).add(uT).scale(0.5).y > 0 && alignPctX > 0.90 && !applied) {
-            edgeData.mAngStrain = Math.PI / 4;
+         if (new Point3d(uH).add(uT).scale(0.5).y > 0 && alignPctX > 0.90) {
+            edgeData.mAngStrain += angleInc;
          }
          
 //       System.out.printf ("Edge [%d-%d], ", h, t);

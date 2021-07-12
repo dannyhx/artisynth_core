@@ -58,7 +58,7 @@ public class PlasticEmbedder {
       }
       
       if (mFemModel.myThinShellAux != null) {
-         mFemModel.myEdgeDataMap.useResidualPlasticStrain (mFemModel);
+         mFemModel.myEdgeDataMap.useResidualPlasticStrain ();
       }
       
       concludeReferenceSpaceAdvance();
@@ -87,7 +87,7 @@ public class PlasticEmbedder {
       }
       
       if (mFemModel.myThinShellAux != null) {
-         mFemModel.myEdgeDataMap.useResidualPlasticStrain (mFemModel);
+         mFemModel.myEdgeDataMap.useResidualPlasticStrain ();
       }
       
       for (FemNode3d node : mFemModel.getNodes ()) {

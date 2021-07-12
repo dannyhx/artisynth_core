@@ -1,5 +1,9 @@
 package artisynth.demos.growth.models.paper;
 
+import artisynth.demos.growth.GrowNode3d;
+import maspack.geometry.Vertex3d;
+import maspack.matrix.Point3d;
+
 /**
  * Notes:
  * 
@@ -18,7 +22,7 @@ public class Basic_Curl_ThinShell extends Basic_Curl {
       mEnableDiffusion = true;
       mEnableGrowth = true; 
       mEnableRemesh = false; 
-      mEnablePlasticEmbedding = false; 
+      mEnablePlasticEmbedding = true; 
       mEnableCollisionHandling = false;
       
       this.mPauseEveryInterval = 999;
@@ -30,4 +34,6 @@ public class Basic_Curl_ThinShell extends Basic_Curl {
       mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
       mRendCfg.mNodeRadius = 0.01;
    }
+   
+
 }

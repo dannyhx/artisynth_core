@@ -1,20 +1,20 @@
 package artisynth.demos.growth.thinshell;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Map;
 
 import artisynth.core.femmodels.FemModel3d;
-import artisynth.core.femmodels.ShellElement3d;
-import artisynth.demos.growth.GrowTriElement;
+import artisynth.core.femmodels.FemNode3d;
+import artisynth.core.femmodels.ShellTriElement;
 import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
 import maspack.geometry.PolygonalMesh;
+import maspack.matrix.Matrix3d;
+import maspack.matrix.Matrix6x3;
 import maspack.matrix.Point3d;
+import maspack.matrix.Vector3d;
 
 /**
  * Provides way to associate data to mesh edges. 
@@ -26,13 +26,13 @@ public class EdgeDataMap {
    }
    
    protected HashMap<HalfEdge,EdgeData> mMap;
+   protected FemModel3d mModel;
    
-   public EdgeDataMap() {
+   public EdgeDataMap(FemModel3d model, PolygonalMesh mesh) {
       this.mMap = new HashMap<HalfEdge,EdgeData>();
-   }
-   
-   public static EdgeDataMap createFromMesh(PolygonalMesh mesh) {
-      EdgeDataMap edm = new EdgeDataMap();
+      this.mModel = model;
+      
+      //
       
       for (Face face : mesh.getFaces ()) {
          for (int e = 0; e < 3; e++) {
@@ -43,11 +43,9 @@ public class EdgeDataMap {
                continue;
             }
             
-            edm.create (edge);
+            this.create (edge);
          }
       }
-      
-      return edm;
    }
    
    public EdgeData create(HalfEdge edge) {
@@ -101,13 +99,13 @@ public class EdgeDataMap {
    /* --- Utils --- */
    
    
-   public void useResidualPlasticStrain(FemModel3d model) {
+   public void useResidualPlasticStrain() {
       for (Map.Entry<HalfEdge, EdgeData> entry : this.mMap.entrySet()) {
          HalfEdge edge = entry.getKey();
          EdgeData edgeData = entry.getValue();
          
-         double ang = ShellUtil.getDihedralAngle (model, edge, false);
-         double angRest = ShellUtil.getDihedralAngle (model, edge, true);
+         double ang = ShellUtil.getDihedralAngle (mModel, edge, false);
+         double angRest = ShellUtil.getDihedralAngle (mModel, edge, true);
          
          // Amount of deformation actually occurred, between t0 and t1.
          double angOcc = ang - angRest;
@@ -116,5 +114,6 @@ public class EdgeDataMap {
          edgeData.mAngStrain -= angOcc;
      }
    }
+   
 }
 

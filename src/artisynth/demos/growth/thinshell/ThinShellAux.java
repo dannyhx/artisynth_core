@@ -9,9 +9,11 @@ import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.FemNodeNeighbor;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.ShellTriElement;
+import artisynth.demos.growth.thinshell.EdgeDataMap.EdgeData;
 import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.MeshUtil;
 import artisynth.demos.growth.util.ShellUtil;
+import artisynth.demos.growth.util.SolverUtil;
 import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
 import maspack.geometry.PolygonalMesh;
@@ -20,6 +22,7 @@ import maspack.matrix.Matrix1x3;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.Matrix3x4;
+import maspack.matrix.Matrix6x3;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector2d;
@@ -433,7 +436,7 @@ public class ThinShellAux {
       
       ///
       
-      double a = ShellUtil.area (ele.getNodes (), false); 
+      double a = ShellUtil.area (ele.getNodes (), true); 
       
       if (this.mIsDDE) {
 //         Matrix2d Gxy = new Matrix2d();
@@ -575,8 +578,8 @@ public class ThinShellAux {
          edge.getOppositeFace ().getIndex ());
       
       double a = 
-         ShellUtil.area (ele0.getNodes (), false) + 
-         ShellUtil.area (ele1.getNodes (), false);
+         ShellUtil.area (ele0.getNodes (), true) + 
+         ShellUtil.area (ele1.getNodes (), true);
       
       // Edge vector norm.
       double l = new Vector3d(x1).sub (x0).norm ();
@@ -779,6 +782,100 @@ public class ThinShellAux {
       d.setColumn (2, dz);
       
       return d; 
+   }
+   
+   // --- Remeshing Utilities --- //
+   
+   /**
+    * Get a matrix representation of the given face's edge strain.
+    * 
+    * plasticity.cpp::edges_to_face
+    * 
+    * @param face
+    * @return
+    */
+   public Matrix3d bendStrain_edgesToFace(Face face) {
+      Matrix3d S = new Matrix3d();
+      
+      ShellTriElement ele = (ShellTriElement)mModel.getShellElement (face.getIndex ());
+      Vector3d nrmRest = ShellUtil.getNormal (ele, true);
+      
+      for (int e = 0; e < 3; e++) {
+         HalfEdge edge = face.getEdge (e);
+         int h = edge.head.getIndex ();
+         int t = edge.tail.getIndex ();
+         
+         FemNode3d hNode = mModel.getNode (h);
+         FemNode3d tNode = mModel.getNode (t);
+         
+         Point3d hu = hNode.getRestPosition ();
+         Point3d ht = tNode.getRestPosition ();
+         
+         Vector3d e_mat = new Vector3d(hu).sub(ht);
+         Vector3d t_mat = new Vector3d(e_mat).normalize ().cross (nrmRest);
+         
+         EdgeData edgeData = mModel.myEdgeDataMap.get (edge);
+         
+         Matrix3d S_inc = MathUtil.outerProduct (t_mat, t_mat);
+         S_inc.scale (-0.5 * edgeData.mAngStrain * e_mat.norm ());
+         
+         S.sub (S_inc);
+      }
+      
+      double areaRest = ShellUtil.area (ele.getNodes (), true);
+      S.scale (1 / areaRest);
+      
+      return S;
+   }
+   
+   /**
+    * Convert a matrix-representation of the given face's edge strain into 
+    * a Vec3 where each element corresponds to an edge.
+    * 
+    * plasticity.cpp::face_to_edges
+    * 
+    * @param face
+    * @param S
+    * @return
+    */
+   public Vector3d bendStrain_faceToEdges(Face face, Matrix3d S) {
+      ShellTriElement ele = (ShellTriElement)mModel.getShellElement (face.getIndex ());
+      Vector3d nrm = ShellUtil.getNormal (ele, true);
+      
+      Matrix6x3 A = new Matrix6x3();
+      
+      for (int e = 0; e < 3; e++) {
+         HalfEdge edge = face.getEdge (e);
+         int h = edge.head.getIndex ();
+         int t = edge.tail.getIndex ();
+         
+         FemNode3d hNode = mModel.getNode (h);
+         FemNode3d tNode = mModel.getNode (t);
+         
+         Point3d hu = hNode.getRestPosition ();
+         Point3d ht = tNode.getRestPosition ();
+         
+         Vector3d e_mat = new Vector3d(hu).sub(ht);
+         Vector3d t_mat = new Vector3d(e_mat).normalize ().cross (nrm);
+         
+         // Se
+         Matrix3d Se = MathUtil.outerProduct (t_mat, t_mat);
+         Se.scale (-0.5 * e_mat.norm ());
+         
+         A.setColumn (e, new double[] {
+            Se.get (0,0), Se.get (1,1), Se.get(2,2), 
+            Se.get(0,1), Se.get(0,2), Se.get(1,2)
+         });
+      }
+
+      double areaRest = ShellUtil.area (ele.getNodes (), true);
+      VectorNd y = new VectorNd(
+         S.get(0,0), S.get(1,1), S.get (2,2), 
+         S.get (0,1), S.get (0,2), S.get (1,2));
+      y.scale (areaRest);
+      
+      VectorNd rv = SolverUtil.solve_llsq (A, y);
+      return new Vector3d(rv);
    }
    
 
