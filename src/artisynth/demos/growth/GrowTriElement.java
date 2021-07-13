@@ -38,6 +38,9 @@ public class GrowTriElement extends ShellTriElement {
     *  contains a symmetrical 3x3 plastic strain matrix for a given integration 
     *  point of the element. (6 x numIntegPts). */
    protected MatrixNd mStrainAtIntegPts;
+   
+   /** Matrix representation of the strain at each edge. */
+   protected Matrix3d mBendStrain;
  
    
    

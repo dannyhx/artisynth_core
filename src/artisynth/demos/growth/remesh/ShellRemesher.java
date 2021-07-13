@@ -9,10 +9,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
+import java.util.Map;
 
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
+import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.modelbase.ModelComponentBase;
+import artisynth.demos.growth.thinshell.EdgeDataMap;
+import artisynth.demos.growth.thinshell.EdgeDataMap.EdgeData;
 import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.MeshUtil;
 import artisynth.demos.growth.util.ShellUtil;
@@ -105,9 +109,23 @@ public class ShellRemesher extends ShellRemeshOps {
 
    /* --- Primary Remeshing Function --- */
    
-   /** Perform a remesh. */
+   /** 
+    * Perform a remesh.
+    * 
+    * dynamicremesh.cpp :: dynamic_remesh(Mesh&...)
+    */
    public void remesh() {
-      // dynamicremesh.cpp :: dynamic_remesh(Mesh&...)
+      // Compute the thin-shell plastic bending strain matrix for each element 
+      // before remeshing. Newly created elements will have their strain matrix 
+      // computed on the spot.
+      if (mFemModel.myThinShellAux != null) {
+         for (Face face : mMesh.getFaces ()) {
+            ShellElement3d ele = mFemModel.getShellElement (face.idx);
+            
+            Matrix3d bendStrain = mFemModel.myThinShellAux.bendStrain_edgesToFace (face);
+            ele.getPlasticBendStrain ().set (bendStrain);
+         }
+      }
       
       mSizingField.computeVertexSizingFields ();
       
@@ -121,6 +139,34 @@ public class ShellRemesher extends ShellRemeshOps {
          "Num denied collapsed b/c poor faces: %d, " +
          "b/c excessive edge metric: %d\n", 
          numDeniedCollapseBcPoorFace, numDeniedCollapseBcBigEdgeMetric);
+      
+      // Compute the thin-shell plastic strain for each edge.
+      if (mFemModel.myThinShellAux != null) {
+         // Reconstruct the map to reflect the remeshed mesh.
+         mFemModel.myEdgeDataMap = new EdgeDataMap(mFemModel, mMesh);
+         
+         for (Face face : mMesh.getFaces ()) {
+            ShellElement3d ele = mFemModel.getShellElement (face.idx);
+            
+            Vector3d edgeStrains = mFemModel.myThinShellAux.
+               bendStrain_faceToEdges (face, ele.getPlasticBendStrain ());
+            
+            for (int e = 0; e < 3; e++) {
+               HalfEdge edge = face.getEdge (e);
+               if (edge.opposite == null) {
+                  continue;
+               }
+               
+               EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
+               edgeData.mAngStrain += edgeStrains.get (e) / 2;
+               // Divide by 2 because opposite face will also contribute to
+               // strain.
+            }
+         }
+         
+         // Refresh node neighbors.
+         mFemModel.myThinShellAux.refreshIndirectNodeNeighbors ();
+      }
    }
    
    
@@ -576,11 +622,11 @@ public class ShellRemesher extends ShellRemeshOps {
       // TODO: preserve logic, node or edge
       if ( MeshUtil.isBoundaryVtx (edge.head) || 
            MeshUtil.isBoundaryVtx (edge.tail) ) {
-         return new OpRv();
+         return createOpRv();
       }
 
       if ( ! SF_canCollapse(edge, rVtx) ) {
-         return new OpRv();
+         return createOpRv();
       }
       
       if (isDebug) System.out.printf (

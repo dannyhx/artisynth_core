@@ -45,6 +45,8 @@ public abstract class ShellElement3d extends FemElement3dBase
    
    protected static FemElementRenderer myRenderer;
    
+   public Matrix3d myPlasticBendStrain;
+   
    public static PropertyList myProps =
       new PropertyList (ShellElement3d.class, FemElement3dBase.class);
 
@@ -217,6 +219,14 @@ public abstract class ShellElement3d extends FemElement3dBase
       return mag/2;
    }         
 
+   public Matrix3d getPlasticBendStrain() {
+      if (this.myPlasticBendStrain == null) {
+         this.myPlasticBendStrain = new Matrix3d();
+      }
+      
+      return this.myPlasticBendStrain;
+   }
+   
    /* --- Shape functions and coordinates --- */
 
    /**

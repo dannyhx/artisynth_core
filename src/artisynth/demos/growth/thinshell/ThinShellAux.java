@@ -140,16 +140,18 @@ public class ThinShellAux {
             FemNode3d n3 = mModel.getNode( oppVtxs[1].getIndex () );
             
             for (FemNode3d nodei : new FemNode3d[] {n0, n1, n2, n3}) {
-               int bi = nodei.getSolveIndex ();
+               int bi = nodei.getLocalSolveIndex ();
                
                for (FemNode3d nodej : new FemNode3d[] {n0, n1, n2, n3} ) {
-                  int bj = nodej.getSolveIndex ();
+                  int bj = nodej.getLocalSolveIndex ();
                   
                   // Assumes !mModel.mySolveMatrixSymmetricP. 
                   if (bj >= bi) {
                      FemNodeNeighbor neigh = nodei.getNodeNeighbor (nodej);
                      if (neigh == null) {
                         nodei.addIndirectNeighbor (nodej);
+                        
+                        System.out.println ("neigh");
                      }
                   }
                }
@@ -169,7 +171,7 @@ public class ThinShellAux {
          
          int i = 0;
          for (FemNode3d nodei : nodes) {
-            int bi = nodei.getSolveIndex ();               
+            int bi = nodei.getLocalSolveIndex ();               
             
             Vector3d iForce = new Vector3d();
             force.getSubVector (i * 3, iForce);
@@ -177,7 +179,7 @@ public class ThinShellAux {
             
             int j = 0;
             for (FemNode3d nodej : nodes) {
-               int bj = nodej.getSolveIndex ();
+               int bj = nodej.getLocalSolveIndex ();
                
                // Assumes !mModel.mySolveMatrixSymmetricP. 
                if (bj >= bi) {
@@ -221,7 +223,7 @@ public class ThinShellAux {
             
             int i = 0;
             for (FemNode3d nodei : new FemNode3d[] {n0, n1, n2, n3}) {
-               int bi = nodei.getSolveIndex ();               
+               int bi = nodei.getLocalSolveIndex ();               
                
                Vector3d iForce = new Vector3d();
                forces.getColumn (i, iForce);
@@ -229,7 +231,7 @@ public class ThinShellAux {
                
                int j = 0;
                for (FemNode3d nodej : new FemNode3d[] {n0, n1, n2, n3} ) {
-                  int bj = nodej.getSolveIndex ();
+                  int bj = nodej.getLocalSolveIndex ();
                   
                   // Assumes !mModel.mySolveMatrixSymmetricP. 
                   if (bj >= bi) {
@@ -797,11 +799,13 @@ public class ThinShellAux {
    public Matrix3d bendStrain_edgesToFace(Face face) {
       Matrix3d S = new Matrix3d();
       
-      ShellTriElement ele = (ShellTriElement)mModel.getShellElement (face.getIndex ());
+      ShellTriElement ele = (ShellTriElement)mModel.getShellElement (
+         face.getIndex ());
       Vector3d nrmRest = ShellUtil.getNormal (ele, true);
       
       for (int e = 0; e < 3; e++) {
          HalfEdge edge = face.getEdge (e);
+         
          int h = edge.head.getIndex ();
          int t = edge.tail.getIndex ();
          
@@ -809,17 +813,18 @@ public class ThinShellAux {
          FemNode3d tNode = mModel.getNode (t);
          
          Point3d hu = hNode.getRestPosition ();
-         Point3d ht = tNode.getRestPosition ();
+         Point3d tu = tNode.getRestPosition ();
          
-         Vector3d e_mat = new Vector3d(hu).sub(ht);
+         Vector3d e_mat = new Vector3d(hu).sub(tu);
          Vector3d t_mat = new Vector3d(e_mat).normalize ().cross (nrmRest);
          
          EdgeData edgeData = mModel.myEdgeDataMap.get (edge);
+         double angStrain = (edgeData != null) ? edgeData.mAngStrain : 0;
          
-         Matrix3d S_inc = MathUtil.outerProduct (t_mat, t_mat);
-         S_inc.scale (-0.5 * edgeData.mAngStrain * e_mat.norm ());
+         Matrix3d S_step = MathUtil.outerProduct (t_mat, t_mat);
+         S_step.scale (0.5 * angStrain * e_mat.norm ());
          
-         S.sub (S_inc);
+         S.sub (S_step);
       }
       
       double areaRest = ShellUtil.area (ele.getNodes (), true);
@@ -846,6 +851,7 @@ public class ThinShellAux {
       
       for (int e = 0; e < 3; e++) {
          HalfEdge edge = face.getEdge (e);
+         
          int h = edge.head.getIndex ();
          int t = edge.tail.getIndex ();
          
@@ -853,9 +859,9 @@ public class ThinShellAux {
          FemNode3d tNode = mModel.getNode (t);
          
          Point3d hu = hNode.getRestPosition ();
-         Point3d ht = tNode.getRestPosition ();
+         Point3d tu = tNode.getRestPosition ();
          
-         Vector3d e_mat = new Vector3d(hu).sub(ht);
+         Vector3d e_mat = new Vector3d(hu).sub(tu);
          Vector3d t_mat = new Vector3d(e_mat).normalize ().cross (nrm);
          
          // Se

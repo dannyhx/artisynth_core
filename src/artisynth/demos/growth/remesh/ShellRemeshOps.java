@@ -18,9 +18,14 @@ import artisynth.core.mechmodels.Particle;
 import artisynth.core.mechmodels.PointParticleAttachment;
 import artisynth.core.mechmodels.VertexContactMaster;
 import artisynth.demos.growth.collision.ContactConstraintAgg;
+import artisynth.demos.growth.remesh.RemeshOps.OpRv;
+import artisynth.demos.growth.remesh.RemeshOps.RemeshOp;
+import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.Face;
+import maspack.geometry.HalfEdge;
 import maspack.geometry.PolygonalMesh;
 import maspack.geometry.Vertex3d;
+import maspack.matrix.Matrix3d;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
 import maspack.util.DataBuffer;
@@ -128,31 +133,70 @@ public class ShellRemeshOps extends RemeshOps {
    }
    
    /** Add a new FEM element. */
-   protected Object addFace(Face face, Object removedParent) {
-      super.addFace (face, removedParent);
+   protected Object addFace(Face face, OpRv opRv) {
+      super.addFace (face, opRv);
       
       ShellTriElement newEle = createElement(face);
       newEle.setName ("MyEle_#" + mMesh.numFaces());
       mFemModel.addShellElement (newEle);
-      newEle.getIntegrationData()[0].computeInverseRestJacobian (
-         newEle.getIntegrationPoints()[0], newEle.getNodes ());
+      
+      ShellOpRv sOpRv = (ShellOpRv) opRv;
+      
+      if (mFemModel.myThinShellAux == null) {
+         newEle.getIntegrationData()[0].computeInverseRestJacobian (
+            newEle.getIntegrationPoints()[0], newEle.getNodes ());
+      } else if (sOpRv.mOp == RemeshOp.BISECT) {
+         // Newly created elements uses same strain as parent's.
+         Matrix3d plasMembStrain = sOpRv.mParentPlasticMembStrains.get (0);
+         Matrix3d plasBendStrain = sOpRv.mParentPlasticBendStrains.get (0);
+         newEle.getPlasticDeformation ().set(plasMembStrain);
+         newEle.getPlasticBendStrain ().set(plasBendStrain);
+      } else if (sOpRv.mOp == RemeshOp.FLIP) {
+         // Newly created elements uses area-weighted average of parents'.
+         Pair<Matrix3d,Matrix3d> strainPair = sOpRv.getAvgParentPlasticStrains ();
+         Matrix3d plasMembStrain = strainPair.first;
+         Matrix3d plasBendStrain = strainPair.second;
+         newEle.getPlasticDeformation ().set(plasMembStrain);
+         newEle.getPlasticBendStrain ().set(plasBendStrain);
+      } else if (sOpRv.mOp == RemeshOp.COLLAPSE) {
+         // Newly created element uses corresponding parent's.
+         Matrix3d plasMembStrain = sOpRv.mParentPlasticMembStrains.removeFirst ();
+         Matrix3d plasBendStrain = sOpRv.mParentPlasticBendStrains.removeFirst ();
+         newEle.getPlasticDeformation ().set(plasMembStrain);
+         newEle.getPlasticBendStrain ().set(plasBendStrain);
+      }
       
       return newEle;
    }
    
    /** Remove a FEM element. */
-   public Object removeFace(Face face) {
-      super.removeFace (face);
+   public Object removeFace(Face face, OpRv opRv) {
+      ShellTriElement rmEle = (ShellTriElement)mFemModel.getShellElement(face.idx);
+
+      // Save the thin-shell element-wise plastic strain.
       
-      ShellElement3d removedEle = mFemModel.getShellElements ().
-         remove (face.idx);
+      if (opRv != null && mFemModel.myThinShellAux != null) {
+         Matrix3d membStrain = new Matrix3d(rmEle.getPlasticDeformation ());
+         Matrix3d bendStrain = mFemModel.myThinShellAux.bendStrain_edgesToFace (face);
+
+         ShellOpRv sOpRv = (ShellOpRv) opRv;
+         sOpRv.mParentPlasticMembStrains.add (membStrain);
+         sOpRv.mParentPlasticBendStrains.add (bendStrain);
+         sOpRv.mParentRestAreas.add( ShellUtil.area(rmEle.getNodes (), true) );
+      }
+
+      // Remove face and its element from model.
+      
+      super.removeFace (face, opRv);
+      mFemModel.getShellElements ().remove (face.idx);
       
       // Rename subsequent ele
+      
       for (int i = 0; i < mFemModel.numShellElements (); i++) {
          mFemModel.getShellElement (i).setName ("MyEle_#" + i);
       }
       
-      return removedEle;
+      return rmEle;
    }
    
 
@@ -589,6 +633,58 @@ public class ShellRemeshOps extends RemeshOps {
       vcm.myWgts = new double[] {wt};
 
       return vcm;
+   }
+   
+   /* --- Helper Classes --- */
+   
+   protected class ShellOpRv extends OpRv {
+      protected LinkedList<Double> mParentRestAreas;
+      protected LinkedList<Matrix3d> mParentPlasticMembStrains; 
+      protected LinkedList<Matrix3d> mParentPlasticBendStrains;
+      
+      public ShellOpRv() {
+         super();
+         init();
+      }
+      
+      public ShellOpRv(int numAddedFaces, int numRemovedFaces) {
+         super(numAddedFaces, numRemovedFaces);
+         init();
+      }
+      
+      protected void init() {
+         this.mParentRestAreas = new LinkedList<Double>();
+         this.mParentPlasticMembStrains = new LinkedList<Matrix3d>();
+         this.mParentPlasticBendStrains = new LinkedList<Matrix3d>();
+      }
+      
+      public Pair<Matrix3d, Matrix3d> getAvgParentPlasticStrains() {
+         Matrix3d membAvg = new Matrix3d();
+         Matrix3d bendAvg = new Matrix3d();
+         
+         double areaSum = 0;
+         for (double area : this.mParentRestAreas) {
+            areaSum += area;
+         }
+         
+         for (int i = 0; i < this.mParentRestAreas.size (); i++) {
+            double area = this.mParentRestAreas.get (i);
+            double wt = area / areaSum;
+            
+            membAvg.scaledAdd (wt, this.mParentPlasticMembStrains.get (i));
+            bendAvg.scaledAdd (wt, this.mParentPlasticBendStrains.get (i));
+         }
+         
+         return new Pair<Matrix3d, Matrix3d>(membAvg, bendAvg);
+      }
+   }
+   
+   protected OpRv createOpRv() {
+      return new ShellOpRv();
+   }
+   
+   protected OpRv createOpRv(int numAddedFaces, int numRemovedFaces) {
+      return new ShellOpRv(numAddedFaces, numRemovedFaces);
    }
    
    /* --- Interfacing --- */

@@ -1,10 +1,8 @@
 package artisynth.demos.growth.util;
 
 import maspack.matrix.DenseMatrixBase;
-import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Vector;
-import maspack.matrix.Vector3d;
 import maspack.matrix.VectorNd;
 
 /*
@@ -53,12 +51,12 @@ public class SolverUtil {
       VectorNd y = new VectorNd(n);
       
       for (int i = 0; i < n; i++) {
-         Vector3d iCol = new Vector3d();
+         VectorNd iCol = new VectorNd(m);
          A.getColumn (i, iCol);
          y.set (i, b.dot (iCol));
          
          for (int j = 0; j < n; j++) {
-            Vector3d jCol = new Vector3d();
+            VectorNd jCol = new VectorNd(m);
             A.getColumn (j, jCol);
             M.set (i, j, iCol.dot (jCol));
          }

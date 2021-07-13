@@ -93,7 +93,7 @@ public class GrowRemesher extends ShellRemesher {
    }
    
    
-   /* --- Primary Remeshing Function --- */
+   /* --- Primary Public Functions--- */
       
    public void remesh() {
       preRemesh();
@@ -106,6 +106,10 @@ public class GrowRemesher extends ShellRemesher {
     * before remeshing.
     */
    public void preRemesh() {
+      if (mFemModel.myThinShellAux != null) {
+         return;
+      }
+      
       isEleModified = false;
    
       int numEles = mMesh.numFaces ();
@@ -137,6 +141,10 @@ public class GrowRemesher extends ShellRemesher {
     * mesh. 
     */
    public void postRemesh() {
+      if (mFemModel.myThinShellAux != null) {
+         return;
+      }
+      
       if (isEleModified) {
 //         System.out.println ("Transferring residual strain to new mesh...");
          transferPlasticDeformationGradients (mFemModel.getShellElements ());
@@ -245,6 +253,21 @@ public class GrowRemesher extends ShellRemesher {
       return itpPrestrain;
    }
   
+   /* --- Primary Remeshing Operations --- */
+   
+//   public OpRv bisectEdge(HalfEdge he) {
+//      OpRv rv = super.bisectEdge (he);
+//      
+//      return rv;
+//   }
+//   
+//   public OpRv flip(HalfEdge edge) {
+//      return super.flip (edge);
+//   }
+//   
+//   public OpRv collapseEdge(HalfEdge e, Vertex3d rVtx, boolean useVtxAvg) {
+//      return super.collapseEdge (e, rVtx, useVtxAvg);
+//   }
 
    /* --- Secondary Functions --- */ 
    
@@ -557,7 +580,7 @@ public class GrowRemesher extends ShellRemesher {
          }
          
          Face newFace = MeshUtil.createFace (newFaceVtxs[0], newFaceVtxs[1], newFaceVtxs[2], refFace);
-         removeFace (refFace);
+         removeFace (refFace, null);
          addFace (newFace, null);
       }
    }

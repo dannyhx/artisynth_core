@@ -4,17 +4,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 import artisynth.core.femmodels.FemModel3d;
-import artisynth.core.femmodels.FemNode3d;
-import artisynth.core.femmodels.ShellTriElement;
-import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
 import maspack.geometry.PolygonalMesh;
-import maspack.matrix.Matrix3d;
-import maspack.matrix.Matrix6x3;
-import maspack.matrix.Point3d;
-import maspack.matrix.Vector3d;
 
 /**
  * Provides way to associate data to mesh edges. 
@@ -25,7 +18,7 @@ public class EdgeDataMap {
       public double mAngStrain;
    }
    
-   protected HashMap<HalfEdge,EdgeData> mMap;
+   public HashMap<HalfEdge,EdgeData> mMap;
    protected FemModel3d mModel;
    
    public EdgeDataMap(FemModel3d model, PolygonalMesh mesh) {

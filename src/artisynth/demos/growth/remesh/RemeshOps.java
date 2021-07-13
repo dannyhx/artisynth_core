@@ -36,7 +36,8 @@ public class RemeshOps {
     * Information regarding the bisection (e.g. new faces that are created).
     */
    public OpRv bisectEdge(HalfEdge he) {
-      OpRv rv = new OpRv(4,2);
+      OpRv rv = createOpRv(4,2);
+      rv.mOp = RemeshOp.BISECT;
       
       Vertex3d vtxH = he.head; 
       Vertex3d vtxT = he.tail;
@@ -58,23 +59,23 @@ public class RemeshOps {
       // Replace local face with two smaller faces, using new edge between
       // new vertex and edge's opposite vertex.
       
-      Object locRemoved = removeFace (locFace);
+      removeFace (locFace, rv);
       rv.mRemovedFaces[0] = locFace;
       rv.mAddedFaces[0] = MeshUtil.createFace (locEleOppVtx, rv.mNewVertex, vtxH, locFace);
       rv.mAddedFaces[1] = MeshUtil.createFace (locEleOppVtx, vtxT, rv.mNewVertex, locFace);
       
-      addFace(rv.mAddedFaces[0], locRemoved);
-      addFace(rv.mAddedFaces[1], locRemoved);
+      addFace(rv.mAddedFaces[0], rv);
+      addFace(rv.mAddedFaces[1], rv);
       
       // Do same for opposite face
       
       if (oppFace != null) {
-         Object oppRemoved = removeFace (oppFace);
+         removeFace (oppFace, rv);
          rv.mRemovedFaces[1] = oppFace;
          rv.mAddedFaces[2] = MeshUtil.createFace (oppEleOppVtx, vtxH, rv.mNewVertex, oppFace);
          rv.mAddedFaces[3] = MeshUtil.createFace (oppEleOppVtx, rv.mNewVertex, vtxT, oppFace);
-         addFace(rv.mAddedFaces[2], oppRemoved);
-         addFace(rv.mAddedFaces[3], oppRemoved);
+         addFace(rv.mAddedFaces[2], rv);
+         addFace(rv.mAddedFaces[3], rv);
       }
       
       return rv;
@@ -88,15 +89,16 @@ public class RemeshOps {
     * Information regarding the flip (e.g. new faces that are created).
     */
    public OpRv flip(HalfEdge edge) {
-      OpRv rv = new OpRv(2,2);
+      OpRv rv = createOpRv(2,2);
+      rv.mOp = RemeshOp.FLIP;
       
       rv.mRemovedFaces[0] = edge.getFace ();
       rv.mRemovedFaces[1] = edge.getOppositeFace ();
       
       rv.mRemovedEdge = MeshUtil.getCommonEdge(rv.mRemovedFaces[0], rv.mRemovedFaces[1]);
       
-      removeFace (rv.mRemovedFaces[0]);
-      removeFace (rv.mRemovedFaces[1]);
+      removeFace (rv.mRemovedFaces[0], rv);
+      removeFace (rv.mRemovedFaces[1], rv);
       
       Vertex3d[] quadVtxs = MeshUtil.getQuadrilateralVtxs(edge);
       
@@ -105,8 +107,8 @@ public class RemeshOps {
       rv.mAddedFaces[0] = MeshUtil.createFace (quadVtxs[0], quadVtxs[1], quadVtxs[3], rv.mRemovedFaces[0]) ;
       rv.mAddedFaces[1] = MeshUtil.createFace (quadVtxs[3], quadVtxs[1], quadVtxs[2], rv.mRemovedFaces[0]) ;  
       
-      addFace (rv.mAddedFaces[0], null);
-      addFace (rv.mAddedFaces[1], null);
+      addFace (rv.mAddedFaces[0], rv);
+      addFace (rv.mAddedFaces[1], rv);
       
       rv.mAddedEdge = MeshUtil.getCommonEdge(rv.mAddedFaces[0], rv.mAddedFaces[1]);
       
@@ -124,6 +126,9 @@ public class RemeshOps {
     * average of 'a' and 'b'.
     */
    public OpRv collapseEdge(HalfEdge e, Vertex3d rVtx, boolean useVtxAvg) {
+      OpRv rv = createOpRv();
+      rv.mOp = RemeshOp.COLLAPSE;
+      
       Vertex3d a = MeshUtil.getOtherVertex (rVtx, e);
       Vertex3d b = rVtx;                                // Vertex to delete
          
@@ -132,13 +137,13 @@ public class RemeshOps {
       // 1. Remove faces (1 or 2) along e
        
       Face face = e.getFace ();
-      removeFace (face);
+      removeFace (face, null);
       
       Vector3d refNrm = new Vector3d();
       face.computeNormal (refNrm);
        
       Face oppFace = e.getOppositeFace ();
-      if (oppFace != null) removeFace (oppFace);
+      if (oppFace != null) removeFace (oppFace, null);
        
       // 2. (OPTIONAL) Modify 'a' to midpoint
      
@@ -168,17 +173,16 @@ public class RemeshOps {
       ArrayList<Object> removedRingObjB = new ArrayList<Object>();
       
       for (Face faceToDelete : faceRingB) {
-         Object removedObj = removeFace (faceToDelete);
+         Object removedObj = removeFace (faceToDelete, rv);
          removedRingObjB.add (removedObj);
       }
        
       for (Face faceToAdd : newFacesB) {
-         addFace (faceToAdd, removedRingObjB.remove (0));
+         addFace (faceToAdd, rv);
       }
        
       removeVertex (b);
 
-      OpRv rv = new OpRv();
       rv.mAddedFaces = newFacesB.toArray (new Face[0]);
       rv.mRemovedFaces = faceRingB.toArray (new Face[0]);
       rv.mNewVertex = null;
@@ -204,12 +208,12 @@ public class RemeshOps {
       mMesh.removeVertex (vtx);
    }
    
-   protected Object addFace(Face face, Object removedParent) {
+   protected Object addFace(Face face, OpRv opRv) {
       Face newFace = mMesh.addFace (face.getTriVertices ());
       return newFace;
    }
    
-   protected Object removeFace(Face face) {
+   protected Object removeFace(Face face, OpRv opRv) {
       mMesh.removeFace (face);
       return face;
    }
@@ -224,6 +228,8 @@ public class RemeshOps {
     * remeshing operation.
     */
    protected class OpRv {
+      public RemeshOp mOp;
+      
       public Face[] mAddedFaces;
       public Face[] mRemovedFaces;
       
@@ -265,7 +271,30 @@ public class RemeshOps {
                 (mAddedFaces.length == 0 && mRemovedFaces.length == 0);
       }
    }
+  
+   protected OpRv createOpRv() {
+      return new OpRv();
+   }
    
+   protected OpRv createOpRv(int numAddedFaces, int numRemovedFaces) {
+      return new OpRv(numAddedFaces, numRemovedFaces);
+   }
+   
+   protected enum RemeshOp {
+      NONE,
+      BISECT,
+      FLIP,
+      COLLAPSE, 
+      CUT;
+      
+      public static boolean isCopyStrain(RemeshOp op) {
+         return (op == BISECT || op == COLLAPSE);
+      }
+      
+      public static boolean isWeightedCopyStrain(RemeshOp op) {
+         return (op == FLIP);
+      }
+   }
    
    
    /* --- Interfacing --- */
