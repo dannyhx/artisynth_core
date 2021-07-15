@@ -16,7 +16,7 @@ public class _Debug_ThinShell extends Basic_Base {
       
       mEnableDiffusion = true;
       mEnableGrowth = true; 
-      mEnableRemesh = false; 
+      mEnableRemesh = true; 
       mEnablePlasticEmbedding = false; 
       
       mEnableCollisionHandling = false;
@@ -25,11 +25,11 @@ public class _Debug_ThinShell extends Basic_Base {
       
 //      mMeshX = 12.5;
 //      mMeshY = 2.5;
-      mMeshX = 25;
-      mMeshY = 6;
-         
-      mMeshXDiv = 25;
-      mMeshYDiv = 6;
+//      mMeshX = 25;
+//      mMeshY = 6;
+//         
+//      mMeshXDiv = 25;
+//      mMeshYDiv = 6;
       
 //       mMeshX = 25;
 //       mMeshY = 5;
@@ -37,14 +37,14 @@ public class _Debug_ThinShell extends Basic_Base {
 //       mMeshXDiv = 50;
 //       mMeshYDiv = 10;
       
-//      mMeshX = 1;
-//      mMeshY = 1;
+      mMeshX = 1;
+      mMeshY = 1;
        
 //      mMeshX = .1;
 //      mMeshY = .1;
       
-//      mMeshXDiv = 1;
-//      mMeshYDiv = 1;
+      mMeshXDiv = 1;
+      mMeshYDiv = 1;
       
       morphogenSrcDuration = 0.01;
       

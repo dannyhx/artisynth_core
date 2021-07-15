@@ -69,6 +69,7 @@ import artisynth.core.util.StringToken;
 import artisynth.demos.growth.thinshell.EdgeDataMap;
 import artisynth.demos.growth.thinshell.ThinShellAux;
 import artisynth.demos.growth.util.HingeUtil;
+import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.AABBTree;
 import maspack.geometry.BVFeatureQuery;
 import maspack.geometry.BVNode;
@@ -2931,6 +2932,7 @@ PointAttachable, ConnectableBody {
          }
       }
 
+      // DAN21
       if (!myStiffnessesValidP && mySolveMatrixSymmetricP) {
          for (FemNode3d n : myNodes) {
             int bi = n.getLocalSolveIndex();
@@ -2943,6 +2945,7 @@ PointAttachable, ConnectableBody {
                      nbrT.setTransposedStiffness(nbr);
                   }
                }
+               
                // used for soft nodal-based incompressibilty:
                for (FemNodeNeighbor nbr : getIndirectNeighbors(n)) {
                   int bj = nbr.myNode.getLocalSolveIndex();

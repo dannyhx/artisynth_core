@@ -7,6 +7,7 @@ import java.util.LinkedList;
 import artisynth.core.driver.Main;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
+import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.gui.ControlPanel;
 import artisynth.core.mechmodels.CollisionBehavior;
 import artisynth.core.mechmodels.CollisionBehavior.Method;
@@ -580,7 +581,7 @@ public class GrowDemo extends ShellPatch {
       // Setup the collision behavior for each pair of models.
       toggleCollisionBehavior(mEnableCollisionHandling);
       
-      if (mIsShowRefMesh) 
+      if (mIsShowRefMesh)
          updateReferenceMesh();
       
       if (mCustom) {

@@ -15,10 +15,10 @@ public class Basic_Curl_ThinShell extends Basic_Curl {
       
       m_isMembrane = true;
       
-      mEnableDiffusion = false;
-      mEnableGrowth = false; 
+      mEnableDiffusion = true;
+      mEnableGrowth = true; 
       mEnableRemesh = true; 
-      mEnablePlasticEmbedding = false; 
+      mEnablePlasticEmbedding = true; 
       mEnableCollisionHandling = false;
       
       this.mPauseEveryInterval = 999;
@@ -31,5 +31,4 @@ public class Basic_Curl_ThinShell extends Basic_Curl {
       mRendCfg.mNodeRadius = 0.01;
    }
    
-
 }

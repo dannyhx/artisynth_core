@@ -38,10 +38,6 @@ public class GrowRemesher extends ShellRemesher {
    /** Chemicals that are associated with the nodes. */
    protected MeshChemicals mMeshChems;
    
-   /** Did the last remesh modify any elements? If not, plastic strain doesn't 
-    *  have to interpolated. */
-   public boolean isEleModified = false;
-   
    /** How much should morphogen concentration influence the mesh resolution? */
    protected double mRefineMorphogen = 0;
    
@@ -109,8 +105,6 @@ public class GrowRemesher extends ShellRemesher {
       if (mFemModel.myThinShellAux != null) {
          return;
       }
-      
-      isEleModified = false;
    
       int numEles = mMesh.numFaces ();
       int numIntegPts = mFemModel.getShellElement(0).numIntegrationPoints ();

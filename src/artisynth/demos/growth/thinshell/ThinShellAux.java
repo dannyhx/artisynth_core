@@ -62,7 +62,6 @@ public class ThinShellAux {
       
       this.mMesh = mesh;
       this.mModel = model;
-      this.refreshIndirectNodeNeighbors ();
    }
    
    protected void setDDEMaterial(String matName) {
@@ -119,45 +118,48 @@ public class ThinShellAux {
     * 
     * This should be called after every remesh. 
     */
-   public void refreshIndirectNodeNeighbors() {
+   public void clearIndirectNeighbors() {
       for (FemNode3d node : mModel.getNodes ()) {
          node.clearIndirectNeighbors ();
       }
       
-      for (Face face : mMesh.getFaces ()) {
-         for (int e = 0; e < 3; e++) {
-            HalfEdge edge = face.getEdge (e);
-            edge = EdgeDataMap.getRealHalfEdge (edge);
-            if (edge.opposite == null) 
-            {
-               continue;
-            }
-            
-            FemNode3d n0 = mModel.getNode( edge.head.getIndex () );
-            FemNode3d n1 = mModel.getNode( edge.tail.getIndex () );
-            Vertex3d[] oppVtxs = MeshUtil.getOppositeVtxs (edge);
-            FemNode3d n2 = mModel.getNode( oppVtxs[0].getIndex () );
-            FemNode3d n3 = mModel.getNode( oppVtxs[1].getIndex () );
-            
-            for (FemNode3d nodei : new FemNode3d[] {n0, n1, n2, n3}) {
-               int bi = nodei.getLocalSolveIndex ();
-               
-               for (FemNode3d nodej : new FemNode3d[] {n0, n1, n2, n3} ) {
-                  int bj = nodej.getLocalSolveIndex ();
-                  
-                  // Assumes !mModel.mySolveMatrixSymmetricP. 
-                  if (bj >= bi) {
-                     FemNodeNeighbor neigh = nodei.getNodeNeighbor (nodej);
-                     if (neigh == null) {
-                        nodei.addIndirectNeighbor (nodej);
-                        
-                        System.out.println ("neigh");
-                     }
-                  }
-               }
-            }
-         }
-      }
+//      for (Face face : mMesh.getFaces ()) {
+//         for (int e = 0; e < 3; e++) {
+//            HalfEdge edge = face.getEdge (e);
+//            edge = EdgeDataMap.getRealHalfEdge (edge);
+//            if (edge.opposite == null) 
+//            {
+//               continue;
+//            }
+//            
+//            FemNode3d n0 = mModel.getNode( edge.head.getIndex () );
+//            FemNode3d n1 = mModel.getNode( edge.tail.getIndex () );
+//            Vertex3d[] oppVtxs = MeshUtil.getOppositeVtxs (edge);
+//            FemNode3d n2 = mModel.getNode( oppVtxs[0].getIndex () );
+//            FemNode3d n3 = mModel.getNode( oppVtxs[1].getIndex () );
+//            
+//            for (FemNode3d nodei : new FemNode3d[] {n0, n1, n2, n3}) {
+//               int bi = nodei.getLocalSolveIndex ();
+//               
+//               if (bi == -1) {
+//                  throw new RuntimeException("Solve index hasn't been initialized yet.");
+//               }
+//               
+//               for (FemNode3d nodej : new FemNode3d[] {n0, n1, n2, n3} ) {
+//                  int bj = nodej.getLocalSolveIndex ();
+//                  
+//                  // Assumes !mModel.mySolveMatrixSymmetricP. 
+//                  if (bj >= bi) {
+//                     FemNodeNeighbor neigh = nodei.getNodeNeighbor (nodej);
+//                     if (neigh == null) {
+//                        nodei.addIndirectNeighbor (nodej);
+//                        nodej.addIndirectNeighbor (nodei);
+//                     }
+//                  }
+//               }
+//            }
+//         }
+//      }
    }
    
    /** Compute and add the stretching force and stiffness of the FE model. */
@@ -183,7 +185,6 @@ public class ThinShellAux {
                
                // Assumes !mModel.mySolveMatrixSymmetricP. 
                if (bj >= bi) {
-                  
                   // Get stiffness matrix between nodei and nodej.
                   Matrix3d ijStiff = new Matrix3d();
                   stiffness.getSubMatrix (3*i, 3*j, ijStiff);
@@ -191,10 +192,8 @@ public class ThinShellAux {
                   FemNodeNeighbor neigh = nodei.getNodeNeighbor (nodej);
                   neigh.getK00 ().add(ijStiff);
                }
-               
                j++;
             }
-            
             i++;
          }
       }
@@ -235,7 +234,6 @@ public class ThinShellAux {
                   
                   // Assumes !mModel.mySolveMatrixSymmetricP. 
                   if (bj >= bi) {
-                     
                      // Get stiffness matrix between nodei and nodej.
                      Matrix3d ijStiff = new Matrix3d();
                      stiffness.getSubMatrix (3*i, 3*j, ijStiff);
@@ -243,6 +241,10 @@ public class ThinShellAux {
                      FemNodeNeighbor neigh = nodei.getNodeNeighbor (nodej);
                      if (neigh == null) {
                         neigh = nodei.getIndirectNeighbor(nodej);
+                        if (neigh == null) {
+                           neigh = nodei.addIndirectNeighbor (nodej);
+                           nodej.addIndirectNeighbor (nodei);
+                        }
                      }
                      neigh.getK00 ().add (ijStiff);
                   }
@@ -307,8 +309,9 @@ public class ThinShellAux {
       double h0 = MathUtil.distanceBetweenPointAndLine (x2, x0, x1) ;
       double h1 = MathUtil.distanceBetweenPointAndLine (x3, x0, x1) ;
       
-      h0 = 0.9; 
-      h1 = 0.9;
+      double k = 0.9;
+      h0 = k; 
+      h1 = k;
       
       Vector2d w_f0 = MathUtil.barycentricWeights (x2, x0, x1);
       Vector2d w_f1 = MathUtil.barycentricWeights (x3, x0, x1); 

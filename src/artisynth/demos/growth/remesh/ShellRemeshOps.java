@@ -53,6 +53,10 @@ public class ShellRemeshOps extends RemeshOps {
    
    protected boolean mHasBackNode;
    
+   /** Did the last remesh modify any elements? If not, plastic strain doesn't 
+    *  have to interpolated, and indirect node neighbors don't have to be cleared. */
+   public boolean isEleModified = false;
+   
    public ShellRemeshOps(PolygonalMesh mesh, FemModel3d femModel) {
       super(mesh);
       mFemModel = femModel;
@@ -137,7 +141,7 @@ public class ShellRemeshOps extends RemeshOps {
       super.addFace (face, opRv);
       
       ShellTriElement newEle = createElement(face);
-      newEle.setName ("MyEle_#" + mMesh.numFaces());
+      newEle.setName ("MyEle_#" + (mMesh.numFaces()-1));
       mFemModel.addShellElement (newEle);
       
       ShellOpRv sOpRv = (ShellOpRv) opRv;
@@ -212,6 +216,7 @@ public class ShellRemeshOps extends RemeshOps {
          triNodes[i] = mFemModel.getNode (v);
       }
 
+      isEleModified = true;
       ShellTriElement newEle = createElement(triNodes[0], triNodes[1],
          triNodes[2], mShellThickness);
 

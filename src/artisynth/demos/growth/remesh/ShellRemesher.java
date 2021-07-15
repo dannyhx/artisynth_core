@@ -59,6 +59,7 @@ public class ShellRemesher extends ShellRemeshOps {
    /** Force edge collapse  if it has a poor aspect ratio. */
    protected boolean allowCollapseForAlreadyPoorAspEdges = true;
    protected double edgeMetricCollapseThreshold = 0.9;
+  
    
    /** 
     * Initialize the remesher. 
@@ -115,6 +116,8 @@ public class ShellRemesher extends ShellRemeshOps {
     * dynamicremesh.cpp :: dynamic_remesh(Mesh&...)
     */
    public void remesh() {
+      isEleModified = false;
+      
       // Compute the thin-shell plastic bending strain matrix for each element 
       // before remeshing. Newly created elements will have their strain matrix 
       // computed on the spot.
@@ -164,8 +167,10 @@ public class ShellRemesher extends ShellRemeshOps {
             }
          }
          
-         // Refresh node neighbors.
-         mFemModel.myThinShellAux.refreshIndirectNodeNeighbors ();
+         // Refresh node neighbors, but only if there was a change.
+         if (isEleModified) {
+            mFemModel.myThinShellAux.clearIndirectNeighbors ();
+         }
       }
    }
    
