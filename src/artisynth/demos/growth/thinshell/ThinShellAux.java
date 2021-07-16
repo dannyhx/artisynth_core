@@ -190,7 +190,7 @@ public class ThinShellAux {
                   stiffness.getSubMatrix (3*i, 3*j, ijStiff);
                   
                   FemNodeNeighbor neigh = nodei.getNodeNeighbor (nodej);
-                  neigh.getK00 ().add(ijStiff);
+                  neigh.getK00 ().scaledAdd(1, ijStiff);
                }
                j++;
             }
@@ -268,7 +268,7 @@ public class ThinShellAux {
     * [2] -> Opposite Node 
     * [3] -> Opposite Node of Opposite Face.
     * 
-    * physics.cpp/bending_force(edge) <Space s>
+    * physics.cpp/bending_force(edge) <Space s> <WS>
     * 
     * @param edge
     * 
@@ -306,35 +306,30 @@ public class ThinShellAux {
       double restTheta = ShellUtil.getDihedralAngle (this.mModel, edge, true);
       restTheta += mModel.myEdgeDataMap.get (edge).mAngStrain;
       
-      double h0 = MathUtil.distanceBetweenPointAndLine (x2, x0, x1) ;
-      double h1 = MathUtil.distanceBetweenPointAndLine (x3, x0, x1) ;
-      
-      double k = 0.9;
-      h0 = k; 
-      h1 = k;
+      double h0 = MathUtil.distanceBetweenPointAndLine (x2, x0, x1);
+      double h1 = MathUtil.distanceBetweenPointAndLine (x3, x0, x1);
       
       Vector2d w_f0 = MathUtil.barycentricWeights (x2, x0, x1);
       Vector2d w_f1 = MathUtil.barycentricWeights (x3, x0, x1); 
       
       Matrix3x4 dthetaM = new Matrix3x4();
-      Vector3d w_f00_n0 = new Vector3d(n0).scale (-w_f0.x / h0); 
-      Vector3d w_f10_n1 = new Vector3d(n1).scale (-w_f1.x / h1); 
-      Vector3d w_f01_n0 = new Vector3d(n0).scale (-w_f0.y / h0); 
-      Vector3d w_f11_n1 = new Vector3d(n1).scale (-w_f1.y / h1); 
-      dthetaM.setColumn (0, new Vector3d(w_f00_n0).add (w_f10_n1));
-      dthetaM.setColumn (1, new Vector3d(w_f01_n0).add (w_f11_n1));
-      dthetaM.setColumn (2, new Vector3d(n0).scale (h0));
-      dthetaM.setColumn (3, new Vector3d(n1).scale (h1));
+      Vector3d w_f00_n0 = new Vector3d(n0).scale (w_f0.x / h0); 
+      Vector3d w_f10_n1 = new Vector3d(n1).scale (w_f1.x / h1); 
+      Vector3d w_f01_n0 = new Vector3d(n0).scale (w_f0.y / h0); 
+      Vector3d w_f11_n1 = new Vector3d(n1).scale (w_f1.y / h1); 
+      dthetaM.setColumn (0, new Vector3d(w_f00_n0).add (w_f10_n1).scale (-1));
+      dthetaM.setColumn (1, new Vector3d(w_f01_n0).add (w_f11_n1).scale (-1));
+      dthetaM.setColumn (2, new Vector3d(n0).scale (1/h0));
+      dthetaM.setColumn (3, new Vector3d(n1).scale (1/h1));
       VectorNd dtheta = MathUtil.matToVec_colMajor (dthetaM);
       
       double coeff = bending_coeff(edge, theta);
       
       MatrixNd dtheta_op = MathUtil.outerProduct (dtheta, dtheta);
       dtheta_op.scale (-coeff * 0.5);
+      dtheta_op.scale (-1); // TODO
       
       dtheta.scale (-coeff * (theta - restTheta) * 0.5);
-      
-//      System.out.printf ("w_f0: %.2f\n", w_f0.norm());
       
       return new Pair<MatrixNd,VectorNd>(dtheta_op, dtheta);
    }
@@ -597,7 +592,7 @@ public class ThinShellAux {
       
       double ke = ke0;                    // min(ke0, ke1)
       double weakening = mMatWeakening;   // max(f0->weakening, f1->weakening)
-      ke *= 1/(1 + weakening * 1);   // Rightmost 1 in place of edge->damage.
+      ke *= 1./(1 + weakening * 1);   // Rightmost 1 in place of edge->damage.
       double shape = (l*l) / (2*a);
       
       return ke * shape; 
