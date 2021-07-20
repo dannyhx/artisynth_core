@@ -141,7 +141,7 @@ PointAttachable, ConnectableBody {
    protected FrameFem3dConstraint myFrameConstraint;
    protected boolean myFrameRelativeP;
    public static boolean useFrameRelativeCouplingMasses = false;
-   protected boolean profileStressAndStiffness = false;
+   protected boolean profileStressAndStiffness = true;
 
    protected PointList<FemNode3d> myNodes;
    protected ArrayList<BodyConnector> myConnectors;
@@ -2886,6 +2886,7 @@ PointAttachable, ConnectableBody {
             }
          }
       }
+      
       for (ShellElement3d e : myShellElements) {
          FemMaterial mat = getElementMaterial(e);
          if (e.getElementClass() == ElementClass.SHELL) {

@@ -3,10 +3,7 @@ package artisynth.demos.growth;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
-import artisynth.core.femmodels.FemElement.ElementClass;
-import artisynth.demos.growth.thinshell.EdgeDataMap;
 import artisynth.demos.growth.thinshell.EdgeDataMap.EdgeData;
-import artisynth.demos.growth.util.HingeUtil;
 import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.Face;
@@ -310,6 +307,12 @@ public class Morphogen2GrowthTensor {
                
                Matrix3d strainMtx = vecToMtx3d(strainVect);
                
+               strainMtx.set (new double[][] {
+                  new double[] {0,0,0}, 
+                  new double[] {0,0.25,0},
+                  new double[] {0,0,0}
+               });
+               
                // Custom
                if (isBendingMorphogenHack && k < 3) {
                   // Apply strain as usual to top-surface.
@@ -323,7 +326,9 @@ public class Morphogen2GrowthTensor {
                   strainMtx.negate ();
                }
                
-               idata[k].addFp (strainMtx);
+//               idata[k].addFp (strainMtx);
+               strainMtx.add (Matrix3d.IDENTITY);
+               idata[k].setFp (strainMtx);
             }
          } else {
             if (gEle.getPlasticDeformation () == null) {
@@ -342,8 +347,31 @@ public class Morphogen2GrowthTensor {
             }
             avgStrain.scale(1.0 / gEle.numNodes ());
             
+            avgStrain.set (new double[][] {
+               new double[] {0,0,0}, 
+               new double[] {0,-5*Math.PI,0},
+               new double[] {0,0,0}
+            });
+            
             if (isBendingMorphogenHack) {
-               this._applyGrowthTensorAsBendingStrain (gEle, avgStrain);
+               int f = ShellUtil.getIndex (gEle);
+               Face face = mMesh.getFace (f);
+             
+               Vector3d edgeStrains = 
+                  mFemModel.myThinShellAux.bendStrain_faceToEdges (face, avgStrain);
+               
+               // For each of the 3 adjacent faces of the element.
+               for (int e = 0; e < 3; e++) {
+                  HalfEdge edge = face.getEdge (e);
+                  
+                  if (edge.opposite == null) {
+                     continue;
+                  }
+                  
+                  EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
+                  edgeData.mAngStrain = edgeStrains.get (e);
+               }
+               
             } else {
                gEle.getPlasticDeformation().add(avgStrain);
             }
@@ -372,76 +400,6 @@ public class Morphogen2GrowthTensor {
    }
    
    
-   
-   /* --- Membrane Bending --- */
-   
-   protected void _applyGrowthTensorAsBendingStrain(
-      GrowTriElement gEle, Matrix3d strain)
-   {
-      int f = ShellUtil.getIndex (gEle);
-      Face face = mMesh.getFace (f);
-      
-      Vector3d elePAR = new Vector3d(gEle.mPolDir).normalize ();
-      Vector3d eleNOR = ShellUtil.getNormal (gEle, true);
-      Vector3d elePER = new Vector3d().cross (eleNOR, elePAR).normalize ();
-      
-      // For each of the 3 adjacent faces of the element.
-      for (int e = 0; e < 3; e++) {
-         HalfEdge edge = face.getEdge (e);
-         
-         if (edge.opposite == null) {
-            continue;
-         }
-         
-         // 2 nodes of the edge.
-         Vertex3d vH = edge.getHead ();
-         Vertex3d vT = edge.getTail ();
-         int h = vH.getIndex (); 
-         int t = vT.getIndex ();
-         GrowNode3d nH = (GrowNode3d)mFemModel.getNode (h); 
-         GrowNode3d nT = (GrowNode3d)mFemModel.getNode (t);
-         Point3d uH = nH.getRestPosition ();
-         Point3d uT = nT.getRestPosition ();
-         
-         // Edge direction.
-         Vector3d edgeDir = new Vector3d(uH).sub (uT);
-         edgeDir.normalize ();
-         
-         // How much does X and Y axes align with edge's direction?
-         // 0.0 to 1.0.
-         double alignPctX = parallelFrac(edgeDir, Vector3d.X_UNIT);
-         double alignPctY = parallelFrac(edgeDir, Vector3d.Y_UNIT);
-         
-         if (alignPctX < 0.98) 
-            alignPctX = 0; 
-         
-         if (alignPctY < 0.98)
-            alignPctY = 0;
-
-         // Stretching along X = bending along Y
-         double concX = Math.max(0, strain.get (1, 1));
-         double concY = Math.max(0, strain.get (0, 0));
-         
-         // 1 concentration = PI/2 radians.
-         
-         double angleInc = 0;
-         angleInc += alignPctX * concX * (Math.PI/2);
-         angleInc += alignPctY * concY * (Math.PI/2);
-         angleInc /= 2.0; // Opposite edge will also contribute.
-         
-         EdgeData edgeData = this.mFemModel.myEdgeDataMap.get (edge);
-//         edgeData.mRestTheta += angleInc;
-         if (new Point3d(uH).add(uT).scale(0.5).y > 0 && alignPctX > 0.90) {
-            edgeData.mAngStrain += angleInc;
-         }
-         
-//       System.out.printf ("Edge [%d-%d], ", h, t);
-         
-//         System.out.printf ("Edge [%d-%d]: alignPctX: %.2f, alignPctY: %.2f, mRestTheta: %.2f, angleInc: %.2f, midpt-y: %.2f\n", 
-//            h, t, alignPctX, alignPctY, edgeData.mRestTheta, angleInc, new Point3d(uH).add(uT).scale (0.5).y );
-      }
-   }
-
    
    
    /* --- Util --- */

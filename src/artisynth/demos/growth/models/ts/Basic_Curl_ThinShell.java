@@ -1,6 +1,7 @@
-package artisynth.demos.growth.models.paper;
+package artisynth.demos.growth.models.ts;
 
 import artisynth.demos.growth.GrowNode3d;
+import artisynth.demos.growth.models.paper.Basic_Curl;
 
 /**
  * Notes:
@@ -15,7 +16,7 @@ public class Basic_Curl_ThinShell extends Basic_Curl {
    protected void build_pre() {
       super.build_pre();
       
-      m_isMembrane = false;
+      m_isMembrane = true;
       
       mEnableDiffusion = true;
       mEnableGrowth = true; 
@@ -32,8 +33,13 @@ public class Basic_Curl_ThinShell extends Basic_Curl {
 //      
 //      ///
 //      
-//      m_shellThickness = 1e-3;
-//      m_youngsModulus = 1e5; 
+      m_shellThickness = 1e-3;
+      m_youngsModulus = 1e4; 
+//      
+//      mEnableDiffusion = false;
+//      mEnableGrowth = false; 
+//      mEnableRemesh = false; 
+//      mEnablePlasticEmbedding = false; 
    }
    
    protected void build_renderConfig() {
@@ -52,7 +58,7 @@ public class Basic_Curl_ThinShell extends Basic_Curl {
       for (int v = 0; v < mMesh[0].numVertices (); v++) {
          if ( isMorphogenSrcNode(v) && t0 < morphogenSrcDuration) {
             GrowNode3d gNode = (GrowNode3d)mFemModel[0].getNode (v);
-            gNode.mChems.set (3, 0.4);
+            gNode.mChems.set (3, 0.75);
          }
       }
    }

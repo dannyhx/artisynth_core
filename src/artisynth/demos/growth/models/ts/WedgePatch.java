@@ -1,18 +1,17 @@
-package artisynth.demos.growth.models.base;
+package artisynth.demos.growth.models.ts;
 
 import java.awt.Color;
 
+import artisynth.core.femmodels.FemElement3d;
 import artisynth.core.femmodels.FemModel.SurfaceRender;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
-import artisynth.core.femmodels.ShellElement3d;
-import artisynth.core.femmodels.ShellTriElement;
+import artisynth.core.femmodels.WedgeElement;
 import artisynth.core.gui.ControlPanel;
 import artisynth.core.materials.LinearMaterial;
+import artisynth.core.materials.NeoHookeanMaterial;
 import artisynth.core.mechmodels.MechModel;
 import artisynth.core.workspace.RootModel;
-import artisynth.demos.growth.thinshell.EdgeDataMap;
-import artisynth.demos.growth.thinshell.ThinShellAux;
 import maspack.geometry.Face;
 import maspack.geometry.MeshFactory;
 import maspack.geometry.PolygonalMesh;
@@ -26,13 +25,15 @@ import maspack.render.Renderer.Shading;
 import maspack.widgets.DoubleFieldSlider;
 import maspack.widgets.LabeledComponentBase;
 
+// artisynth.demos.growth.models.ts.WedgePatch
+
 /**
  * Square patch of triangular solid-shell elements, subjected to gravity. 
  * Some nodes will be held in-place to demonstrate shell bending forces.
  * 
  * This is a base class for the growth demo.
  */
-public class ShellPatch extends RootModel {
+public class WedgePatch extends RootModel {
    
    /* --- Bodies --- */
    
@@ -57,10 +58,10 @@ public class ShellPatch extends RootModel {
    public double mMeshY = 10;
    
    /** Number of shell elements per row. */
-   public int mMeshXDiv = 10;
+   public int mMeshXDiv = 50;
    
    /** Number of shell elements per column. */
-   public int mMeshYDiv = 10;
+   public int mMeshYDiv = 50;
    
    /* --- FEM physical properties --- */
    
@@ -126,7 +127,6 @@ public class ShellPatch extends RootModel {
          clear ();
          build (null);
       }
-      System.out.println ("ShellPatch.initialize()");
       super.initialize (t);
    }
 
@@ -174,11 +174,21 @@ public class ShellPatch extends RootModel {
          mFemModel[m] = createFemModel();
 
          // Create a node for each mesh vertex
-         for (int v = 0; v < mMesh[m].numVertices (); v++) {
-            Vertex3d vtx = mMesh[m].getVertex (v);
-            FemNode3d node = createNode(vtx.getPosition ());
-            node.setName ("MyNode_#" + v);
-            mFemModel[m].addNode (node);
+         for (boolean isFront : new boolean[] {true, false}) {
+            for (int v = 0; v < mMesh[m].numVertices (); v++) {
+               Vertex3d vtx = mMesh[m].getVertex (v);
+               
+               FemNode3d node = null;
+               if (isFront) {
+                  node = createNode(vtx.getPosition ());
+                  node.setName ("MyNode_#" + v);
+               } else {
+                  node = createNode((Point3d)new Point3d(vtx.getPosition ()).add (0, 0, 1e-3));
+                  node.setName ("MyNode_#" + v + "_back");
+               }
+
+               mFemModel[m].addNode (node);
+            }
          }
          
          // Create an element for each mesh face
@@ -190,18 +200,14 @@ public class ShellPatch extends RootModel {
             FemNode3d n1 = mFemModel[m].getNode( vtxIdxs[1] );
             FemNode3d n2 = mFemModel[m].getNode( vtxIdxs[2] );
    
-            ShellTriElement ele = createElement(n0, n1, n2, m_shellThickness);
+            FemNode3d n3 = mFemModel[m].getNode( vtxIdxs[0]+mMesh[m].numVertices () );
+            FemNode3d n4 = mFemModel[m].getNode( vtxIdxs[1]+mMesh[m].numVertices () );
+            FemNode3d n5 = mFemModel[m].getNode( vtxIdxs[2]+mMesh[m].numVertices () );
+            
+            FemElement3d ele = createElement(n0, n1, n2, n3, n4, n5);
             ele.setName ("MyEle_#" + f);
-            mFemModel[m].addShellElement(ele);
+            mFemModel[m].addElement(ele);
          }
-         
-         if (this.m_isMembrane) {
-            mFemModel[m].myEdgeDataMap = new EdgeDataMap(mFemModel[m], mMesh[m]);
-            mFemModel[m].myThinShellAux = new ThinShellAux(mFemModel[m], mMesh[m]);
-            mFemModel[m].myThinShellAux.setAltMaterial (
-               m_youngsModulus, m_poissonsRatio, m_shellThickness);
-         }
-
          
          mMechModel.addModel (mFemModel[m]);
       }
@@ -215,7 +221,7 @@ public class ShellPatch extends RootModel {
    protected void build_modelProperties() {
       for (int m=0; m<M; m++) { 
          mFemModel[m].setMaterial (
-            new LinearMaterial(m_youngsModulus, m_poissonsRatio));
+            new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio));
          mFemModel[m].setStiffnessDamping (m_stiffnessDamping);
          mFemModel[m].setGravity (mGravity);
          mFemModel[m].setDensity (m_density);
@@ -259,7 +265,6 @@ public class ShellPatch extends RootModel {
          RenderProps.setPointStyle (mFemModel[m].getNodes(), 
                                     Renderer.PointStyle.SPHERE);
          RenderProps.setPointRadius (mFemModel[m].getNodes(), mRendCfg.mNodeRadius);
-         mFemModel[m].setDirectorRenderLen (mRendCfg.mDirectorLen);
          mFemModel[m].getRenderProps ().setLineWidth (mRendCfg.mLineWidth);
          if (getMainViewer() != null) {
             getMainViewer ().setBackgroundColor (mRendCfg.mBackgroundColor);
@@ -275,13 +280,11 @@ public class ShellPatch extends RootModel {
    protected void build_assembleUI() {
       // Add control panel
 
-      mPanel = new ControlPanel("shellPatchControlPanel");
-      mPanel.addWidget (this, "shellThickness", m_shellThickness, 10);
+      mPanel = new ControlPanel("wedgePatchControlPanel");
       mPanel.addWidget (mFemModel[0], "particleDamping");
       mPanel.addWidget (mFemModel[0], "stiffnessDamping", 0, 2000);
       mPanel.addWidget (mFemModel[0], "density", 10, 1000);
       mPanel.addWidget (mFemModel[0], "gravity");
-      mPanel.addWidget (mFemModel[0], "directorRenderLen");
       mPanel.addWidget (mFemModel[0], "material");
       LabeledComponentBase comp = mPanel.addWidget (mFemModel[0], "material.YoungsModulus");
       ((DoubleFieldSlider)comp).setSliderRange (1, 100000);
@@ -311,10 +314,9 @@ public class ShellPatch extends RootModel {
       return new FemNode3d(pt);
    }
    
-   protected ShellTriElement createElement(FemNode3d n0, FemNode3d n1,
-   FemNode3d n2, double thickness) {
-      ShellTriElement ele = new ShellTriElement(n0, n1, n2, thickness, this.m_isMembrane);
-      return ele;
+   protected FemElement3d createElement(FemNode3d n0, FemNode3d n1,
+   FemNode3d n2, FemNode3d n3, FemNode3d n4, FemNode3d n5) {
+      return  new WedgeElement(n0, n1, n2, n3, n4, n5);
    }
    
    /**
@@ -335,26 +337,16 @@ public class ShellPatch extends RootModel {
    /* --- Properties --- */
    
    public static PropertyList myProps =
-      new PropertyList (ShellPatch.class, RootModel.class);
+      new PropertyList (WedgePatch.class, RootModel.class);
    
    static {
-      myProps.add("shellThickness", "Thickness of each shell element", 
-                  m_shellThickness);
+
    }
    
    @Override
    public PropertyList getAllPropertyInfo() {
       return myProps;
    }
-   
-   public double getShellThickness() {
-      return mFemModel[0].getShellElement (0).getDefaultThickness ();
-   }
-   
-   public void setShellThickness(double newThickness) {
-      for (ShellElement3d ele : mFemModel[0].getShellElements ()) {
-         ele.setDefaultThickness (newThickness);
-      }
-   }
+
    
 }

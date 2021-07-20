@@ -1,22 +1,46 @@
-package artisynth.demos.growth.models.paper;
+package artisynth.demos.growth.models.ts;
 
 import artisynth.core.materials.FemMaterial;
 import artisynth.core.materials.NeoHookeanMaterial;
 import artisynth.demos.growth.GrowChemical;
 import artisynth.demos.growth.GrowModel3d;
 import artisynth.demos.growth.GrowNode3d;
+import artisynth.demos.growth.models.paper.Basic_Base;
 import maspack.geometry.PolygonalMesh;
+
+//  artisynth.demos.growth.models.ts._Debug_ThinShell
+
+/*
+      if (this.m_isMembrane) {
+         m_shellThickness = 1;
+         m_youngsModulus = 1e8;
+      } else {
+         m_shellThickness = 1e-2;
+         m_youngsModulus = 1e6;
+      }
+   
+                strainMtx.set (new double[][] {
+                  new double[] {0,0,0}, 
+                  new double[] {0,0.5,0},
+                  new double[] {0,0,0}
+               });
+               
+            avgStrain.set (new double[][] {
+               new double[] {0,0,0}, 
+               new double[] {0,-5*Math.PI,0},
+               new double[] {0,0,0}
+            });
+            
+ */
 
 public class _Debug_ThinShell extends Basic_Base {
    
    protected void build_pre() {
       super.build_pre();
-      
-      m_isMembrane = true;
-      
+            
       mEnableDiffusion = true;
       mEnableGrowth = true; 
-      mEnableRemesh = true; 
+      mEnableRemesh = false; 
       mEnablePlasticEmbedding = false; 
       
       mEnableCollisionHandling = false;
@@ -43,8 +67,8 @@ public class _Debug_ThinShell extends Basic_Base {
 //      mMeshX = .1;
 //      mMeshY = .1;
       
-      mMeshXDiv = 1;
-      mMeshYDiv = 1;
+      mMeshXDiv = 50;
+      mMeshYDiv = 50;
       
       morphogenSrcDuration = 0.01;
       
@@ -54,9 +78,16 @@ public class _Debug_ThinShell extends Basic_Base {
       mSurfaceColor = SurfaceColor.DEFAULT;
       
       //
+      m_isMembrane = false;
       
-      m_shellThickness = 0.001;
-      m_youngsModulus = 1e3;
+      if (this.m_isMembrane) {
+         m_shellThickness = 1;
+         m_youngsModulus = 1e8;
+      } else {
+         m_shellThickness = 1e-2;
+         m_youngsModulus = 1e6;
+      }
+      
       mSizeMin = 0.05;
       mSizeMax = mSizeMin*5;
       mDiffusionTimestepScale = 0.01;
@@ -65,6 +96,7 @@ public class _Debug_ThinShell extends Basic_Base {
 //      ShellPatch.m_particleDamping = 10;
       
    }
+   
    
 //   protected void build_modelSkeleton() {
 //      mMesh = new PolygonalMesh[M];
@@ -100,7 +132,7 @@ public class _Debug_ThinShell extends Basic_Base {
       super.build_renderConfig ();
       
       mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
-      mRendCfg.mNodeRadius = 0.05;
+      mRendCfg.mNodeRadius = 0.00;
    }
    
    protected void build_post() {

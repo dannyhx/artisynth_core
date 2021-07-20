@@ -570,7 +570,9 @@ public class GrowDemo extends ShellPatch {
             Main.getMain ().getViewer ().setCenter (mCameraCenter);
          }
          
-         Main.getMain ().getViewer ().setBackgroundColor (mRendCfg.mBackgroundColor);
+         if (Main.getMain ().getViewer () != null) {
+            Main.getMain ().getViewer ().setBackgroundColor (mRendCfg.mBackgroundColor);
+         }
       }
       
       // Pause the simulation if so.
