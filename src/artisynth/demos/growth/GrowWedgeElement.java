@@ -1,18 +1,13 @@
 package artisynth.demos.growth;
 
 import artisynth.core.femmodels.FemNode3d;
-import artisynth.core.femmodels.ShellTriElement;
+import artisynth.core.femmodels.WedgeElement;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Vector3d;
 
-/** 
- * Solid-shell (or simply referred as shell) modified to accommodate growth. 
- * 
- * Attributes are with respect to Morphogen2GrowthTensor.java.
- */
-public class GrowTriElement extends ShellTriElement implements GrowElementBase {
-   
+public class GrowWedgeElement extends WedgeElement implements GrowElementBase {
+
    /** Primary direction of growth. */
    public Vector3d mPolDir = new Vector3d(0,1,0);
    
@@ -34,39 +29,31 @@ public class GrowTriElement extends ShellTriElement implements GrowElementBase {
    
    /** Matrix representation of the strain at each edge. */
    protected Matrix3d mBendStrain;
- 
+   
+   
    
    
    /* --- Constructor --- */
 
-   public GrowTriElement (GrowNode3d p0, GrowNode3d p1,
-   GrowNode3d p2, double thickness) {
-      super(p0, p1, p2, thickness, false);
+   public GrowWedgeElement (GrowNode3d p0, GrowNode3d p1,
+   GrowNode3d p2, GrowNode3d p3, GrowNode3d p4, GrowNode3d p5) {
+      super(p0, p1, p2, p3, p4, p5);
+      
+      // Force GrowNode3d[]
+      setNodes(p0, p1, p2, p3, p4, p5);
       
       Matrix3d Fg = new Matrix3d();
       Fg.setIdentity ();
       setPlasticDeformation( Fg );
    }
    
-   public GrowTriElement (GrowNode3d p0, GrowNode3d p1,
-   GrowNode3d p2, double thickness, boolean membrane) {
-      super(p0, p1, p2, thickness, membrane);
-      
-      Matrix3d Fg = new Matrix3d();
-      Fg.setIdentity ();
-      setPlasticDeformation( Fg );
-   }
-   
-
-   
- 
    
    /* --- Plastic Embedding --- */
-   
 
    public void useResidualPlasticStrain() {
       GrowElementBase.useResidualPlasticStrain_df (this);
    }
+   
    
    /* --- Nodes --- */
    
@@ -74,9 +61,13 @@ public class GrowTriElement extends ShellTriElement implements GrowElementBase {
     * We cannot override ShellTriElement() to initialize myNodes as
     * GrowNode[], so use this instead.
     * */
-   public void setNodes (FemNode3d p0, FemNode3d p1, FemNode3d p2) {
-      myNodes = new GrowNode3d[myNodeCoords.length/3];
-      super.setNodes (p0, p1, p2);
+   public void setNodes (FemNode3d p0, FemNode3d p1, FemNode3d p2, FemNode3d p3,
+   FemNode3d p4, FemNode3d p5) {
+      myNodes = new GrowNode3d[] {
+          (GrowNode3d)p0, (GrowNode3d)p1, (GrowNode3d)p2,
+          (GrowNode3d)p3, (GrowNode3d)p4, (GrowNode3d)p5
+      };
+      super.setNodes (myNodes);
    }
    
    public GrowNode3d[] getNodes() {

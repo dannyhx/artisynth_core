@@ -5,11 +5,8 @@ import artisynth.core.femmodels.StiffnessWarper3d;
 
 public class GrowStiffnessWarper3d extends StiffnessWarper3d {
 
-   protected GrowTriElement elem;
-   
    public GrowStiffnessWarper3d (FemElement3dBase elem) {
       super (elem);
-      this.elem = (GrowTriElement)elem;
    }
    
    protected GrowLinearMaterialCache getOrCreateLinearCache (FemElement3dBase e) {

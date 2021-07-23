@@ -3,6 +3,7 @@ package artisynth.demos.growth.util;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
+import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode;
 import artisynth.core.femmodels.FemNode3d;
@@ -12,6 +13,7 @@ import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.ShellTriElement;
 import artisynth.core.modelbase.ModelComponent;
 import artisynth.core.modelbase.ModelComponentBase;
+import artisynth.demos.growth.GrowElementBase;
 import artisynth.demos.growth.GrowIntegrationData3d;
 import artisynth.demos.growth.def.NeighborElement;
 import maspack.geometry.HalfEdge;
@@ -36,12 +38,12 @@ public class ShellUtil {
    public static Vector3d getNormal(FemNode3d node, boolean isRest) {
       Vector3d nodeNormal = new Vector3d();
       
-      for (ShellElement3d ele : node.getAdjacentShellElements ()) {
-         Vector3d eleNrm = getNormal((ShellTriElement)ele, isRest);
+      for (FemElement3dBase ele : node.getAdjacentElements ()) {
+         Vector3d eleNrm = getNormal(ele, isRest);
          nodeNormal.add (eleNrm);
       }
       
-      nodeNormal.scale (1.0 / node.getAdjacentShellElements ().size ());
+      nodeNormal.scale (1.0 / node.getAdjacentElements ().size ());
       nodeNormal.normalize ();
       return nodeNormal;
    }
@@ -52,7 +54,7 @@ public class ShellUtil {
     * @param isRest
     * If true, compute normal in reference-space.
     */
-   public static Vector3d getNormal(ShellTriElement ele, boolean isRest) {
+   public static Vector3d getNormal(FemElement3dBase ele, boolean isRest) {
       if (isRest) {
          return MathUtil.getNormal (
             ele.getNodes ()[0].getRestPosition (), 
@@ -366,4 +368,19 @@ public class ShellUtil {
       return MathUtil.dihedralAngle (hPos, tPos, eleNrm, eleOppNrm);
    }
 
+   // Components
+   
+   public static LinkedList<FemElement3dBase> getAllElements(FemModel3d model) {
+      LinkedList<FemElement3dBase> eles = new LinkedList<FemElement3dBase>();
+      
+      for (FemElement3dBase ele : model.getElements()) {
+         eles.add (ele);
+      }
+      
+      for (FemElement3dBase ele : model.getShellElements()) {
+         eles.add (ele);
+      }
+      
+      return eles;
+   }
 }

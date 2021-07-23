@@ -2,11 +2,15 @@ package artisynth.demos.growth.models.base;
 
 import java.awt.Color;
 
+import artisynth.core.femmodels.FemElement.ElementClass;
+import artisynth.core.femmodels.FemElement3d;
+import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel.SurfaceRender;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.ShellTriElement;
+import artisynth.core.femmodels.WedgeElement;
 import artisynth.core.gui.ControlPanel;
 import artisynth.core.materials.LinearMaterial;
 import artisynth.core.mechmodels.MechModel;
@@ -65,7 +69,7 @@ public class ShellPatch extends RootModel {
    /* --- FEM physical properties --- */
    
    /** Use membrane? */
-   protected boolean m_isMembrane = false;
+   protected ElementClass mEleClass = ElementClass.VOLUMETRIC;
    
    /** Overall density of shell patch. */
    protected double m_density = 100;
@@ -174,11 +178,28 @@ public class ShellPatch extends RootModel {
          mFemModel[m] = createFemModel();
 
          // Create a node for each mesh vertex
-         for (int v = 0; v < mMesh[m].numVertices (); v++) {
-            Vertex3d vtx = mMesh[m].getVertex (v);
-            FemNode3d node = createNode(vtx.getPosition ());
-            node.setName ("MyNode_#" + v);
-            mFemModel[m].addNode (node);
+         
+         // Need to explicitly create back nodes for volumetric elements.
+         boolean[] frontBack = 
+            (mEleClass == ElementClass.VOLUMETRIC) ? 
+               new boolean[] {true, false} :
+               new boolean[] {true}; 
+         
+         for (boolean isFront : frontBack) {
+            for (int v = 0; v < mMesh[m].numVertices (); v++) {
+               Vertex3d vtx = mMesh[m].getVertex (v);
+
+               FemNode3d node = null;
+               if (isFront) {
+                  node = createNode(vtx.getPosition ());
+                  node.setName ("MyNode_#" + v);
+               } else {
+                  node = createNode((Point3d)new Point3d(vtx.getPosition ()).add (0, 0, m_shellThickness));
+                  node.setName ("MyNode_#" + v + "b");
+               }
+               
+               mFemModel[m].addNode (node);
+            }
          }
          
          // Create an element for each mesh face
@@ -190,18 +211,27 @@ public class ShellPatch extends RootModel {
             FemNode3d n1 = mFemModel[m].getNode( vtxIdxs[1] );
             FemNode3d n2 = mFemModel[m].getNode( vtxIdxs[2] );
    
-            ShellTriElement ele = createElement(n0, n1, n2, m_shellThickness);
-            ele.setName ("MyEle_#" + f);
-            mFemModel[m].addShellElement(ele);
+            if (mEleClass == ElementClass.VOLUMETRIC) {
+               FemNode3d n3 = mFemModel[m].getNode( vtxIdxs[0]+mMesh[m].numVertices () );
+               FemNode3d n4 = mFemModel[m].getNode( vtxIdxs[1]+mMesh[m].numVertices () );
+               FemNode3d n5 = mFemModel[m].getNode( vtxIdxs[2]+mMesh[m].numVertices () );
+               
+               FemElement3d ele = createVolElement(n0, n1, n2, n3, n4, n5);
+               ele.setName ("MyEle_#" + f);
+               mFemModel[m].addElement(ele);
+            } else {
+               ShellTriElement ele = createShellElement(n0, n1, n2, m_shellThickness);
+               ele.setName ("MyEle_#" + f);
+               mFemModel[m].addShellElement(ele);
+            }
          }
          
-         if (this.m_isMembrane) {
+         if (mEleClass == ElementClass.MEMBRANE) {
             mFemModel[m].myEdgeDataMap = new EdgeDataMap(mFemModel[m], mMesh[m]);
             mFemModel[m].myThinShellAux = new ThinShellAux(mFemModel[m], mMesh[m]);
             mFemModel[m].myThinShellAux.setAltMaterial (
                m_youngsModulus, m_poissonsRatio, m_shellThickness);
          }
-
          
          mMechModel.addModel (mFemModel[m]);
       }
@@ -281,7 +311,9 @@ public class ShellPatch extends RootModel {
       mPanel.addWidget (mFemModel[0], "stiffnessDamping", 0, 2000);
       mPanel.addWidget (mFemModel[0], "density", 10, 1000);
       mPanel.addWidget (mFemModel[0], "gravity");
-      mPanel.addWidget (mFemModel[0], "directorRenderLen");
+      if (mEleClass != ElementClass.VOLUMETRIC ) {
+         mPanel.addWidget (mFemModel[0], "directorRenderLen");
+      }
       mPanel.addWidget (mFemModel[0], "material");
       LabeledComponentBase comp = mPanel.addWidget (mFemModel[0], "material.YoungsModulus");
       ((DoubleFieldSlider)comp).setSliderRange (1, 100000);
@@ -311,10 +343,16 @@ public class ShellPatch extends RootModel {
       return new FemNode3d(pt);
    }
    
-   protected ShellTriElement createElement(FemNode3d n0, FemNode3d n1,
+   protected FemElement3d createVolElement(
+   FemNode3d n0, FemNode3d n1, FemNode3d n2, FemNode3d n3, FemNode3d n4, 
+   FemNode3d n5) 
+   {
+      return new WedgeElement(n0, n1, n2, n3, n4, n5);
+   }
+   
+   protected ShellTriElement createShellElement(FemNode3d n0, FemNode3d n1,
    FemNode3d n2, double thickness) {
-      ShellTriElement ele = new ShellTriElement(n0, n1, n2, thickness, this.m_isMembrane);
-      return ele;
+      return new ShellTriElement(n0, n1, n2, thickness, mEleClass == ElementClass.MEMBRANE);
    }
    
    /**
@@ -348,10 +386,22 @@ public class ShellPatch extends RootModel {
    }
    
    public double getShellThickness() {
+      if (mEleClass == ElementClass.VOLUMETRIC) {
+         FemNode3d n0 = mFemModel[0].getElement (0).getNodes ()[0];
+         FemNode3d n1 = mFemModel[0].getElement (0).getNodes ()[1];
+         return n0.getRestPosition ().distance (n1.getRestPosition ());
+      }
+      
       return mFemModel[0].getShellElement (0).getDefaultThickness ();
    }
    
    public void setShellThickness(double newThickness) {
+      if (mEleClass == ElementClass.VOLUMETRIC) {
+         System.out.println (
+            "Skipping thickness adjustment for volumetric elements.");
+         return;
+      }
+      
       for (ShellElement3d ele : mFemModel[0].getShellElements ()) {
          ele.setDefaultThickness (newThickness);
       }

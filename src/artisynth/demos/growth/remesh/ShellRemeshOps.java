@@ -46,12 +46,12 @@ public class ShellRemeshOps extends RemeshOps {
    protected FemModel3d mFemModel;
    
    /** New shell elements are set to this thickness. */
-   protected double mShellThickness;
+   protected double mShellThickness = -1;
    
    // CSNCMT
    protected ContactConstraintAgg mCCAgg;
    
-   protected boolean mHasBackNode;
+   protected boolean mHasBackNode = false;
    
    /** Did the last remesh modify any elements? If not, plastic strain doesn't 
     *  have to interpolated, and indirect node neighbors don't have to be cleared. */
@@ -60,18 +60,22 @@ public class ShellRemeshOps extends RemeshOps {
    public ShellRemeshOps(PolygonalMesh mesh, FemModel3d femModel) {
       super(mesh);
       mFemModel = femModel;
-      mShellThickness = mFemModel.getShellElement (0).getDefaultThickness ();
       
-      mHasBackNode = 
-         femModel.getShellElement (0).getElementClass () == ElementClass.SHELL;
+      if (mFemModel.numShellElements () > 0) {
+         mShellThickness = mFemModel.getShellElement (0).getDefaultThickness ();
+         mHasBackNode = 
+            femModel.getShellElement (0).getElementClass () == ElementClass.SHELL;
+      }
    }
    
    protected void setTarget(PolygonalMesh mesh, FemModel3d femModel) {
       super.setTarget (mesh);
       mFemModel = femModel;
       
-      mHasBackNode = 
-         femModel.getShellElement (0).getElementClass () == ElementClass.SHELL;
+      if (mFemModel.numShellElements () > 0) {
+         mHasBackNode = 
+            femModel.getShellElement (0).getElementClass () == ElementClass.SHELL;
+      }
    }
    
    // CSNCMT

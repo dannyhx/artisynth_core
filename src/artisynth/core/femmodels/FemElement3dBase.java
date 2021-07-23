@@ -29,12 +29,12 @@ public abstract class FemElement3dBase extends FemElement
 
    // the warping point is an integration point at the center of the element,
    // used for corotated linear behavior and other things
-   protected IntegrationData3d myWarpingData;
+   public IntegrationData3d myWarpingData;
    protected StiffnessWarper3d myWarper = null;
    protected ElementRotationData myRotationData = null;
 
     // per-element integration point data
-   protected IntegrationData3d[] myIntegrationData;
+   public IntegrationData3d[] myIntegrationData;
    protected boolean myIntegrationDataValid = false;
 
    protected static double DEFAULT_ELEMENT_WIDGET_SIZE = 0.0;

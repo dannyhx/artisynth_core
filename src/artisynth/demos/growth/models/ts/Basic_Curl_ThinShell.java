@@ -1,5 +1,6 @@
 package artisynth.demos.growth.models.ts;
 
+import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.demos.growth.GrowNode3d;
 import artisynth.demos.growth.models.paper.Basic_Curl;
 
@@ -16,7 +17,7 @@ public class Basic_Curl_ThinShell extends Basic_Curl {
    protected void build_pre() {
       super.build_pre();
       
-      m_isMembrane = true;
+      mEleClass = ElementClass.MEMBRANE;
       
       mEnableDiffusion = true;
       mEnableGrowth = true; 

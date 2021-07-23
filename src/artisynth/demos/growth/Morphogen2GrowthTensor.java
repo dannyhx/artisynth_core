@@ -1,5 +1,6 @@
 package artisynth.demos.growth;
 
+import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
@@ -40,13 +41,15 @@ public class Morphogen2GrowthTensor {
   
    // Assume any absorbed morphogen is for plastic bending.
    public boolean isBendingMorphogenHack = false;
+
+   // Bending strain to apply to all the elements, regardless of their
+   // chemical concentration. Only applicable when isBendingMorphogenHack is 
+   // true.
+   public Matrix3d fixedBendingStrain = null;
    
    protected FemModel3d mFemModel;
    protected PolygonalMesh mMesh; 
    
-   public Morphogen2GrowthTensor(FemModel3d femModel) {
-      setTarget(femModel);
-   }
    
    public Morphogen2GrowthTensor(FemModel3d femModel, PolygonalMesh mesh) {
       setTarget(femModel, mesh);
@@ -66,9 +69,14 @@ public class Morphogen2GrowthTensor {
    
    /** Change the polarity direction of every element. */
    public void updatePolarityDirection(Vector3d polDir) {
+      for (FemElement3dBase ele : mFemModel.getElements ()) {
+         GrowElementBase gEle = (GrowElementBase) ele;
+         gEle.setPolDir (polDir);
+      }
+      
       for (ShellElement3d ele : mFemModel.getShellElements ()) {
-         GrowTriElement gEle = (GrowTriElement) ele;
-         gEle.mPolDir.set (polDir);
+         GrowElementBase gEle = (GrowElementBase) ele;
+         gEle.setPolDir (polDir);
       }
    }
    
@@ -127,17 +135,17 @@ public class Morphogen2GrowthTensor {
     * It's dependent on each element's polarity direction (mPolDir).
     */
    protected void createFrames() {
-      for (ShellElement3d ele : mFemModel.getShellElements ()) {
-         GrowTriElement gEle = (GrowTriElement) ele;
+      for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
+         GrowElementBase gEle = (GrowElementBase)ele;
          
          // First, generate the principle axes of this element.
          //     j0 == parallel to normal
          //     j1 == parallel to polDir
          //     j2 == perpendicular to j0 and j1 (i.e. cross(j0,j1) )
          
-         Vector3d polDir = new Vector3d(gEle.mPolDir);
+         Vector3d polDir = new Vector3d(gEle.getPolDir ());
          
-         Vector3d j0 = ShellUtil.getNormal (gEle, false);
+         Vector3d j0 = ShellUtil.getNormal (ele, false);
          Vector3d j1 = new Vector3d( polDir ).normalize ();
          Vector3d j2 = new Vector3d().cross (j0, j1).normalize ();
          
@@ -151,7 +159,7 @@ public class Morphogen2GrowthTensor {
          frame.setColumn (1, j2);
          frame.setColumn (2, j0);
          
-         gEle.mFrame = frame;
+         gEle.setFrame(frame);
       }
    }
    
@@ -165,13 +173,13 @@ public class Morphogen2GrowthTensor {
     * j => node index.
     */
    protected void createElementGrowthTensors() {
-      for (ShellElement3d ele : mFemModel.getShellElements ()) {
-         GrowTriElement gEle = (GrowTriElement) ele;
+      for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
+         GrowElementBase gEle = (GrowElementBase)ele;
          
          GrowNode3d[] nodes = gEle.getNodes ();
          
          int numNodes = nodes.length;
-         gEle.mElementGrowthTensor = new MatrixNd(numNodes, GrowChemical.NUM_TYPES);
+         gEle.setElementGrowthTensor (new MatrixNd(numNodes, GrowChemical.NUM_TYPES));
          
          double[] parCol = new double[numNodes];
          double[] perCol = new double[numNodes];
@@ -181,9 +189,9 @@ public class Morphogen2GrowthTensor {
             perCol[i] = nodes[i].getGrowChem (GrowChemical.PER);
             norCol[i] = nodes[i].getGrowChem (GrowChemical.NOR);
          }
-         gEle.mElementGrowthTensor.setColumn (0, parCol);
-         gEle.mElementGrowthTensor.setColumn (1, perCol);
-         gEle.mElementGrowthTensor.setColumn (2, norCol);
+         gEle.getElementGrowthTensor ().setColumn (0, parCol);
+         gEle.getElementGrowthTensor ().setColumn (1, perCol);
+         gEle.getElementGrowthTensor ().setColumn (2, norCol);
       }
    }
    
@@ -195,11 +203,10 @@ public class Morphogen2GrowthTensor {
     * strain: each node has its own 6-vec strain.
     */
    protected void rotateElementGrowthTensors() {
-      for (ShellElement3d ele : mFemModel.getShellElements ()) {
-         GrowTriElement gEle = (GrowTriElement) ele;
+      for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
+         GrowElementBase gEle = (GrowElementBase)ele;
          
-         int numNodes = gEle.numNodes ();
-         GrowNode3d[] nodes = gEle.getNodes ();
+         int numNodes = ele.numNodes ();
          
          // Create a Nx6 matrix where each row (6-vector) corresponds to a 
          // 3x3 symmetrical strain of a node.
@@ -207,7 +214,7 @@ public class Morphogen2GrowthTensor {
          // to the right of the the local growth tensor.
          // Local growth tensor is NxNumPrincipleAxes.
          MatrixNd strainVects = new MatrixNd(numNodes, numStrainComp());
-         strainVects.addSubMatrix (0, 0, gEle.mElementGrowthTensor);
+         strainVects.addSubMatrix (0, 0, gEle.getElementGrowthTensor ());
          
          for (int n = 0; n < numNodes; n++) {
             // Convert strain representation from 6-vector to 3x3 sym matrix
@@ -230,7 +237,7 @@ public class Morphogen2GrowthTensor {
             
             Matrix3d globalStrain = new Matrix3d();
             
-            Matrix3d frame = gEle.mFrame;
+            Matrix3d frame = gEle.getFrame();
             
             // R M R' is standard formula for rotating matrix to a frame
             globalStrain.set(frame);
@@ -242,7 +249,7 @@ public class Morphogen2GrowthTensor {
             
             strainVects.setRow (n, mtx3dToVec(globalStrain));
          }
-         gEle.mRotatedElementGrowthStrains = strainVects;
+         gEle.setRotatedElementGrowthStrains ( strainVects );
       }
    }
    
@@ -255,21 +262,21 @@ public class Morphogen2GrowthTensor {
     * non-reduced elements.
     */
    protected void interpolateElementGrowthTensors() {
-      for (ShellElement3d ele : mFemModel.getShellElements ()) {
-         GrowTriElement gEle = (GrowTriElement) ele;
+      for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
+         GrowElementBase gEle = (GrowElementBase)ele;
          
          // eps0
-         MatrixNd strainCols = new MatrixNd(gEle.mRotatedElementGrowthStrains);
+         MatrixNd strainCols = new MatrixNd(gEle.getRotatedElementGrowthStrains ());
          strainCols.transpose ();
          
          // The value of shape function at every vertex index and 
          // integration coordinate. N-by-Q matrix.
          MatrixNd shapeMtx = getIntegExtrapolationMatrix();
          
-         gEle.mStrainAtIntegPts = new MatrixNd();
+         gEle.setStrainAtIntegPts ( new MatrixNd() );
          
          // (StrainLength by N) * (N by Q)
-         gEle.mStrainAtIntegPts.mul (strainCols, shapeMtx);
+         gEle.getStrainAtIntegPts ().mul (strainCols, shapeMtx);
       }
    }
    
@@ -294,8 +301,8 @@ public class Morphogen2GrowthTensor {
     * attribute.
     */
    public void applyGrowthTensors() {
-      for (ShellElement3d ele : mFemModel.getShellElements ()) {
-         GrowTriElement gEle = (GrowTriElement) ele;
+      for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
+         GrowElementBase gEle = (GrowElementBase)ele;
          
          if (mFemModel.myThinShellAux == null) {
             GrowIntegrationData3d[] idata = gEle.getIntegrationData ();
@@ -303,15 +310,12 @@ public class Morphogen2GrowthTensor {
                // Convert stored strain 6-vector into 3x3 sym strain matrix.
        
                double[] strainVect = new double[numStrainComp()];
-               gEle.mStrainAtIntegPts.getColumn (k, strainVect);
+               gEle.getStrainAtIntegPts ().getColumn (k, strainVect);
                
-               Matrix3d strainMtx = vecToMtx3d(strainVect);
-               
-               strainMtx.set (new double[][] {
-                  new double[] {0,0,0}, 
-                  new double[] {0,0.25,0},
-                  new double[] {0,0,0}
-               });
+               Matrix3d strainMtx = 
+                  (this.fixedBendingStrain == null) ?
+                  vecToMtx3d(strainVect) : 
+                  new Matrix3d(this.fixedBendingStrain);
                
                // Custom
                if (isBendingMorphogenHack && k < 3) {
@@ -326,35 +330,38 @@ public class Morphogen2GrowthTensor {
                   strainMtx.negate ();
                }
                
-//               idata[k].addFp (strainMtx);
-               strainMtx.add (Matrix3d.IDENTITY);
-               idata[k].setFp (strainMtx);
+               if (this.fixedBendingStrain == null ) {
+                  idata[k].addFp (strainMtx);
+               } else {
+                  strainMtx.add (Matrix3d.IDENTITY);
+                  idata[k].setFp (strainMtx);
+               }
             }
          } else {
-            if (gEle.getPlasticDeformation () == null) {
-               gEle.setPlasticDeformation (Matrix3d.IDENTITY);
+            if (ele.getPlasticDeformation () == null) {
+               ele.setPlasticDeformation (Matrix3d.IDENTITY);
             }
             
             // Average the strain across the nodes, and consider that as the
             // element's strain.
             
-            Matrix3d avgStrain = new Matrix3d(); 
-            double[] S = new double[numStrainComp()];
-            for (int n = 0; n < gEle.numNodes (); n++) {
-               gEle.mRotatedElementGrowthStrains.getRow (n,S); 
-               Matrix3d nodeStrain = vecToMtx3d (S);
-               avgStrain.add(nodeStrain); 
-            }
-            avgStrain.scale(1.0 / gEle.numNodes ());
+            Matrix3d avgStrain = null;
             
-            avgStrain.set (new double[][] {
-               new double[] {0,0,0}, 
-               new double[] {0,-5*Math.PI,0},
-               new double[] {0,0,0}
-            });
+            if (this.fixedBendingStrain == null) {
+               avgStrain = new Matrix3d(); 
+               double[] S = new double[numStrainComp()];
+               for (int n = 0; n < ele.numNodes (); n++) {
+                  gEle.getRotatedElementGrowthStrains ().getRow (n,S); 
+                  Matrix3d nodeStrain = vecToMtx3d (S);
+                  avgStrain.add(nodeStrain); 
+               }
+               avgStrain.scale(1.0 / ele.numNodes ());
+            } else {
+               avgStrain = this.fixedBendingStrain;
+            }
             
             if (isBendingMorphogenHack) {
-               int f = ShellUtil.getIndex (gEle);
+               int f = ShellUtil.getIndex (ele);
                Face face = mMesh.getFace (f);
              
                Vector3d edgeStrains = 
@@ -373,7 +380,7 @@ public class Morphogen2GrowthTensor {
                }
                
             } else {
-               gEle.getPlasticDeformation().add(avgStrain);
+               ele.getPlasticDeformation().add(avgStrain);
             }
          }
       }
@@ -386,8 +393,8 @@ public class Morphogen2GrowthTensor {
     * the identity matrix; any applied growth tensor is dropped.
     */
    public void unapplyGrowthTensors() {
-      for (ShellElement3d ele : mFemModel.getShellElements ()) {
-         GrowTriElement gEle = (GrowTriElement) ele;
+      for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
+         GrowElementBase gEle = (GrowElementBase)ele;
          
          GrowIntegrationData3d[] idata = gEle.getIntegrationData();
          for (int k = 0; k < idata.length; k++) {
@@ -437,39 +444,16 @@ public class Morphogen2GrowthTensor {
    protected MatrixNd mIntegExtrapolationMatrixCache;
    protected MatrixNd getIntegExtrapolationMatrix() {
       if (mIntegExtrapolationMatrixCache == null ) {
-         mIntegExtrapolationMatrixCache =
-            mFemModel.getShellElement (0).getShapeMatrix ();
+         
+         if (mFemModel.numShellElements () > 0) {
+            mIntegExtrapolationMatrixCache =
+               mFemModel.getShellElement (0).getShapeMatrix ();
+         } else {
+            mIntegExtrapolationMatrixCache =
+               mFemModel.getElement (0).getShapeMatrix ();
+         }
       }
       
       return mIntegExtrapolationMatrixCache;
    }
-   
-   /** 
-    * From 0 to 1, how parallel are the two vectors?
-    */
-   protected static double parallelFrac(Vector3d A, Vector3d B) {
-      // -PI to PI
-      double ang = MathUtil.vectorPairAngle (A, B);
-      
-      // 0 to PI
-      // 0    -> PI/2 (parallel to perpendicular).
-      // PI/2 -> PI   (perpendicular to parallel).
-      ang = Math.abs(ang);
-      
-      // 0 -> PI/2 (perpendicular to parallel)
-      if (ang < Math.PI/2) {
-         ang = Math.PI/2 - ang; 
-      } else {
-         ang = ang - Math.PI/2;
-      }
-      
-      // 0 to 1 scale.
-      ang = ang / (Math.PI/2); 
-      
-      return ang; 
-   }
-   
-
-
-  
 }

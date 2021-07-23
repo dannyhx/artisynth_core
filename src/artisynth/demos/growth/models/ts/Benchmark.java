@@ -1,12 +1,13 @@
 package artisynth.demos.growth.models.ts;
 
+import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.demos.growth.GrowNode3d;
 import artisynth.demos.growth.models.paper.Basic_Base;
 
 /**
  * How to use:
  * 
- *      this.m_isMembrane = true|false
+ *      this.mEleClass = ElementClass.SHELL|ElementClass.MEMBRANE
  *      
  * Set Artisynth command-line flags to include:-play
  * Note that GUI runs in separate thread; doesn't impact solver performance.
@@ -48,7 +49,7 @@ public class Benchmark extends Basic_Base {
       
       //
       
-      this.m_isMembrane = false;
+      this.mEleClass = ElementClass.SHELL;
    }
    
    protected void build_renderConfig() {
@@ -72,7 +73,7 @@ public class Benchmark extends Basic_Base {
       for (int v = 0; v < mMesh[0].numVertices (); v++) {
          if ( isMorphogenSrcNode(v) && t0 < morphogenSrcDuration) {
             GrowNode3d gNode = (GrowNode3d)mFemModel[0].getNode (v);
-            gNode.mChems.set (3, (this.m_isMembrane) ? 0.1 : 1);
+            gNode.mChems.set (3, (this.mEleClass == ElementClass.MEMBRANE) ? 0.1 : 1);
          }
       }
    }

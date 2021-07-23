@@ -326,7 +326,7 @@ public class GrowRemesher extends ShellRemesher {
    }
    
    protected GrowNode3d createNode() {
-      GrowNode3d node = new GrowNode3d(!mHasBackNode);
+      GrowNode3d node = new GrowNode3d(mHasBackNode);
       mSizingField.addVertexSF (new Matrix3d());
       
       node.mChems = new VectorNd( mMeshChems.getNumChemTypes () );

@@ -5,9 +5,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 
 import artisynth.core.driver.Main;
+import artisynth.core.femmodels.FemElement.ElementClass;
+import artisynth.core.femmodels.FemElement3d;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
+import artisynth.core.femmodels.WedgeElement;
 import artisynth.core.gui.ControlPanel;
 import artisynth.core.mechmodels.CollisionBehavior;
 import artisynth.core.mechmodels.CollisionBehavior.Method;
@@ -22,6 +25,7 @@ import artisynth.demos.growth.GrowModel3d;
 import artisynth.demos.growth.GrowNode3d;
 import artisynth.demos.growth.GrowRemesher;
 import artisynth.demos.growth.GrowTriElement;
+import artisynth.demos.growth.GrowWedgeElement;
 import artisynth.demos.growth.Morphogen2GrowthTensor;
 import artisynth.demos.growth.PlasticEmbedder;
 import artisynth.demos.growth.collision.CollisionDetector;
@@ -435,16 +439,25 @@ public class GrowDemo extends ShellPatch {
    }
    
    protected GrowNode3d createNode(Point3d pt) {
-      return new GrowNode3d(pt, new VectorNd(mNumChemTypes), m_isMembrane);
+      return new GrowNode3d(pt, new VectorNd(mNumChemTypes), mEleClass == ElementClass.SHELL);
    }
    
-   protected GrowTriElement createElement(FemNode3d n0, FemNode3d n1,
+   protected FemElement3d createVolElement(
+   FemNode3d n0, FemNode3d n1, FemNode3d n2, FemNode3d n3, FemNode3d n4, 
+   FemNode3d n5) 
+   {
+      return new GrowWedgeElement(
+         (GrowNode3d)n0, (GrowNode3d)n1, (GrowNode3d)n2, 
+         (GrowNode3d)n3, (GrowNode3d)n4, (GrowNode3d)n5);
+   }
+   
+   protected GrowTriElement createShellElement(FemNode3d n0, FemNode3d n1,
    FemNode3d n2, double thickness)
    {
       return new GrowTriElement(
          (GrowNode3d)n0, 
          (GrowNode3d)n1,
-         (GrowNode3d)n2, thickness, m_isMembrane);
+         (GrowNode3d)n2, thickness, mEleClass == ElementClass.MEMBRANE);
    }
    
    public boolean shouldBeFrozen(int idx) {

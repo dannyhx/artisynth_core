@@ -44,7 +44,7 @@ public class GrowDeformedPoint extends FemDeformedPoint {
 
       // E = plastic strain = Fp - I
       Matrix3d E = new Matrix3d();
-      E.setSymmetric ( gid.getFp () );
+      E.setSymmetric ( gid.getFp () );  // Not necessary
       E.m00 -= 1;
       E.m11 -= 1;
       E.m22 -= 1;

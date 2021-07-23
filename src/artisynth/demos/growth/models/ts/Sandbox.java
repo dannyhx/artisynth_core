@@ -1,12 +1,15 @@
 package artisynth.demos.growth.models.ts;
 
+import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.materials.FemMaterial;
+import artisynth.core.materials.LinearMaterial;
 import artisynth.core.materials.NeoHookeanMaterial;
 import artisynth.demos.growth.GrowChemical;
 import artisynth.demos.growth.GrowModel3d;
 import artisynth.demos.growth.GrowNode3d;
 import artisynth.demos.growth.models.paper.Basic_Base;
 import maspack.geometry.PolygonalMesh;
+import maspack.matrix.Matrix3d;
 
 //  artisynth.demos.growth.models.ts._Debug_ThinShell
 
@@ -33,7 +36,7 @@ import maspack.geometry.PolygonalMesh;
             
  */
 
-public class _Debug_ThinShell extends Basic_Base {
+public class Sandbox extends Basic_Base {
    
    protected void build_pre() {
       super.build_pre();
@@ -67,8 +70,8 @@ public class _Debug_ThinShell extends Basic_Base {
 //      mMeshX = .1;
 //      mMeshY = .1;
       
-      mMeshXDiv = 50;
-      mMeshYDiv = 50;
+      mMeshXDiv = 1;
+      mMeshYDiv = 1;
       
       morphogenSrcDuration = 0.01;
       
@@ -78,15 +81,10 @@ public class _Debug_ThinShell extends Basic_Base {
       mSurfaceColor = SurfaceColor.DEFAULT;
       
       //
-      m_isMembrane = false;
+      mEleClass = ElementClass.SHELL;
       
-      if (this.m_isMembrane) {
-         m_shellThickness = 1;
-         m_youngsModulus = 1e8;
-      } else {
-         m_shellThickness = 1e-2;
-         m_youngsModulus = 1e6;
-      }
+      m_shellThickness = 1e-3; 
+      m_youngsModulus = 1e5;  
       
       mSizeMin = 0.05;
       mSizeMax = mSizeMin*5;
@@ -98,29 +96,28 @@ public class _Debug_ThinShell extends Basic_Base {
    }
    
    
-//   protected void build_modelSkeleton() {
-//      mMesh = new PolygonalMesh[M];
-//      PolygonalMesh m = new PolygonalMesh();
-//      
-//      m.addVertex (0, 0, 0); 
-//      m.addVertex (1, 0, 0); 
-//      m.addVertex (1, 1, 0);
-//      m.addFace (0, 1, 2);
-//      
-//      m.scale (0.1);
-//      
-//      mMesh[0] = m;
-//   }
+   protected void build_modelSkeleton() {
+      mMesh = new PolygonalMesh[M];
+      PolygonalMesh m = new PolygonalMesh();
+      
+      m.addVertex (0, 0, 0); 
+      m.addVertex (1, 0, 0); 
+      m.addVertex (1, 1, 0);
+      m.addFace (0, 1, 2);
+      
+      m.scale (0.1);
+      
+      mMesh[0] = m;
+   }
    
    protected void build_modelProperties() {
       super.build_modelProperties();
       
       FemMaterial mat = null;
-//      mat = new LinearMaterial();
-      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
+      mat = new LinearMaterial(m_youngsModulus, m_poissonsRatio);
+//      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
 //      mat = new MooneyRivlinMaterial(1500, 0, 0, 0, 0, 150000);
 //      mat = new OgdenMaterial();   // Pill shape 
-
       
       for (int m=0; m<M; m++) {
         mFemModel[m].setMaterial (mat);
@@ -132,12 +129,12 @@ public class _Debug_ThinShell extends Basic_Base {
       super.build_renderConfig ();
       
       mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
-      mRendCfg.mNodeRadius = 0.00;
+      mRendCfg.mNodeRadius = 0.01;
    }
    
    protected void build_post() {
       super.build_post ();
-      mMorphogen2GrowthTensor.isBendingMorphogenHack = true;
+      mMorphogen2GrowthTensor.isBendingMorphogenHack = false;
    }
    
    public boolean isMorphogenSrcNode(int v) {
@@ -155,7 +152,7 @@ public class _Debug_ThinShell extends Basic_Base {
       for (int v = 0; v < mMesh[0].numVertices (); v++) {
          if ( isMorphogenSrcNode(v) && t0 < morphogenSrcDuration) {
             GrowNode3d gNode = (GrowNode3d)mFemModel[0].getNode (v);
-            gNode.mChems.set (GrowChemical.PAR.mIdx, 0.1);
+            gNode.mChems.set (3, 2);
             
 //            gNode.setVelocity (0, 0, 1);
 //            break;
