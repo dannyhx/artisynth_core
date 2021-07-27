@@ -50,28 +50,9 @@ public class DualCurl extends Basic_Base {
       
       mEnableCollisionHandling = false;
       
-      // If half the area, then bending is more volatile.
-      
-//      mMeshX = 12.5;
-//      mMeshY = 2.5;
-//      mMeshX = 25;
-//      mMeshY = 6;
-//         
-//      mMeshXDiv = 25;
-//      mMeshYDiv = 6;
-      
-//       mMeshX = 25;
-//       mMeshY = 5;
-//       
-//       mMeshXDiv = 50;
-//       mMeshYDiv = 10;
-      
       mMeshX = 1;
       mMeshY = 1;
        
-//      mMeshX = .1;
-//      mMeshY = .1;
-      
       mMeshXDiv = 50;
       mMeshYDiv = 50;
       
@@ -82,12 +63,20 @@ public class DualCurl extends Basic_Base {
       mRenderMode = RenderMode.DEFAULT;
       mSurfaceColor = SurfaceColor.DEFAULT;
       
-      //
+      // Configuration
+      
       mEleClass = ElementClass.VOLUMETRIC;
+      double[] thicknesses = new double[] {1e-3, 1e-2, 1e-2, 1e-1};
+      double[] youngModuluses = new double[] {1e6, 1e6, 1e6, 1e6};
+      double[] bottomStrains = new double[] {0.25, 0.25, 0.25, 0.25};
+      double[] angularStrain = new double[] {0.12435, 0.12435, 0.12435, 0.12435}; 
+      int t = 0;
+      
+      //
       
       if (mEleClass == ElementClass.MEMBRANE) {
          m_shellThickness = 1;
-         m_youngsModulus = 1e8;
+         m_youngsModulus = youngModuluses[t];
          
          mFixedBendingStrainMtx = new Matrix3d();
          mFixedBendingStrainMtx.set (new double[][] {
@@ -97,7 +86,7 @@ public class DualCurl extends Basic_Base {
          });
       } else if (mEleClass == ElementClass.SHELL) {
          m_shellThickness = 1e-2;
-         m_youngsModulus = 1e6;
+         m_youngsModulus = youngModuluses[t];
          
          mFixedBendingStrainMtx = new Matrix3d();
          mFixedBendingStrainMtx.set (new double[][] {
@@ -107,7 +96,7 @@ public class DualCurl extends Basic_Base {
          });
       } else {
          m_shellThickness = 1e-2;
-         m_youngsModulus = 1e6;
+         m_youngsModulus = youngModuluses[t];
          
          mFixedBendingStrainMtx = new Matrix3d();
          mFixedBendingStrainMtx.set (new double[][] {
@@ -145,8 +134,8 @@ public class DualCurl extends Basic_Base {
       super.build_modelProperties();
       
       FemMaterial mat = null;
-      mat = new LinearMaterial(m_youngsModulus, m_poissonsRatio);
-//      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
+//      mat = new LinearMaterial(m_youngsModulus, m_poissonsRatio);
+      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
 //      mat = new MooneyRivlinMaterial(1500, 0, 0, 0, 0, 150000);
 //      mat = new OgdenMaterial();   // Pill shape 
 

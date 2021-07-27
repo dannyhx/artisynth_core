@@ -22,11 +22,10 @@ public class GrowDeformedPoint extends FemDeformedPoint {
    IntegrationPoint3d ipnt, IntegrationData3d idat,
    RotationMatrix3d R, FemElement3dBase elem, int idx) {
       
-      GrowTriElement gEle = (GrowTriElement)elem;
       GrowIntegrationData3d gid = (GrowIntegrationData3d)idat;
       
       // Sanity
-      idat.computeInverseRestJacobian (ipnt, gEle.getNodes ());
+      idat.computeInverseRestJacobian (ipnt, elem.getNodes ());
       
       super.setFromIntegrationPoint (ipnt, idat, R, elem, idx);
       
