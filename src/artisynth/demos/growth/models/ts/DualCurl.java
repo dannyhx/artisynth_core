@@ -1,5 +1,7 @@
 package artisynth.demos.growth.models.ts;
 
+import java.awt.Color;
+
 import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.materials.FemMaterial;
 import artisynth.core.materials.LinearMaterial;
@@ -8,31 +10,31 @@ import artisynth.demos.growth.GrowChemical;
 import artisynth.demos.growth.GrowModel3d;
 import artisynth.demos.growth.GrowNode3d;
 import artisynth.demos.growth.models.paper.Basic_Base;
+import artisynth.demos.growth.thinshell.ThinShellAux;
 import maspack.geometry.PolygonalMesh;
 import maspack.matrix.Matrix3d;
 
 //  artisynth.demos.growth.models.ts._Debug_ThinShell
 
 /*
-      if (this.m_isMembrane) {
-         m_shellThickness = 1;
-         m_youngsModulus = 1e8;
-      } else {
-         m_shellThickness = 1e-2;
-         m_youngsModulus = 1e6;
-      }
-   
-                strainMtx.set (new double[][] {
-                  new double[] {0,0,0}, 
-                  new double[] {0,0.5,0},
-                  new double[] {0,0,0}
-               });
-               
-            avgStrain.set (new double[][] {
-               new double[] {0,0,0}, 
-               new double[] {0,-5*Math.PI,0},
-               new double[] {0,0,0}
-            });
+     Solid-Shell:
+        Straight:
+        
+        Arc:
+           1e-2 thickness
+           1e4 young
+           0.5 strain
+     
+     Thin-Shell:
+        Straight:
+           1e-2 thickness
+           1e4 young
+           20*PI
+        
+        Arc:
+           5e-2 thickness
+           1e4 young
+           40*PI
             
  */
 
@@ -43,7 +45,7 @@ public class DualCurl extends Basic_Base {
    protected void build_pre() {
       super.build_pre();
             
-      mEnableDiffusion = true;
+      mEnableDiffusion = false;
       mEnableGrowth = true; 
       mEnableRemesh = false; 
       mEnablePlasticEmbedding = false; 
@@ -66,54 +68,80 @@ public class DualCurl extends Basic_Base {
       // Configuration
       
       mEleClass = ElementClass.VOLUMETRIC;
-      double[] thicknesses = new double[] {1e-3, 1e-2, 1e-2, 1e-1};
-      double[] youngModuluses = new double[] {1e6, 1e6, 1e6, 1e6};
-      double[] bottomStrains = new double[] {0.25, 0.25, 0.25, 0.25};
-      double[] angularStrain = new double[] {0.12435, 0.12435, 0.12435, 0.12435}; 
-      int t = 0;
+//      mEleClass = ElementClass.SHELL;
+//      mEleClass = ElementClass.MEMBRANE;
+      
+      int t = 1;
+      
+      double[] thicknesses = new double[] {1e-3, 1e-2};
+      double[] youngModuluses = new double[] {1e4, 1e4};
+      double[] sidedStrains_vol = new double[] {0.85, 0.85};
+      double[] sidedStrains_shell = new double[] {0.6, 0.6};
+      double[] pauses_vol = new double[] {3.52,7.96};
+      double[] pauses_shell = new double[] {3.43,8.46};
+      
+      double[] thicknesses_ts = new double[] {1e-3, 1e-2,    1e-2};
+      double[] youngModuluses_ts = new double[] {1e4, 1e4,   1e4};
+      double[] angularStrainsQual = new double[] {4*Math.PI, 40*Math.PI,    50*Math.PI};
+      double[] pauses_ts = new double[] {10.59,5.33, 999};
+//    double[] angularStrains = new double[] {0.12435, 0.12435, 0.12435, 0.12435}; 
+
       
       //
       
       if (mEleClass == ElementClass.MEMBRANE) {
-         m_shellThickness = 1;
-         m_youngsModulus = youngModuluses[t];
+         m_shellThickness = thicknesses_ts[t];  // 1
+         m_youngsModulus = youngModuluses_ts[t]; // 1e8
          
          mFixedBendingStrainMtx = new Matrix3d();
          mFixedBendingStrainMtx.set (new double[][] {
             new double[] {0,0,0}, 
-            new double[] {0,-5*Math.PI,0},
+            new double[] {0,angularStrainsQual[t],0},  // -5 * PI 
             new double[] {0,0,0}
          });
+         
+         if (t == 0) {
+            ThinShellAux.mBendForceScaling = 100;
+         }
+         
+         mPauseEveryInterval = pauses_ts[t];
       } else if (mEleClass == ElementClass.SHELL) {
-         m_shellThickness = 1e-2;
+         m_shellThickness = thicknesses[t];
          m_youngsModulus = youngModuluses[t];
          
          mFixedBendingStrainMtx = new Matrix3d();
          mFixedBendingStrainMtx.set (new double[][] {
             new double[] {0,0,0}, 
-            new double[] {0,0.25,0},
+            new double[] {0,sidedStrains_shell[t],0},
             new double[] {0,0,0}
          });
+         
+         mPauseEveryInterval = pauses_shell[t]; 
+
       } else {
-         m_shellThickness = 1e-2;
+         m_shellThickness = thicknesses[t];
          m_youngsModulus = youngModuluses[t];
          
          mFixedBendingStrainMtx = new Matrix3d();
          mFixedBendingStrainMtx.set (new double[][] {
             new double[] {0,0,0}, 
-            new double[] {0,0.25,0},
+            new double[] {0,sidedStrains_vol[t],0},
             new double[] {0,0,0}
          });
+         
+         mPauseEveryInterval = pauses_vol[t];
       }
       
       mSizeMin = 0.05;
       mSizeMax = mSizeMin*5;
       mDiffusionTimestepScale = 0.01;
-      mPauseEveryInterval = 999.00; 
       
+      mShowColorBar = false;
 //      ShellPatch.m_particleDamping = 10;
       
    }
+   
+   
    
    
 //   protected void build_modelSkeleton() {
@@ -134,8 +162,8 @@ public class DualCurl extends Basic_Base {
       super.build_modelProperties();
       
       FemMaterial mat = null;
-//      mat = new LinearMaterial(m_youngsModulus, m_poissonsRatio);
-      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
+      mat = new LinearMaterial(m_youngsModulus, m_poissonsRatio);
+//      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
 //      mat = new MooneyRivlinMaterial(1500, 0, 0, 0, 0, 150000);
 //      mat = new OgdenMaterial();   // Pill shape 
 
@@ -145,12 +173,23 @@ public class DualCurl extends Basic_Base {
       }
    }
    
+   protected void build_addUI() {
+   }
    
    protected void build_renderConfig() {
       super.build_renderConfig ();
       
       mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
       mRendCfg.mNodeRadius = 0.00;
+      
+      mRendCfg.mDirectorLen = 0; 
+      mRendCfg.mFrontMeshColor = Color.LIGHT_GRAY; 
+      mRendCfg.mRearMeshColor = Color.GREEN;
+      
+      if (mEleClass == ElementClass.VOLUMETRIC) {
+         mRendCfg.mFrontMeshColor = Color.GREEN; 
+         mRendCfg.mRearMeshColor = Color.GREEN;
+      }
    }
    
    protected void build_post() {

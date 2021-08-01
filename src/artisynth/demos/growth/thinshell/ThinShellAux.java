@@ -45,6 +45,8 @@ public class ThinShellAux {
    protected PolygonalMesh mMesh; 
    protected FemModel3d mModel;
    
+   public static double mBendForceScaling = 1;
+   
    /**
     * Auxiliary helper class to provide thin-shell forces and stiffness to 
     * membranes. 
@@ -226,6 +228,7 @@ public class ThinShellAux {
                
                Vector3d iForce = new Vector3d();
                forces.getColumn (i, iForce);
+               iForce.scale (mBendForceScaling);
                nodei.getInternalForce ().add(iForce);
                
                int j = 0;
