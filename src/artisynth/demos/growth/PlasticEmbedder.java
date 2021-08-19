@@ -208,6 +208,7 @@ public class PlasticEmbedder {
    protected boolean hasBackNode() {
       if (this.mHasBackNodes == null) {
          this.mHasBackNodes = (
+         mFemModel.numShellElements () > 0 &&
          mFemModel.getShellElement (0).getElementClass () == ElementClass.SHELL);
       }
       

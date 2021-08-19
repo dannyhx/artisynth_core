@@ -63,29 +63,44 @@ public class ShellTriElement extends ShellElement3d {
       };
    }
 
-   protected static double[] myDefaultIntegrationCoords = null;
+   public static double[] myDefaultIntegrationCoords = null;
    protected static double[] myMembraneIntegrationCoords = null;
+   public static final double[] INTEGRATION_COORDS_GAUSS_6;
    public static final double[] INTEGRATION_COORDS_GAUSS_9;
    public static final double[] INTEGRATION_COORDS_MEMBRANE;
-
+   
    static {
       double a = 1/6.0;
       double b = 2/3.0;
       double w1 = 5/9.0;
       double w2 = 8/9.0;
+      
       INTEGRATION_COORDS_GAUSS_9 = new double[] { 
-         a, a, -b, a*w1,
-         b, a, -b, a*w1,
-         a, b, -b, a*w1, 
-         
-         a, a, 0, a*w2, 
-         b, a, 0, a*w2, 
-         a, b, 0, a*w2,
-         
-         a, a, b, a*w1, 
-         b, a, b, a*w1, 
-         a, b, b, a*w1
-      };
+          a, a, -b, a*w1,
+          b, a, -b, a*w1,
+          a, b, -b, a*w1, 
+          
+          a, a, 0, a*w2, 
+          b, a, 0, a*w2, 
+          a, b, 0, a*w2,
+          
+          a, a, b, a*w1, 
+          b, a, b, a*w1, 
+          a, b, b, a*w1
+       };
+      
+      double q = 1/Math.sqrt(3); // quadrature point
+      double w = 1.0/6.0;
+      
+      INTEGRATION_COORDS_GAUSS_6 = new double[] { 
+          a, a, -q, w,
+          b, a, -q, w,
+          a, b, -q, w, 
+          a, a, q, w, 
+          b, a, q, w, 
+          a, b, q, w
+       };
+
       myDefaultIntegrationCoords = INTEGRATION_COORDS_GAUSS_9;
 
       double w3 = 1/6.0; // membrane weights should sum to 1/2

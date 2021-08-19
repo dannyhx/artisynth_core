@@ -57,7 +57,7 @@ public class MechSystemSolver {
    MechSystem mySys;
    RigidBodySolver myRBSolver;
 
-   public boolean profileKKTSolveTime = false;
+   public boolean profileKKTSolveTime = true;
    public boolean profileWholeSolve = false;
    public boolean profileConstrainedBE = true;
    // always updating friction causes inverseMassMatrix updates

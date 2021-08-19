@@ -1,5 +1,6 @@
 package artisynth.demos.growth;
 
+import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
@@ -46,6 +47,7 @@ public class Morphogen2GrowthTensor {
    // chemical concentration. Only applicable when isBendingMorphogenHack is 
    // true.
    public Matrix3d fixedBendingStrain = null;
+   public boolean zeroStrainAtBottom = false;
    
    protected FemModel3d mFemModel;
    protected PolygonalMesh mMesh; 
@@ -316,18 +318,33 @@ public class Morphogen2GrowthTensor {
                   (this.fixedBendingStrain == null) ?
                   vecToMtx3d(strainVect) : 
                   new Matrix3d(this.fixedBendingStrain);
-               
-               // Custom
-               if (isBendingMorphogenHack && k < 3) {
-                  // Apply strain as usual to top-surface.
-               } 
-               else if (isBendingMorphogenHack && k < 6) {
-                  // Do not apply strain to mid-surface.
-                  strainMtx.setZero ();
-               } 
-               else if (isBendingMorphogenHack) {
-                  // Negate strain to bottom-surface to simulate bending.
-                  strainMtx.negate ();
+
+               if (ele.getElementClass () == ElementClass.SHELL) {
+                  if (isBendingMorphogenHack && k < 3) {
+                     // Apply strain as usual to top-surface.
+                  } 
+                  else if (isBendingMorphogenHack && k < 6) {
+                     // Do not apply strain to mid-surface.
+                     strainMtx.setZero ();
+                  } 
+                  else if (isBendingMorphogenHack) {
+                     // Negate strain to bottom-surface to simulate bending.
+                     if (zeroStrainAtBottom)
+                        strainMtx.setZero ();  
+                     else
+                        strainMtx.negate ();
+                  }
+               } else {
+                  if (isBendingMorphogenHack && k < 3) {
+                     // Apply strain as usual to top-surface.
+                  } 
+                  else if (isBendingMorphogenHack && k < 6) {
+                     // Negate strain to bottom-surface to simulate bending.
+                     if (zeroStrainAtBottom)
+                        strainMtx.setZero ();  
+                     else
+                        strainMtx.negate ();
+                  } 
                }
                
                if (this.fixedBendingStrain == null ) {
@@ -393,6 +410,23 @@ public class Morphogen2GrowthTensor {
     * the identity matrix; any applied growth tensor is dropped.
     */
    public void unapplyGrowthTensors() {
+      if (mFemModel.myThinShellAux != null) {
+         for (Face face : mMesh.getFaces ()) {
+            for (int e = 0; e < 3; e++) {
+               HalfEdge edge = face.getEdge (e);
+               
+               if (edge.opposite == null) {
+                  continue;
+               }
+               
+               EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
+               edgeData.mAngStrain = 0;
+            }
+         }
+         
+         return;
+      }
+      
       for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
          GrowElementBase gEle = (GrowElementBase)ele;
          

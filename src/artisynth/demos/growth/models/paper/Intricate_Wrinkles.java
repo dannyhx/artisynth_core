@@ -1,6 +1,7 @@
 package artisynth.demos.growth.models.paper;
 
 import artisynth.core.driver.Main;
+import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.demos.growth.GrowNode3d;
 import artisynth.demos.growth.models.base.GrowDemo;
 import artisynth.demos.growth.models.base.ShellPatch.RenderConfig;

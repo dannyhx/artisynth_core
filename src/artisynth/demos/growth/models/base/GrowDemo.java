@@ -249,6 +249,9 @@ public class GrowDemo extends ShellPatch {
    /** If true, do not discard the residual strain. */
    protected static boolean mMaintainResidualStrain = true;
    
+   /** Minimum energy before pausing. 0 to disable check. */
+   protected static double mMinEnergyBeforePausing = 0;
+   
    /** When toggled to true, currently selected nodes are incised. Resets back
     *  to false after incision. */
    protected static boolean mCutSelectedNodes = false;
@@ -408,6 +411,7 @@ public class GrowDemo extends ShellPatch {
       mPanel.addWidget (this, "enableCollisionHandling");
       mPanel.addWidget (this, "enableSelfCollision");
       mPanel.addWidget (this, "maintainResidualStrain");
+      mPanel.addWidget (this, "minEnergyBeforePausing");
 
       mPanel.addWidget (this, "surfaceColor");
       mPanel.addWidget (this, "nodeColor");
@@ -478,6 +482,7 @@ public class GrowDemo extends ShellPatch {
       myProps.add("enableCollisionHandling", "", mEnableCollisionHandling);
       myProps.add("enableSelfCollision", "", mEnableSelfCollision);
       myProps.add("maintainResidualStrain", "", mMaintainResidualStrain);
+      myProps.add("minEnergyBeforePausing", "", mMinEnergyBeforePausing);
 
       myProps.add("renderMode", "", mRenderMode);
       myProps.add("surfaceColor", "", mSurfaceColor);
@@ -517,6 +522,8 @@ public class GrowDemo extends ShellPatch {
    public void setEnableSelfCollision(boolean val) { mEnableSelfCollision = val; }
    public boolean getMaintainResidualStrain() { return mMaintainResidualStrain; }
    public void setMaintainResidualStrain(boolean val) { mMaintainResidualStrain = val; }
+   public double getMinEnergyBeforePausing() { return mMinEnergyBeforePausing; }
+   public void setMinEnergyBeforePausing(double val) { mMinEnergyBeforePausing = val; }
    
    public RenderMode getRenderMode() { return mRenderMode; }
    public void setRenderMode(RenderMode val) { 
@@ -591,6 +598,10 @@ public class GrowDemo extends ShellPatch {
       // Pause the simulation if so.
       if (MathUtil.compare (t0 % mPauseEveryInterval, 0) == 0 && t0 != 0) {
          setStopRequest (true);
+      }
+      
+      if (t0 > 0.05 && mMinEnergyBeforePausing != 0 && mFemModel[0].getEnergy () < mMinEnergyBeforePausing ) {
+         setStopRequest(true);
       }
       
       // Setup the collision behavior for each pair of models.
