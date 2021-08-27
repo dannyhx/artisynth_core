@@ -37,6 +37,7 @@ import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.Face;
 import maspack.geometry.PolygonalMesh;
 import maspack.geometry.Vertex3d;
+import maspack.matrix.AxisAlignedRotation;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
 import maspack.matrix.VectorNd;
@@ -232,7 +233,7 @@ public class GrowDemo extends ShellPatch {
    /** Show the color bar? */
    protected boolean mShowColorBar = true;
    
-   public enum SurfaceColor { DEFAULT, PLASTIC_STRAIN, MORPHOGEN }
+   public enum SurfaceColor { DEFAULT, PLASTIC_STRAIN, MORPHOGEN, RESIDUAL_PLASTIC_BENDING_STRAIN }
    
    /** Color the surface according to the plastic strain or morphogen 
     *  concentration? If no coloring, use DEFAULT. */
@@ -265,6 +266,8 @@ public class GrowDemo extends ShellPatch {
    
    /** Starting camera position. */
    protected Point3d mCameraCenter;
+   
+   protected AxisAlignedRotation mAxisAlignedRotation = null;
    
    /* --- Color nodes according to the specific morphogen concentration. --- */
    
@@ -593,6 +596,10 @@ public class GrowDemo extends ShellPatch {
          if (Main.getMain ().getViewer () != null) {
             Main.getMain ().getViewer ().setBackgroundColor (mRendCfg.mBackgroundColor);
          }
+         
+         if (mAxisAlignedRotation != null) {
+            Main.getMain ().getViewer ().setAxialView (mAxisAlignedRotation);
+         }
       }
       
       // Pause the simulation if so.
@@ -729,6 +736,8 @@ public class GrowDemo extends ShellPatch {
          mGrowColorer.computePlasticStrainColors ();
       else if (mSurfaceColor == SurfaceColor.MORPHOGEN) 
          mGrowColorer.computeMorphogenColors ();
+      else if (mSurfaceColor == SurfaceColor.RESIDUAL_PLASTIC_BENDING_STRAIN) 
+         mGrowColorer.computeResidualPlasticBendingStrainColors ();
       else if (mGrowColorer != null)
          mGrowColorer.toggleOff ();
       

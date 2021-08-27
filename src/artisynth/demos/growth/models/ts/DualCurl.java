@@ -19,6 +19,7 @@ import artisynth.demos.growth.models.paper.Basic_Base;
 import artisynth.demos.growth.thinshell.ThinShellAux;
 import maspack.geometry.PolygonalMesh;
 import maspack.geometry.Vertex3d;
+import maspack.matrix.AxisAlignedRotation;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
@@ -44,8 +45,8 @@ public class DualCurl extends Basic_Base {
       mMeshX = 1;
       mMeshY = 1;
        
-      mMeshXDiv = 100;
-      mMeshYDiv = 100;
+      mMeshXDiv = 50;
+      mMeshYDiv = 50;
       
       morphogenSrcDuration = 0.01;
       
@@ -56,31 +57,32 @@ public class DualCurl extends Basic_Base {
       
       // Configuration
       
-//      mEleClass = ElementClass.VOLUMETRIC;
-//      mEleClass = ElementClass.SHELL;
-      mEleClass = ElementClass.MEMBRANE;
+      mEleClass = ElementClass.VOLUMETRIC;
+      mEleClass = ElementClass.SHELL;
+//      mEleClass = ElementClass.MEMBRANE;
       
       zeroStrainAtBottom = true;
       ShellTriElement.myDefaultIntegrationCoords = ShellTriElement.INTEGRATION_COORDS_GAUSS_6;
       
       mMinEnergyBeforePausing = 1e-6;
+//      mMinEnergyBeforePausing = -1;
       
       int t = 3;
 
       if (t < 3) {
          mCameraCenter = new Point3d(0,0,0);
-         mCameraEye = new Point3d(1.91791, -0.491349, 0.208651);
+         mCameraEye = new Point3d(1.8275, -0.536991, 0.506706);
       } else {
          mCameraCenter = new Point3d(0, 0, 0);
-         mCameraEye = new Point3d(1.10326, -0.998906, 0.508363);
+         mCameraEye = new Point3d(1.8275, -0.536991, 0.506706);
       }
       
       double[] thicknesses = new double[] {1e-3, 1e-2, 1e-1, 1e-2};
       double[] youngModuluses = new double[] {1e4, 1e4, 1e4, 1e4};
-      double angScale = (t == 3) ? 15 : 1; 
+      double angScale = (t == 3) ? 7.5 : 1;   // 15 : 1
       double width = (mMeshX/(float)mMeshXDiv);  
       double a = thicknesses[t];
-      double theta = angScale*2*PI / mMeshXDiv / 2;
+      double theta = angScale*2*PI / mMeshXDiv;  // /2
       double o = a * Math.tan (theta);   // absolute units
       double strain = (o/width);
       System.out.printf ("Strain: %.2f \n", strain);
@@ -155,6 +157,17 @@ public class DualCurl extends Basic_Base {
       if (false) {
          this.mIsActivatePAR = true;
          this.mFixedBendingStrainMtx = null;
+         m_youngsModulus = 1e2;
+         mPauseEveryInterval = 999;
+      }
+      
+      // Residual display
+      if (false) {
+         mShowColorBar = false; 
+         mSurfaceColor = SurfaceColor.RESIDUAL_PLASTIC_BENDING_STRAIN;
+//         mPauseEveryInterval = 4;
+//         mCameraEye = new Point3d(0.0, 0, 2.1991);
+//         mAxisAlignedRotation = AxisAlignedRotation.NY_X;
       }
    }
    
@@ -238,7 +251,7 @@ public class DualCurl extends Basic_Base {
       for (int v = 0; v < mMesh[0].numVertices (); v++) {
          if ( isMorphogenSrcNode(v) && t0 < morphogenSrcDuration) {
             GrowNode3d gNode = (GrowNode3d)mFemModel[0].getNode (v);
-            gNode.mChems.set (3, 1);
+//            gNode.mChems.set (3, 1);
             
 //            gNode.setVelocity (0, 0, 1);
 //            break;

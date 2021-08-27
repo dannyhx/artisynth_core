@@ -347,6 +347,13 @@ public class ShellUtil {
       return Integer.parseInt (idxStr);
    }
    
+   public static boolean isVolBackNode(ModelComponent comp) {
+      int nameLen = comp.getName ().length ();
+      String lastChar = comp.getName ().substring (nameLen-1);
+      
+      return (lastChar.equals("b"));
+   }
+   
    // MathUtil
    
    public static double getDihedralAngle(FemModel3d model, HalfEdge edge, boolean isRest) {

@@ -22,7 +22,7 @@ public class KKTSolver {
 
    public static boolean computeResidualMG = false;
 
-   boolean myTimeSolves = false;
+   boolean myTimeSolves = true;
    boolean myMDiagonalP = false;
    int mySizeM;
    int myTypeM = Matrix.SYMMETRIC;

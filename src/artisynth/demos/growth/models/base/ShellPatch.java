@@ -193,9 +193,11 @@ public class ShellPatch extends RootModel {
                if (isFront) {
                   node = createNode(vtx.getPosition ());
                   node.setName ("MyNode_#" + v);
+                  node.setIndex (v);
                } else {
                   node = createNode((Point3d)new Point3d(vtx.getPosition ()).add (0, 0, m_shellThickness));
                   node.setName ("MyNode_#" + v + "b");
+                  node.setIndex (v+mMesh[m].numVertices ());
                }
                
                mFemModel[m].addNode (node);

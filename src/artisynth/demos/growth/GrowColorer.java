@@ -5,6 +5,7 @@ import java.awt.Color;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.renderables.ColorBar;
 import artisynth.core.workspace.RootModel;
+import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.PolygonalMesh;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.Vector3d;
@@ -25,6 +26,10 @@ public class GrowColorer {
    
    /** Highest value in the plastic strain color bar.*/
    public double mMaxPlasticStrainColorBarRange = 1.10;
+   
+   /** Value range in the residual plastic strain color bar. */
+   protected final double mMinResidualPlasticStrainColorBarRange = 0;
+   public double mMaxResidualPlasticStrainColorBarRange = 0.0539;
    
    /** Lowest value in the morphogen color bar. */
    protected final double mMinMorphogenColorBarRange = 0;
@@ -93,6 +98,63 @@ public class GrowColorer {
          mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (node).getIndex (), 
             rgb[0], rgb[1], rgb[2], 1);
       }  
+   }
+   
+   /**
+    * Update the colors, corresponding to the amount of residual plastic strain.
+    */
+   public void computeResidualPlasticBendingStrainColors () {
+      // When coloring vtx-by-vtx, cannot give different colors for
+      // front and back faces.
+      boolean isShellEle = this.mFemModel.numShellElements () > 0;
+      if (isShellEle) {
+         RenderProps.setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT);
+      } else {
+         RenderProps.setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
+      }
+      mSurfaceMesh = mFemModel.getSurfaceMesh ();  // Latest surface mesh
+      mSurfaceMesh.setVertexColoringEnabled ();
+      mColorBar.updateLabels (mMinResidualPlasticStrainColorBarRange, mMaxResidualPlasticStrainColorBarRange);
+      
+      double[] nodalRS = mFemModel.getNodalResidualPlasticBendingStrain ();
+      double[] rgb = new double[3];
+      
+      double max = 0;
+      double min = 0;
+      
+      for (int n = 0; n < mFemModel.numNodes (); n++) {
+         FemNode3d node = mFemModel.getNode (n);
+         
+         if (!isShellEle && !ShellUtil.isVolBackNode(node)) {
+            // Use its back node's color.
+            int numNodes = mFemModel.numNodes ();
+            int b = n + (numNodes/2);
+            
+            double scalar = nodalRS[b];
+            mColorBar.getColor (scalar, rgb);
+            mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (node).getIndex (), rgb[0], rgb[1], rgb[2], 0);
+            continue;
+         }
+
+         double scalar = nodalRS[n];
+         mColorBar.getColor (scalar, rgb);
+         mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (node).getIndex (), 
+            rgb[0], rgb[1], rgb[2], 1);
+         
+         if (n == 0 || scalar > max) {
+            max = scalar;
+         }
+         
+         if (n == 0 || scalar < min) {
+            min = scalar;
+         }
+         
+//         FemNode3d nodeB = mFemModel.getNode (n+3);
+//         mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (nodeB).getIndex (), 
+//            rgb[0], rgb[1], rgb[2], 1);
+      }  
+      
+      System.out.printf ("Stress: [%.4f, %.4f]\n", min, max);
    }
    
    /**

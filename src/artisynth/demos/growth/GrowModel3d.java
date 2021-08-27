@@ -1,10 +1,12 @@
 package artisynth.demos.growth;
 
 import artisynth.core.femmodels.FemDeformedPoint;
+import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.IntegrationPoint3d;
 import artisynth.core.femmodels.ShellElement3d;
+import artisynth.core.femmodels.WedgeElement;
 import artisynth.demos.growth.thinshell.EdgeDataMap;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.matrix.Matrix3d;
@@ -86,6 +88,97 @@ public class GrowModel3d extends FemModel3d {
       }
       
       return nodalFgs;
+   }
+
+   protected WedgeElement mSampleWedgeElement = new WedgeElement();
+   /** 
+    * Get the (interpolated) residual bending plastic stress at each node.
+    */
+   public double[] getNodalResidualPlasticBendingStrain () {
+      double[] nodalRS = new double[numNodes()];
+      
+      Matrix3d F = new Matrix3d();
+      Matrix3d invJ0 = new Matrix3d();
+      
+      for (FemElement3dBase ele : this.getAllElements ()) {
+         GrowElementBase gEle = (GrowElementBase)ele; 
+         
+         IntegrationPoint3d[] ipnts = null;
+         GrowIntegrationData3d[] idata = gEle.getIntegrationData();
+         MatrixNd nodalExtrapMat = null;
+         
+         boolean isShellEle = (gEle instanceof GrowTriElement);
+         
+         if (isShellEle) {
+            GrowTriElement sEle = (GrowTriElement) gEle;
+            ipnts = sEle.getIntegrationPoints();
+         } else {
+            GrowWedgeElement vEle = (GrowWedgeElement) gEle;
+            ipnts = vEle.getIntegrationPoints ();
+         }
+         
+         nodalExtrapMat = mSampleWedgeElement.getNodalExtrapolationMatrix();
+
+         
+         // For each integration point
+         for (int k=0; k<ipnts.length; k++) {
+            
+            // Only measure residual strain in bending-surface.
+            if (k >= 3) {
+               continue;
+            }
+            
+            // For each node
+            for (int en = 0; en < ele.numNodes (); en++) {
+               FemNode3d node = gEle.getNodes ()[en];
+               if (!isShellEle && !ShellUtil.isVolBackNode (node)) {
+                  continue;
+               }
+               
+               // % contribute of this integration pt to this node
+               int vNodeIdx = en;
+               if (isShellEle) {
+                  vNodeIdx += 3;
+               }
+               
+               double a = nodalExtrapMat.get (vNodeIdx, k);
+               if (a == 0) {
+                  continue;
+               }
+               
+               // Calculate F
+               double detInvJ0 = ipnts[k].computeInverseRestJacobian (invJ0, gEle.getNodes ());
+               if (detInvJ0 <= 0) {
+                  throw new RuntimeException("Detected negative detInvJ0.");
+               }
+               double detF = ipnts[k].computeGradient (F, gEle.getNodes (), invJ0);
+               if (detF <= 0) {
+                  throw new RuntimeException("Detected negative detF.");
+               }
+               
+               // Expected F 
+               double detExpF = idata[k].getFp ().determinant ();
+               
+               double RS = detExpF - detF;
+               
+//               if (a < 0 || RS < 0) {
+//                  throw new RuntimeException("");
+//               }
+               
+               int nodeGlobalIdx = node.getIndex ();
+               
+               double inc = Math.abs(a)/node.numAdjacentElements() * RS;
+               
+//               if (!node.hasDirector ()) {
+//                  inc /= 5;
+//               }
+               
+               nodalRS[nodeGlobalIdx] += inc;
+            }
+         }
+      }
+      
+      return nodalRS;
    }
    
    protected FemDeformedPoint createFemDeformedPoint() {
