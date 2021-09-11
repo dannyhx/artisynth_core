@@ -100,6 +100,9 @@ public class GrowModel3d extends FemModel3d {
       Matrix3d F = new Matrix3d();
       Matrix3d invJ0 = new Matrix3d();
       
+      double avgDetRemain = 0;
+      double avgExpDet = 0;
+      
       for (FemElement3dBase ele : this.getAllElements ()) {
          GrowElementBase gEle = (GrowElementBase)ele; 
          
@@ -119,7 +122,6 @@ public class GrowModel3d extends FemModel3d {
          
          nodalExtrapMat = mSampleWedgeElement.getNodalExtrapolationMatrix();
 
-         
          // For each integration point
          for (int k=0; k<ipnts.length; k++) {
             
@@ -127,6 +129,23 @@ public class GrowModel3d extends FemModel3d {
             if (k >= 3) {
                continue;
             }
+            
+            // Calculate F
+            double detInvJ0 = ipnts[k].computeInverseRestJacobian (invJ0, gEle.getNodes ());
+            if (detInvJ0 <= 0) {
+               throw new RuntimeException("Detected negative detInvJ0.");
+            }
+            double detF = ipnts[k].computeGradient (F, gEle.getNodes (), invJ0);
+            if (detF <= 0) {
+               throw new RuntimeException("Detected negative detF.");
+            }
+            
+            // Expected F 
+            double detExpF = idata[k].getFp ().determinant ();
+            double RS = detExpF - detF;
+            
+            avgDetRemain += (RS) * (1.0/3);
+            avgExpDet += detExpF * (1.0/3);
             
             // For each node
             for (int en = 0; en < ele.numNodes (); en++) {
@@ -146,21 +165,6 @@ public class GrowModel3d extends FemModel3d {
                   continue;
                }
                
-               // Calculate F
-               double detInvJ0 = ipnts[k].computeInverseRestJacobian (invJ0, gEle.getNodes ());
-               if (detInvJ0 <= 0) {
-                  throw new RuntimeException("Detected negative detInvJ0.");
-               }
-               double detF = ipnts[k].computeGradient (F, gEle.getNodes (), invJ0);
-               if (detF <= 0) {
-                  throw new RuntimeException("Detected negative detF.");
-               }
-               
-               // Expected F 
-               double detExpF = idata[k].getFp ().determinant ();
-               
-               double RS = detExpF - detF;
-               
 //               if (a < 0 || RS < 0) {
 //                  throw new RuntimeException("");
 //               }
@@ -176,7 +180,12 @@ public class GrowModel3d extends FemModel3d {
                nodalRS[nodeGlobalIdx] += inc;
             }
          }
+         
       }
+
+      avgDetRemain /= this.numAllElements ();
+      avgExpDet /= this.numAllElements ();
+      System.out.printf ("avgDetRemain: [%.6f], avgExpDet: [%.6f]\n", avgDetRemain, avgExpDet);
       
       return nodalRS;
    }

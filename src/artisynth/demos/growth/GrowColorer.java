@@ -121,9 +121,11 @@ public class GrowColorer {
       
       double max = 0;
       double min = 0;
+      double sum = 0;
       
       for (int n = 0; n < mFemModel.numNodes (); n++) {
          FemNode3d node = mFemModel.getNode (n);
+         sum += nodalRS[n];
          
          if (!isShellEle && !ShellUtil.isVolBackNode(node)) {
             // Use its back node's color.
@@ -154,7 +156,7 @@ public class GrowColorer {
 //            rgb[0], rgb[1], rgb[2], 1);
       }  
       
-      System.out.printf ("Stress: [%.4f, %.4f]\n", min, max);
+      System.out.printf ("Stress: [%.4f, %.4f]. Total: [%.4f]\n", min, max, sum);
    }
    
    /**

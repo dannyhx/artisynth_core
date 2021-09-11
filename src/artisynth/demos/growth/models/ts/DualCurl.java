@@ -45,8 +45,8 @@ public class DualCurl extends Basic_Base {
       mMeshX = 1;
       mMeshY = 1;
        
-      mMeshXDiv = 50;
-      mMeshYDiv = 50;
+      mMeshXDiv = 25;
+      mMeshYDiv = 25;
       
       morphogenSrcDuration = 0.01;
       
@@ -67,7 +67,7 @@ public class DualCurl extends Basic_Base {
       mMinEnergyBeforePausing = 1e-6;
 //      mMinEnergyBeforePausing = -1;
       
-      int t = 3;
+      int t = 1;
 
       if (t < 3) {
          mCameraCenter = new Point3d(0,0,0);
@@ -162,12 +162,22 @@ public class DualCurl extends Basic_Base {
       }
       
       // Residual display
-      if (false) {
+      if (true) {
          mShowColorBar = false; 
          mSurfaceColor = SurfaceColor.RESIDUAL_PLASTIC_BENDING_STRAIN;
 //         mPauseEveryInterval = 4;
 //         mCameraEye = new Point3d(0.0, 0, 2.1991);
 //         mAxisAlignedRotation = AxisAlignedRotation.NY_X;
+      }
+      
+      // Shearing
+      if (false) {
+         m_shellThickness = 1e-1;
+         mFixedBendingStrainMtx.set (new double[][] {
+            new double[] {0,0,0}, 
+            new double[] {0,0.5,0},
+            new double[] {0,0,0}
+         });
       }
    }
    
@@ -192,7 +202,7 @@ public class DualCurl extends Basic_Base {
       
       FemMaterial mat = null;
       mat = new LinearMaterial(m_youngsModulus, m_poissonsRatio);
-//      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
+      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
 //      mat = new MooneyRivlinMaterial(1500, 0, 0, 0, 0, 150000);
 //      mat = new OgdenMaterial();   // Pill shape 
 
@@ -211,7 +221,7 @@ public class DualCurl extends Basic_Base {
       mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
       mRendCfg.mNodeRadius = 0.0005;
       
-      mRendCfg.mDirectorLen = 0; 
+      mRendCfg.mDirectorLen = 1; 
       mRendCfg.mFrontMeshColor = Color.LIGHT_GRAY; 
       mRendCfg.mRearMeshColor = Color.GREEN;
       
