@@ -81,9 +81,12 @@ public interface GrowElementBase {
          P_residual.sub (P_expected, P_occurred);
          P_residual.add (Matrix3d.IDENTITY);
          
-         // Non-linear   // TODO
-//         P_residual.mulInverseRight (P_expected, P_occurred);
-//         P_residual.mul (R_occurred, P_residual);
+         // Non-linear   
+         // This use instead of linear unless need to reproduce the paper's
+         // experiments on an numerically identical level.
+//         P_residual.add (P_expected, Matrix3d.IDENTITY);
+//         P_residual.mulInverse (F_occurred); 
+//         P_residual.sub (Matrix3d.IDENTITY);
          
          // Symmetric testing.
          // Doesn't make much of a difference. Numerically, numbers
