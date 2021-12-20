@@ -37,6 +37,9 @@ import maspack.matrix.Vector3d;
  *     
  *         Use t=1 for the 2PI cylinder curl experiment.
  *         Use t=3 for the amplified curl experiment. 
+ *         
+ *     Use mMeshXDiv and mMeshYDiv == 25 to observe less exaggerated
+ *     opposite axis bending.
  */
 public class DualCurl extends Basic_Base {
    
@@ -57,8 +60,8 @@ public class DualCurl extends Basic_Base {
       mMeshX = 1;
       mMeshY = 1;
        
-      mMeshXDiv = 25;
-      mMeshYDiv = 25;
+      mMeshXDiv = 50;
+      mMeshYDiv = 50;
       
       morphogenSrcDuration = 0.01;
       
@@ -69,17 +72,17 @@ public class DualCurl extends Basic_Base {
       
       // Configuration
       
-      mEleClass = ElementClass.VOLUMETRIC;
+//      mEleClass = ElementClass.VOLUMETRIC;
       mEleClass = ElementClass.SHELL;
 //      mEleClass = ElementClass.MEMBRANE;
       
       zeroStrainAtBottom = true;
       ShellTriElement.myDefaultIntegrationCoords = ShellTriElement.INTEGRATION_COORDS_GAUSS_6;
       
-      mMinEnergyBeforePausing = 1e-6;
+//      mMinEnergyBeforePausing = 1e-6;
 //      mMinEnergyBeforePausing = -1;
       
-      int t = 1;
+      int t = 3;
 
       if (t < 3) {
          mCameraCenter = new Point3d(0,0,0);
@@ -109,7 +112,7 @@ public class DualCurl extends Basic_Base {
       
       double[] thicknesses_ts = new double[] {     1e-3,  1e-2, 1e-1, 1e-2 };
       double[] youngModuluses_ts = new double[] {  1e4,   1e4,  1e4,  1e4 };
-      double[] angularStrainsQual = new double[] { 2*PI,  2*PI, 2*PI, 2*PI*15};       
+      double[] angularStrainsQual = new double[] { 2*PI,  2*PI, 2*PI, 2*PI*7.5};       
       double[] pauses_ts = new double[] {          999,    999,   999,   3};
 
       if (mEleClass == ElementClass.MEMBRANE) {
@@ -214,7 +217,7 @@ public class DualCurl extends Basic_Base {
       
       FemMaterial mat = null;
       mat = new LinearMaterial(m_youngsModulus, m_poissonsRatio);
-      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
+//      mat = new NeoHookeanMaterial(m_youngsModulus, m_poissonsRatio);  // Corset shape. Very similar to LinearMaterial
 //      mat = new MooneyRivlinMaterial(1500, 0, 0, 0, 0, 150000);
 //      mat = new OgdenMaterial();   // Pill shape 
 
