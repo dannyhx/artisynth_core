@@ -15,8 +15,10 @@ import artisynth.core.gui.ControlPanel;
 import artisynth.core.materials.LinearMaterial;
 import artisynth.core.mechmodels.MechModel;
 import artisynth.core.workspace.RootModel;
-import artisynth.demos.growth.thinshell.EdgeDataMap;
-import artisynth.demos.growth.thinshell.ThinShellAux;
+import artisynth.demos.growth.models.ts.EdgeDataMap;
+import artisynth.demos.growth.models.ts.ThinShellAux;
+import artisynth.demos.growth.models.ts.ThinShellType;
+import artisynth.demos.growth.models.ts.narain.NarainShell;
 import maspack.geometry.Face;
 import maspack.geometry.MeshFactory;
 import maspack.geometry.PolygonalMesh;
@@ -68,8 +70,11 @@ public class ShellPatch extends RootModel {
    
    /* --- FEM physical properties --- */
    
-   /** Use membrane? */
+   /** Element type */
    protected ElementClass mEleClass = ElementClass.VOLUMETRIC;
+   
+   /** If using membrane element type, what thin-shell behavior to use? */
+   protected ThinShellType mTsType = ThinShellType.NARAIN;
    
    /** Overall density of shell patch. */
    protected double m_density = 100;
@@ -229,9 +234,8 @@ public class ShellPatch extends RootModel {
          }
          
          if (mEleClass == ElementClass.MEMBRANE) {
-            mFemModel[m].myEdgeDataMap = new EdgeDataMap(mFemModel[m], mMesh[m]);
-            mFemModel[m].myThinShellAux = new ThinShellAux(mFemModel[m], mMesh[m]);
-            mFemModel[m].myThinShellAux.setAltMaterial (
+            mFemModel[m].myThinShellAux = new ThinShellAux(mTsType, mFemModel[m], mMesh[m]);
+            mFemModel[m].myThinShellAux.setMaterialProperties (
                m_youngsModulus, m_poissonsRatio, m_shellThickness);
          }
          

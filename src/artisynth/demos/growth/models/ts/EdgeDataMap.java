@@ -1,4 +1,4 @@
-package artisynth.demos.growth.thinshell;
+package artisynth.demos.growth.models.ts;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -87,26 +87,7 @@ public class EdgeDataMap {
       
       return edge; 
    }
-   
-   
-   /* --- Utils --- */
-   
-   
-   public void useResidualPlasticStrain() {
-      for (Map.Entry<HalfEdge, EdgeData> entry : this.mMap.entrySet()) {
-         HalfEdge edge = entry.getKey();
-         EdgeData edgeData = entry.getValue();
-         
-         double ang = ShellUtil.getDihedralAngle (mModel, edge, false);
-         double angRest = ShellUtil.getDihedralAngle (mModel, edge, true);
-         
-         // Amount of deformation actually occurred, between t0 and t1.
-         double angOcc = ang - angRest;
-         
-         // Remaining deformation to expect.
-         edgeData.mAngStrain -= angOcc;
-     }
-   }
+  
    
 }
 

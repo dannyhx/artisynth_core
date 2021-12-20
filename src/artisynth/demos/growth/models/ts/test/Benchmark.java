@@ -1,4 +1,4 @@
-package artisynth.demos.growth.models.ts;
+package artisynth.demos.growth.models.ts.test;
 
 import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.demos.growth.GrowNode3d;

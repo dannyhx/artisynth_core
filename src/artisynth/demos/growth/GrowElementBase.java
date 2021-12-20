@@ -77,12 +77,12 @@ public interface GrowElementBase {
          
          Matrix3d P_residual = new Matrix3d();
          
-         // Linear
+         // Additive approach.
          P_residual.sub (P_expected, P_occurred);
          P_residual.add (Matrix3d.IDENTITY);
          
-         // Non-linear   
-         // This use instead of linear unless need to reproduce the paper's
+         // Multiplicative approach.
+         // This use instead of additive unless need to reproduce the paper's
          // experiments on an numerically identical level.
 //         P_residual.add (P_expected, Matrix3d.IDENTITY);
 //         P_residual.mulInverse (F_occurred); 

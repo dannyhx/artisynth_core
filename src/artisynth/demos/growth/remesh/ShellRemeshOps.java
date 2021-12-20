@@ -184,13 +184,7 @@ public class ShellRemeshOps extends RemeshOps {
       // Save the thin-shell element-wise plastic strain.
       
       if (opRv != null && mFemModel.myThinShellAux != null) {
-         Matrix3d membStrain = new Matrix3d(rmEle.getPlasticDeformation ());
-         Matrix3d bendStrain = mFemModel.myThinShellAux.bendStrain_edgesToFace (face);
-
-         ShellOpRv sOpRv = (ShellOpRv) opRv;
-         sOpRv.mParentPlasticMembStrains.add (membStrain);
-         sOpRv.mParentPlasticBendStrains.add (bendStrain);
-         sOpRv.mParentRestAreas.add( ShellUtil.area(rmEle.getNodes (), true) );
+         mFemModel.myThinShellAux.remeshRemoveFacePreOp (face, opRv);
       }
 
       // Remove face and its element from model.
@@ -646,10 +640,10 @@ public class ShellRemeshOps extends RemeshOps {
    
    /* --- Helper Classes --- */
    
-   protected class ShellOpRv extends OpRv {
-      protected LinkedList<Double> mParentRestAreas;
-      protected LinkedList<Matrix3d> mParentPlasticMembStrains; 
-      protected LinkedList<Matrix3d> mParentPlasticBendStrains;
+   public class ShellOpRv extends OpRv {
+      public LinkedList<Double> mParentRestAreas;
+      public LinkedList<Matrix3d> mParentPlasticMembStrains; 
+      public LinkedList<Matrix3d> mParentPlasticBendStrains;
       
       public ShellOpRv() {
          super();

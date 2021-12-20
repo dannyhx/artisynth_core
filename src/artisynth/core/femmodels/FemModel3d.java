@@ -66,8 +66,9 @@ import artisynth.core.util.IntegerToken;
 import artisynth.core.util.ScalableUnits;
 import artisynth.core.util.ScanToken;
 import artisynth.core.util.StringToken;
-import artisynth.demos.growth.thinshell.EdgeDataMap;
-import artisynth.demos.growth.thinshell.ThinShellAux;
+import artisynth.demos.growth.models.ts.EdgeDataMap;
+import artisynth.demos.growth.models.ts.ThinShellAux;
+import artisynth.demos.growth.models.ts.narain.NarainShell;
 import artisynth.demos.growth.util.HingeUtil;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.AABBTree;
@@ -274,8 +275,8 @@ PointAttachable, ConnectableBody {
 
    static float[] myInvertedColor = new float[] { 1f, 0f, 0f};
 
-   // Only applicable for thin-shell elements.
-   public EdgeDataMap myEdgeDataMap;
+   // Instantiated whenever a thin-shell library (e.g. Narain) is to override
+   // the default membrane force and stiffness calculation. 
    public ThinShellAux myThinShellAux;
    
    public static PropertyList myProps =
@@ -2906,8 +2907,7 @@ PointAttachable, ConnectableBody {
       }     
       
       if (myThinShellAux != null) {
-         myThinShellAux.addStretchingForceAndStiffness ();
-         myThinShellAux.addBendingForceAndStiffness ();
+         myThinShellAux.addForceAndStiffness ();
       }
 
       // incompressibility

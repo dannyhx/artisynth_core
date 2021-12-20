@@ -7,7 +7,7 @@ import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.IntegrationPoint3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.WedgeElement;
-import artisynth.demos.growth.thinshell.EdgeDataMap;
+import artisynth.demos.growth.models.ts.EdgeDataMap;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
@@ -18,7 +18,7 @@ import maspack.util.DataBuffer;
 /** 
  * Extension of FemModel3d to account for growth. 
  *  
- * Currently only contains modifications for aesthetics. 
+ * Currently only contains modifications relating to display-purposes. 
  */
 public class GrowModel3d extends FemModel3d {
    

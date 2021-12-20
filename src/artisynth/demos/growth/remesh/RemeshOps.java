@@ -227,7 +227,7 @@ public class RemeshOps {
     * Stores information regarding the effected mesh features for a given
     * remeshing operation.
     */
-   protected class OpRv {
+   public class OpRv {
       public RemeshOp mOp;
       
       public Face[] mAddedFaces;

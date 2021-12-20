@@ -7,8 +7,8 @@ import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.ShellTriElement;
 import artisynth.core.modelbase.ComponentChangeEvent;
 import artisynth.core.modelbase.ComponentChangeEvent.Code;
-import artisynth.demos.growth.thinshell.EdgeDataMap;
-import artisynth.demos.growth.thinshell.EdgeDataMap.EdgeData;
+import artisynth.demos.growth.models.ts.EdgeDataMap;
+import artisynth.demos.growth.models.ts.EdgeDataMap.EdgeData;
 import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.MeshUtil;
 import artisynth.demos.growth.util.ShellUtil;
@@ -58,7 +58,7 @@ public class PlasticEmbedder {
       }
       
       if (mFemModel.myThinShellAux != null) {
-         mFemModel.myEdgeDataMap.useResidualPlasticStrain ();
+         mFemModel.myThinShellAux.useResidualPlasticStrain ();
       }
       
       concludeReferenceSpaceAdvance();
@@ -87,7 +87,7 @@ public class PlasticEmbedder {
       }
       
       if (mFemModel.myThinShellAux != null) {
-         mFemModel.myEdgeDataMap.useResidualPlasticStrain ();
+         mFemModel.myThinShellAux.useResidualPlasticStrain ();
       }
       
       for (FemNode3d node : mFemModel.getNodes ()) {

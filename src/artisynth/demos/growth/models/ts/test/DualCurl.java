@@ -1,4 +1,4 @@
-package artisynth.demos.growth.models.ts;
+package artisynth.demos.growth.models.ts.test;
 
 import java.awt.Color;
 import static java.lang.Math.PI;
@@ -16,7 +16,6 @@ import artisynth.demos.growth.GrowNode3d;
 import artisynth.demos.growth.models.base.GrowDemo.SurfaceColor;
 import artisynth.demos.growth.models.base.ShellPatch.RenderConfig;
 import artisynth.demos.growth.models.paper.Basic_Base;
-import artisynth.demos.growth.thinshell.ThinShellAux;
 import maspack.geometry.PolygonalMesh;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.AxisAlignedRotation;
@@ -26,6 +25,19 @@ import maspack.matrix.Vector3d;
 
 //  artisynth.demos.growth.models.ts._Debug_ThinShell
 
+/**
+ * Simulation to make a square patch curl into a cylinder.
+ * 
+ * Paramters to adjust:
+ *     // Element type
+ *     mEleClass = VOLUMETRIC | SHELL | MEMBRANE
+ *     
+ *     // Thickness variations. Can leave at 1 for 0.01 (1e-2) thickness. 
+ *     t = 0 | 1 | 2 | 3
+ *     
+ *         Use t=1 for the 2PI cylinder curl experiment.
+ *         Use t=3 for the amplified curl experiment. 
+ */
 public class DualCurl extends Basic_Base {
    
    protected Matrix3d mFixedBendingStrainMtx = null;

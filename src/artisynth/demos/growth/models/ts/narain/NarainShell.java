@@ -1,15 +1,25 @@
-package artisynth.demos.growth.thinshell;
+package artisynth.demos.growth.models.ts.narain;
 
 import maspack.matrix.Vector3d;
 import maspack.matrix.Vector4d;
 import maspack.matrix.VectorNd;
 import maspack.util.Pair;
+
+import java.util.Map;
+
+import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.FemNodeNeighbor;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.ShellTriElement;
-import artisynth.demos.growth.thinshell.EdgeDataMap.EdgeData;
+import artisynth.demos.growth.GrowElementBase;
+import artisynth.demos.growth.GrowthTensorUtil;
+import artisynth.demos.growth.models.ts.EdgeDataMap;
+import artisynth.demos.growth.models.ts.ThinShellBase;
+import artisynth.demos.growth.models.ts.EdgeDataMap.EdgeData;
+import artisynth.demos.growth.remesh.RemeshOps.OpRv;
+import artisynth.demos.growth.remesh.ShellRemeshOps.ShellOpRv;
 import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.MeshUtil;
 import artisynth.demos.growth.util.ShellUtil;
@@ -27,7 +37,7 @@ import maspack.matrix.MatrixNd;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector2d;
 
-public class ThinShellAux {
+public class NarainShell extends ThinShellBase {
    
    /** Current data-driven material model */
    protected boolean mIsDDE = false; 
@@ -42,9 +52,6 @@ public class ThinShellAux {
    /** Material weakening. Left to 0. */
    protected double mMatWeakening;
    
-   protected PolygonalMesh mMesh; 
-   protected FemModel3d mModel;
-   
    public static double mBendForceScaling = 1;
    
    /**
@@ -53,7 +60,9 @@ public class ThinShellAux {
     * 
     * Reference: ArcSim 3.0.
     */
-   public ThinShellAux(FemModel3d model, PolygonalMesh mesh) {
+   public NarainShell(FemModel3d model, PolygonalMesh mesh) {
+      super(model, mesh);
+      
       if (this.mIsDDE) {
          this.setDDEMaterial ("ribbon");
       } else {
@@ -61,9 +70,6 @@ public class ThinShellAux {
       }
       
       this.mMatWeakening = 0;
-      
-      this.mMesh = mesh;
-      this.mModel = model;
    }
    
    protected void setDDEMaterial(String matName) {
@@ -101,7 +107,7 @@ public class ThinShellAux {
       }
    }
    
-   public void setAltMaterial(
+   public void setMaterialProperties(
       double youngsModulus, double poissonsRatio, double thickness) 
    {
       this.mAltPoisson = poissonsRatio;
@@ -307,7 +313,7 @@ public class ThinShellAux {
       
       double theta = ShellUtil.getDihedralAngle (this.mModel, edge, false);
       double restTheta = ShellUtil.getDihedralAngle (this.mModel, edge, true);
-      restTheta += mModel.myEdgeDataMap.get (edge).mAngStrain;
+      restTheta += mEDM.get (edge).mAngStrain;
       
       double h0 = MathUtil.distanceBetweenPointAndLine (x2, x0, x1);
       double h1 = MathUtil.distanceBetweenPointAndLine (x3, x0, x1);
@@ -819,7 +825,7 @@ public class ThinShellAux {
          Vector3d e_mat = new Vector3d(hu).sub(tu);
          Vector3d t_mat = new Vector3d(e_mat).normalize ().cross (nrmRest);
          
-         EdgeData edgeData = mModel.myEdgeDataMap.get (edge);
+         EdgeData edgeData = mEDM.get (edge);
          double angStrain = (edgeData != null) ? edgeData.mAngStrain : 0;
          
          Matrix3d S_step = MathUtil.outerProduct (t_mat, t_mat);
@@ -885,5 +891,144 @@ public class ThinShellAux {
       return new Vector3d(rv);
    }
    
+   /* --- Remeshing --- */
+   
+   public void remeshPreOp() {
+      for (Face face : mMesh.getFaces ()) {
+         ShellElement3d ele = mModel.getShellElement (face.idx);
+         
+         Matrix3d bendStrain = bendStrain_edgesToFace (face);
+         ele.getPlasticBendStrain ().set (bendStrain);
+      }
+   }
 
+   public void remeshPostOp(boolean isEleModified) {
+      // Reconstruct the map to reflect the remeshed mesh.
+      this.mEDM = new EdgeDataMap(mModel, mMesh);
+      
+      for (Face face : mMesh.getFaces ()) {
+         ShellElement3d ele = mModel.getShellElement (face.idx);
+         
+         Vector3d edgeStrains = 
+            bendStrain_faceToEdges (face, ele.getPlasticBendStrain ());
+         
+         for (int e = 0; e < 3; e++) {
+            HalfEdge edge = face.getEdge (e);
+            if (edge.opposite == null) {
+               continue;
+            }
+            
+            EdgeData edgeData = mEDM.get (edge);
+            edgeData.mAngStrain += edgeStrains.get (e) / 2;
+            // Divide by 2 because opposite face will also contribute to
+            // strain.
+         }
+      }
+      
+      // Refresh node neighbors, but only if there was a change.
+      if (isEleModified) {
+         clearIndirectNeighbors ();
+      }
+   }
+   
+   /* --- Remeshing Operations --- */
+   
+   public void remeshRemoveFacePreOp(Face face, OpRv opRv) {
+      ShellTriElement rmEle = (ShellTriElement)mModel.getShellElement(face.idx);
+      
+      Matrix3d membStrain = new Matrix3d(rmEle.getPlasticDeformation ());
+      Matrix3d bendStrain = bendStrain_edgesToFace (face);
+
+      ShellOpRv sOpRv = (ShellOpRv) opRv;
+      sOpRv.mParentPlasticMembStrains.add (membStrain);
+      sOpRv.mParentPlasticBendStrains.add (bendStrain);
+      sOpRv.mParentRestAreas.add( ShellUtil.area(rmEle.getNodes (), true) );
+   }
+   
+   /* --- Morphogen2Growth --- */
+   
+   public void applyGrowthTensorToEle(
+      FemElement3dBase ele, boolean isBendingMorphogenHack, 
+      Matrix3d fixedBendingStrain) 
+   {
+      GrowElementBase gEle = (GrowElementBase)ele;
+      
+      if (ele.getPlasticDeformation () == null) {
+         ele.setPlasticDeformation (Matrix3d.IDENTITY);
+      }
+      
+      // Average the strain across the nodes, and consider that as the
+      // element's strain.
+      
+      Matrix3d avgStrain = null;
+      
+      if (fixedBendingStrain == null) {
+         avgStrain = new Matrix3d(); 
+         double[] S = new double[GrowthTensorUtil.numStrainComp()];
+         for (int n = 0; n < ele.numNodes (); n++) {
+            gEle.getRotatedElementGrowthStrains ().getRow (n,S); 
+            Matrix3d nodeStrain = GrowthTensorUtil.vecToMtx3d (S);
+            avgStrain.add(nodeStrain); 
+         }
+         avgStrain.scale(1.0 / ele.numNodes ());
+      } else {
+         avgStrain = fixedBendingStrain;
+      }
+      
+      if (isBendingMorphogenHack) {
+         int f = ShellUtil.getIndex (ele);
+         Face face = mMesh.getFace (f);
+       
+         Vector3d edgeStrains = 
+            bendStrain_faceToEdges (face, avgStrain);
+         
+         // For each of the 3 adjacent faces of the element.
+         for (int e = 0; e < 3; e++) {
+            HalfEdge edge = face.getEdge (e);
+            
+            if (edge.opposite == null) {
+               continue;
+            }
+            
+            EdgeData edgeData = mEDM.get (edge);
+            edgeData.mAngStrain = edgeStrains.get (e);
+         }
+         
+      } else {
+         ele.getPlasticDeformation().add(avgStrain);
+      }
+   }
+   
+   public void unapplyGrowthTensors() {
+      for (Face face : mMesh.getFaces ()) {
+         for (int e = 0; e < 3; e++) {
+            HalfEdge edge = face.getEdge (e);
+            
+            if (edge.opposite == null) {
+               continue;
+            }
+            
+            EdgeData edgeData = mEDM.get (edge);
+            edgeData.mAngStrain = 0;
+         }
+      }
+   }
+   
+   /* --- Plasticity --- */
+   
+   public void useResidualPlasticStrain() {
+      for (Map.Entry<HalfEdge, EdgeData> entry : mEDM.mMap.entrySet()) {
+         HalfEdge edge = entry.getKey();
+         EdgeData edgeData = entry.getValue();
+         
+         double ang = ShellUtil.getDihedralAngle (mModel, edge, false);
+         double angRest = ShellUtil.getDihedralAngle (mModel, edge, true);
+         
+         // Amount of deformation actually occurred, between t0 and t1.
+         double angOcc = ang - angRest;
+         
+         // Remaining deformation to expect.
+         edgeData.mAngStrain -= angOcc;
+     }
+   }
 }

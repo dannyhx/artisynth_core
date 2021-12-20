@@ -15,8 +15,8 @@ import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.modelbase.ModelComponentBase;
-import artisynth.demos.growth.thinshell.EdgeDataMap;
-import artisynth.demos.growth.thinshell.EdgeDataMap.EdgeData;
+import artisynth.demos.growth.models.ts.EdgeDataMap;
+import artisynth.demos.growth.models.ts.EdgeDataMap.EdgeData;
 import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.MeshUtil;
 import artisynth.demos.growth.util.ShellUtil;
@@ -122,12 +122,7 @@ public class ShellRemesher extends ShellRemeshOps {
       // before remeshing. Newly created elements will have their strain matrix 
       // computed on the spot.
       if (mFemModel.myThinShellAux != null) {
-         for (Face face : mMesh.getFaces ()) {
-            ShellElement3d ele = mFemModel.getShellElement (face.idx);
-            
-            Matrix3d bendStrain = mFemModel.myThinShellAux.bendStrain_edgesToFace (face);
-            ele.getPlasticBendStrain ().set (bendStrain);
-         }
+         mFemModel.myThinShellAux.remeshPreOp ();
       }
       
       mSizingField.computeVertexSizingFields ();
@@ -145,32 +140,7 @@ public class ShellRemesher extends ShellRemeshOps {
       
       // Compute the thin-shell plastic strain for each edge.
       if (mFemModel.myThinShellAux != null) {
-         // Reconstruct the map to reflect the remeshed mesh.
-         mFemModel.myEdgeDataMap = new EdgeDataMap(mFemModel, mMesh);
-         
-         for (Face face : mMesh.getFaces ()) {
-            ShellElement3d ele = mFemModel.getShellElement (face.idx);
-            
-            Vector3d edgeStrains = mFemModel.myThinShellAux.
-               bendStrain_faceToEdges (face, ele.getPlasticBendStrain ());
-            
-            for (int e = 0; e < 3; e++) {
-               HalfEdge edge = face.getEdge (e);
-               if (edge.opposite == null) {
-                  continue;
-               }
-               
-               EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
-               edgeData.mAngStrain += edgeStrains.get (e) / 2;
-               // Divide by 2 because opposite face will also contribute to
-               // strain.
-            }
-         }
-         
-         // Refresh node neighbors, but only if there was a change.
-         if (isEleModified) {
-            mFemModel.myThinShellAux.clearIndirectNeighbors ();
-         }
+         mFemModel.myThinShellAux.remeshPostOp(isEleModified);
       }
    }
    

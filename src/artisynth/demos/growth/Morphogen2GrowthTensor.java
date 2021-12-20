@@ -5,7 +5,7 @@ import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
-import artisynth.demos.growth.thinshell.EdgeDataMap.EdgeData;
+import artisynth.demos.growth.models.ts.EdgeDataMap.EdgeData;
 import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.Face;
@@ -31,14 +31,6 @@ import maspack.matrix.Vector3d;
  * When set to true, all absorbed morphogen is treated as plastic bending.
  */
 public class Morphogen2GrowthTensor {
-   
-   /** Set to 2 if growth tensor is symmetrical. Otherwise, set to 1. */
-   protected int SYM_COUNT = 2;
-  
-   /** Number of unique components in the growth tensor. */
-   protected int numStrainComp() {
-      return (SYM_COUNT == 2) ? 6 : 9;
-   }
   
    // Assume any absorbed morphogen is for plastic bending.
    public boolean isBendingMorphogenHack = false;
@@ -215,7 +207,8 @@ public class Morphogen2GrowthTensor {
          // This Nx6 matrix is created by simply appending a zeroed 3x3 matrix
          // to the right of the the local growth tensor.
          // Local growth tensor is NxNumPrincipleAxes.
-         MatrixNd strainVects = new MatrixNd(numNodes, numStrainComp());
+         MatrixNd strainVects = new MatrixNd(
+            numNodes, GrowthTensorUtil.numStrainComp());
          strainVects.addSubMatrix (0, 0, gEle.getElementGrowthTensor ());
          
          for (int n = 0; n < numNodes; n++) {
@@ -229,10 +222,10 @@ public class Morphogen2GrowthTensor {
             //    yy yz
             // zx    zz 
             
-            double[] S = new double[numStrainComp()];
+            double[] S = new double[GrowthTensorUtil.numStrainComp()];
             strainVects.getRow (n,S); 
             
-            Matrix3d strain = vecToMtx3d(S);
+            Matrix3d strain = GrowthTensorUtil.vecToMtx3d(S);
             
             // Rotate strain to be aligned with element's frame of principle 
             // directions.
@@ -249,7 +242,7 @@ public class Morphogen2GrowthTensor {
             // Now convert global strain representation from 3x3 sym matrix
             // to 6-vector.
             
-            strainVects.setRow (n, mtx3dToVec(globalStrain));
+            strainVects.setRow (n, GrowthTensorUtil.mtx3dToVec(globalStrain));
          }
          gEle.setRotatedElementGrowthStrains ( strainVects );
       }
@@ -306,100 +299,60 @@ public class Morphogen2GrowthTensor {
       for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
          GrowElementBase gEle = (GrowElementBase)ele;
          
-         if (mFemModel.myThinShellAux == null) {
-            GrowIntegrationData3d[] idata = gEle.getIntegrationData ();
-            for (int k = 0; k < idata.length; k++) {
-               // Convert stored strain 6-vector into 3x3 sym strain matrix.
-       
-               double[] strainVect = new double[numStrainComp()];
-               gEle.getStrainAtIntegPts ().getColumn (k, strainVect);
-               
-               Matrix3d strainMtx = 
-                  (this.fixedBendingStrain == null) ?
-                  vecToMtx3d(strainVect) : 
-                  new Matrix3d(this.fixedBendingStrain);
+         if (mFemModel.myThinShellAux != null) {
+            mFemModel.myThinShellAux.applyGrowthTensorToEle (
+               ele, isBendingMorphogenHack, fixedBendingStrain);
+            continue; 
+         }
+         
+         GrowIntegrationData3d[] idata = gEle.getIntegrationData ();
+         for (int k = 0; k < idata.length; k++) {
+            // Convert stored strain 6-vector into 3x3 sym strain matrix.
+    
+            double[] strainVect = new double[GrowthTensorUtil.numStrainComp()];
+            gEle.getStrainAtIntegPts ().getColumn (k, strainVect);
+            
+            Matrix3d strainMtx = 
+               (this.fixedBendingStrain == null) ?
+               GrowthTensorUtil.vecToMtx3d(strainVect) : 
+               new Matrix3d(this.fixedBendingStrain);
 
-               if (ele.getElementClass () == ElementClass.SHELL) {
-                  if (isBendingMorphogenHack && k < 3) {
-                     // Apply strain as usual to top-surface.
-                  } 
-                  else if (isBendingMorphogenHack && k < 6) {
-                     // Do not apply strain to mid-surface.
-                     strainMtx.setZero ();
-                  } 
-                  else if (isBendingMorphogenHack) {
-                     // Negate strain to bottom-surface to simulate bending.
-                     if (zeroStrainAtBottom)
-                        strainMtx.setZero ();  
-                     else
-                        strainMtx.negate ();
-                  }
-               } else {
-                  if (isBendingMorphogenHack && k < 3) {
-                     // Apply strain as usual to top-surface.
-                  } 
-                  else if (isBendingMorphogenHack && k < 6) {
-                     // Negate strain to bottom-surface to simulate bending.
-                     if (zeroStrainAtBottom)
-                        strainMtx.setZero ();  
-                     else
-                        strainMtx.negate ();
-                  } 
+            if (ele.getElementClass () == ElementClass.SHELL) {
+               if (isBendingMorphogenHack && k < 3) {
+                  // Apply strain as usual to top-surface.
+               } 
+               else if (isBendingMorphogenHack && k < 6) {
+                  // Do not apply strain to mid-surface.
+                  strainMtx.setZero ();
+               } 
+               else if (isBendingMorphogenHack) {
+                  // Negate strain to bottom-surface to simulate bending.
+                  if (zeroStrainAtBottom)
+                     strainMtx.setZero ();  
+                  else
+                     strainMtx.negate ();
                }
-               
-               if (this.fixedBendingStrain == null ) {
-                  idata[k].addFp (strainMtx);
-               } else {
-                  strainMtx.add (Matrix3d.IDENTITY);
-                  idata[k].setFp (strainMtx);
-               }
-            }
-         } else {
-            if (ele.getPlasticDeformation () == null) {
-               ele.setPlasticDeformation (Matrix3d.IDENTITY);
-            }
-            
-            // Average the strain across the nodes, and consider that as the
-            // element's strain.
-            
-            Matrix3d avgStrain = null;
-            
-            if (this.fixedBendingStrain == null) {
-               avgStrain = new Matrix3d(); 
-               double[] S = new double[numStrainComp()];
-               for (int n = 0; n < ele.numNodes (); n++) {
-                  gEle.getRotatedElementGrowthStrains ().getRow (n,S); 
-                  Matrix3d nodeStrain = vecToMtx3d (S);
-                  avgStrain.add(nodeStrain); 
-               }
-               avgStrain.scale(1.0 / ele.numNodes ());
             } else {
-               avgStrain = this.fixedBendingStrain;
+               if (isBendingMorphogenHack && k < 3) {
+                  // Apply strain as usual to top-surface.
+               } 
+               else if (isBendingMorphogenHack && k < 6) {
+                  // Negate strain to bottom-surface to simulate bending.
+                  if (zeroStrainAtBottom)
+                     strainMtx.setZero ();  
+                  else
+                     strainMtx.negate ();
+               } 
             }
             
-            if (isBendingMorphogenHack) {
-               int f = ShellUtil.getIndex (ele);
-               Face face = mMesh.getFace (f);
-             
-               Vector3d edgeStrains = 
-                  mFemModel.myThinShellAux.bendStrain_faceToEdges (face, avgStrain);
-               
-               // For each of the 3 adjacent faces of the element.
-               for (int e = 0; e < 3; e++) {
-                  HalfEdge edge = face.getEdge (e);
-                  
-                  if (edge.opposite == null) {
-                     continue;
-                  }
-                  
-                  EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
-                  edgeData.mAngStrain = edgeStrains.get (e);
-               }
-               
+            if (this.fixedBendingStrain == null ) {
+               idata[k].addFp (strainMtx);
             } else {
-               ele.getPlasticDeformation().add(avgStrain);
+               strainMtx.add (Matrix3d.IDENTITY);
+               idata[k].setFp (strainMtx);
             }
          }
+
       }
       
       ShellUtil.invalidateFem (mFemModel);
@@ -411,29 +364,16 @@ public class Morphogen2GrowthTensor {
     */
    public void unapplyGrowthTensors() {
       if (mFemModel.myThinShellAux != null) {
-         for (Face face : mMesh.getFaces ()) {
-            for (int e = 0; e < 3; e++) {
-               HalfEdge edge = face.getEdge (e);
-               
-               if (edge.opposite == null) {
-                  continue;
-               }
-               
-               EdgeData edgeData = mFemModel.myEdgeDataMap.get (edge);
-               edgeData.mAngStrain = 0;
+         mFemModel.myThinShellAux.unapplyGrowthTensors ();
+      } else {
+         for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
+            GrowElementBase gEle = (GrowElementBase)ele;
+            
+            GrowIntegrationData3d[] idata = gEle.getIntegrationData();
+            for (int k = 0; k < idata.length; k++) {
+               idata[k].setFp (new Matrix3d());
+               idata[k].getFp ().setIdentity ();
             }
-         }
-         
-         return;
-      }
-      
-      for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
-         GrowElementBase gEle = (GrowElementBase)ele;
-         
-         GrowIntegrationData3d[] idata = gEle.getIntegrationData();
-         for (int k = 0; k < idata.length; k++) {
-            idata[k].setFp (new Matrix3d());
-            idata[k].getFp ().setIdentity ();
          }
       }
       
@@ -441,39 +381,7 @@ public class Morphogen2GrowthTensor {
    }
    
    
-   
-   
    /* --- Util --- */
-   
-   protected Matrix3d vecToMtx3d(double[] V) {
-      if (SYM_COUNT == 2) {
-         return new Matrix3d(
-            V[0],           V[5]/SYM_COUNT, V[4]/SYM_COUNT,
-            V[5]/SYM_COUNT, V[1],           V[3]/SYM_COUNT,
-            V[4]/SYM_COUNT, V[3]/SYM_COUNT, V[2]); 
-      }
-      
-      return new Matrix3d(
-         V[0], V[5], V[4],
-         V[8], V[1], V[3],
-         V[7], V[6], V[2]); 
-   }
-   
-   protected double[] mtx3dToVec(Matrix3d mtx) {
-      if (SYM_COUNT == 2) {
-         return new double[] {
-             mtx.m00, mtx.m11, mtx.m22, 
-             mtx.m12*SYM_COUNT, 
-             mtx.m20*SYM_COUNT, 
-             mtx.m01*SYM_COUNT};
-      }
-      
-      return new double[] {
-          mtx.m00, mtx.m11, mtx.m22,
-          mtx.m12, mtx.m02, mtx.m01, 
-          mtx.m21, mtx.m20, mtx.m10
-      };
-   }
    
    protected MatrixNd mIntegExtrapolationMatrixCache;
    protected MatrixNd getIntegExtrapolationMatrix() {
