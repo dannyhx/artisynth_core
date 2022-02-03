@@ -7,8 +7,10 @@ import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
-import maspack.matrix.VectorNd;
 
+/**
+ * GeometryDerivatives.cpp 
+ */
 public class GeometryDerivative {
    
    public static class FirstFundamentalFormRv {
@@ -17,7 +19,11 @@ public class GeometryDerivative {
       Matrix2d Result;
    }
    
-   public static FirstFundamentalFormRv firstFundamentalForm(ShellElement3d ele) {
+   public static FirstFundamentalFormRv firstFundamentalForm(
+      ShellElement3d ele, 
+      MatrixNd derivative, 
+      MatrixNd[] hessian
+   ) {
       FemNode3d[] nodes = ele.getNodes ();
       
       // Nodal positions.
@@ -34,56 +40,63 @@ public class GeometryDerivative {
          q2_q0.dot (q1_q0), q2_q0.dot (q2_q0)
       );
       
-      MatrixNd derivative = new MatrixNd(4, 9);
-      MatrixUtil.add1x3Block (derivative, 0, 3, new Vector3d(q1_q0).scale (2));
-      MatrixUtil.add1x3Block (derivative, 0, 0, new Vector3d(q1_q0).scale (-2));
-      MatrixUtil.add1x3Block (derivative, 1, 6, new Vector3d(q1_q0));
-      MatrixUtil.add1x3Block (derivative, 1, 3, new Vector3d(q2_q0));
-      MatrixUtil.add1x3Block (derivative, 1, 0, new Vector3d(q1_q0).add (q2_q0).scale (-1));
-      MatrixUtil.add1x3Block (derivative, 2, 6, new Vector3d(q1_q0));
-      MatrixUtil.add1x3Block (derivative, 2, 3, new Vector3d(q2_q0));
-      MatrixUtil.add1x3Block (derivative, 2, 0, new Vector3d(q1_q0).add(q2_q0).scale (-1));
-      MatrixUtil.add1x3Block (derivative, 3, 6, new Vector3d(q2_q0).scale (2));
-      MatrixUtil.add1x3Block (derivative, 3, 0, new Vector3d(q2_q0).scale (-2));
-      
-      MatrixNd[] hessian = new MatrixNd[4];
-      for (int i = 0; i < 4; i++) {
-         hessian[i] = new MatrixNd(9, 9);
+      if (derivative != null) {
+         derivative.setZero ();
+         MatrixUtil.add1x3Block (derivative, 0, 3, new Vector3d(q1_q0).scale (2));
+         MatrixUtil.add1x3Block (derivative, 0, 0, new Vector3d(q1_q0).scale (-2));
+         MatrixUtil.add1x3Block (derivative, 1, 6, new Vector3d(q1_q0));
+         MatrixUtil.add1x3Block (derivative, 1, 3, new Vector3d(q2_q0));
+         MatrixUtil.add1x3Block (derivative, 1, 0, new Vector3d(q1_q0).add (q2_q0).scale (-1));
+         MatrixUtil.add1x3Block (derivative, 2, 6, new Vector3d(q1_q0));
+         MatrixUtil.add1x3Block (derivative, 2, 3, new Vector3d(q2_q0));
+         MatrixUtil.add1x3Block (derivative, 2, 0, new Vector3d(q1_q0).add(q2_q0).scale (-1));
+         MatrixUtil.add1x3Block (derivative, 3, 6, new Vector3d(q2_q0).scale (2));
+         MatrixUtil.add1x3Block (derivative, 3, 0, new Vector3d(q2_q0).scale (-2));
       }
       
-      Matrix3d I = Matrix3d.IDENTITY;
-      Matrix3d I2 = new Matrix3d();
-      I2.scale (2, I);
-      Matrix3d negI = new Matrix3d(I);
-      negI.scale (-1);
-      Matrix3d negI2 = new Matrix3d(I);
-      negI2.scale (-2);
+      if (hessian != null) {
+         if (hessian.length != 4) {
+            hessian = new MatrixNd[4];
+         }
+         
+         for (int i = 0; i < 4; i++) {
+            hessian[i] = new MatrixNd(9, 9);
+         }
+         
+         MatrixNd I = new MatrixNd(Matrix3d.IDENTITY);
+         MatrixNd I2 = new MatrixNd(I);
+         I2.scale (2);
+         MatrixNd negI = new MatrixNd(I);
+         negI.scale (-1);
+         MatrixNd negI2 = new MatrixNd(I);
+         negI2.scale (-2);
 
-      MatrixUtil.add3x3Block (hessian[0], 0, 0, I2);
-      MatrixUtil.add3x3Block (hessian[0], 3, 3, I2);
-      MatrixUtil.add3x3Block (hessian[0], 0, 3, negI2);
-      MatrixUtil.add3x3Block (hessian[0], 3, 0, negI2);
-      
-      MatrixUtil.add3x3Block (hessian[1], 3, 6, I);
-      MatrixUtil.add3x3Block (hessian[1], 6, 3, I);
-      MatrixUtil.add3x3Block (hessian[1], 0, 3, negI);
-      MatrixUtil.add3x3Block (hessian[1], 0, 6, negI);
-      MatrixUtil.add3x3Block (hessian[1], 3, 0, negI);
-      MatrixUtil.add3x3Block (hessian[1], 6, 0, negI);
-      MatrixUtil.add3x3Block (hessian[1], 0, 0, I2);
-      
-      MatrixUtil.add3x3Block (hessian[2], 3, 6, I);
-      MatrixUtil.add3x3Block (hessian[2], 6, 3, I);
-      MatrixUtil.add3x3Block (hessian[2], 0, 3, negI);
-      MatrixUtil.add3x3Block (hessian[2], 0, 6, negI);
-      MatrixUtil.add3x3Block (hessian[2], 3, 0, negI);
-      MatrixUtil.add3x3Block (hessian[2], 6, 0, negI);
-      MatrixUtil.add3x3Block (hessian[2], 0, 0, I2);
-      
-      MatrixUtil.add3x3Block (hessian[3], 0, 0, I2);
-      MatrixUtil.add3x3Block (hessian[3], 6, 6, I2);
-      MatrixUtil.add3x3Block (hessian[3], 0, 6, negI2);
-      MatrixUtil.add3x3Block (hessian[3], 6, 0, negI2);
+         hessian[0].addSubMatrix (0, 0, derivative);
+         hessian[0].addSubMatrix (3, 3, I2);
+         hessian[0].addSubMatrix (0, 3, negI2);
+         hessian[0].addSubMatrix (3, 0, negI2);
+         
+         hessian[1].addSubMatrix (3, 6, I);
+         hessian[1].addSubMatrix (6, 3, I);
+         hessian[1].addSubMatrix (0, 3, negI);
+         hessian[1].addSubMatrix (0, 6, negI);
+         hessian[1].addSubMatrix (3, 0, negI);
+         hessian[1].addSubMatrix (6, 0, negI);
+         hessian[1].addSubMatrix (0, 0, I2);
+         
+         hessian[2].addSubMatrix (3, 6, I);
+         hessian[2].addSubMatrix (6, 3, I);
+         hessian[2].addSubMatrix (0, 3, negI);
+         hessian[2].addSubMatrix (0, 6, negI);
+         hessian[2].addSubMatrix (3, 0, negI);
+         hessian[2].addSubMatrix (6, 0, negI);
+         hessian[2].addSubMatrix (0, 0, I2);
+         
+         hessian[3].addSubMatrix (0, 0, I2);
+         hessian[3].addSubMatrix (6, 6, I2);
+         hessian[3].addSubMatrix (0, 6, negI2);
+         hessian[3].addSubMatrix (6, 0, negI2);
+      }
       
       FirstFundamentalFormRv rv = new FirstFundamentalFormRv();
       rv.Derivative = derivative;
@@ -144,6 +157,11 @@ public class GeometryDerivative {
             // Apply scaling and add to derivative.
             derivative.scaledAdd (n.get (i) / nnorm / enorm, nderiv_irow);
          }
+         
+         MatrixNd eT = new MatrixNd();
+         eT.set (e);  // Should be (1,3)
+         derivative.addScaledSubMatrix (0, 6, -nnorm / enorm / enorm / enorm, eT);
+         derivative.addScaledSubMatrix (0, 3, nnorm / enorm / enorm / enorm, eT);
       }
       
       if (hessian != null) {
@@ -171,53 +189,37 @@ public class GeometryDerivative {
          
          // Hessian blocks.
          
-         Matrix3d _e_nT = new Matrix3d();
-         _e_nT.outerProduct (e, n);
-         _e_nT.scale (-1.0);
+         Matrix3d e_nT = new Matrix3d();
+         e_nT.outerProduct (e, n);
+         e_nT.scale (1.0);
          MatrixNd block = new MatrixNd(3,9);
-         block.mul (_e_nT, nderiv);
-         block.scale (1/nnorm/enorm/enorm/enorm);
-         MatrixUtil.addBlock (hessian, 6, 0, block);
+         block.mul (e_nT, nderiv);
+         hessian.addScaledSubMatrix(6, 0, -1*nnorm/enorm/enorm/enorm, block);
+         hessian.addScaledSubMatrix(3, 0, +1/nnorm/enorm/enorm/enorm, block);
          
-         block.scale (-1.0);
-         MatrixUtil.addBlock (hessian, 3, 0, block);
-         
-         Matrix3d _n_eT = new Matrix3d();
-         _n_eT.mul (n, e);
-         MatrixNd _nderivT = new MatrixNd(9, 3);
-         nderiv.transpose(_nderivT);
-         block.mul (_nderivT, _n_eT);
-         block.scale (-1.0 / nnorm / enorm / enorm/ enorm);
-         MatrixUtil.addBlock (hessian, 0, 6, block);
-
-         block.scale (-1.0);
-         MatrixUtil.addBlock (hessian, 0, 3, block);
+         Matrix3d n_eT = new Matrix3d();
+         n_eT.mul (n, e);
+         MatrixNd nderivT = new MatrixNd(9, 3);
+         nderiv.transpose(nderivT);
+         block.mul (nderivT, n_eT);
+         hessian.addScaledSubMatrix(0, 6, -1.0 / nnorm / enorm / enorm/ enorm, block);
+         hessian.addScaledSubMatrix(0, 3, +1.0 / nnorm / enorm / enorm/ enorm, block);
          
          block.set (Matrix3d.IDENTITY);
-         block.scale (-1.0 * nnorm / enorm / enorm / enorm);
-         MatrixUtil.addBlock(hessian, 6, 6, block);
-         
-         block.scale (-1.0);
-         MatrixUtil.addBlock(hessian, 6, 3, block);
-         
-         MatrixUtil.addBlock(hessian, 3, 6, block);
-         
-         block.scale (-1.0);
-         MatrixUtil.addBlock(hessian, 3, 3, block);
+         hessian.addScaledSubMatrix(6, 6, -1.0 * nnorm / enorm / enorm / enorm, block);
+         hessian.addScaledSubMatrix(6, 3, +1.0 * nnorm / enorm / enorm / enorm, block);
+         hessian.addScaledSubMatrix (3, 6, nnorm / enorm / enorm / enorm, block);
+         hessian.addScaledSubMatrix (3, 3, -1.0 * nnorm / enorm / enorm / enorm, block);
          
          Matrix3d outer = new Matrix3d();
          outer.outerProduct (e, e);
          outer.scale (3.0 / nnorm / enorm / enorm / enorm / enorm / enorm);
+         MatrixNd outerNd = new MatrixNd(outer);
          
-         MatrixUtil.addBlock(hessian, 6, 6, block);
-
-         block.scale (-1.0);
-         MatrixUtil.addBlock(hessian, 6, 3, block);
-         
-         MatrixUtil.addBlock(hessian, 3, 6, block);
-         
-         block.scale (-1.0);
-         MatrixUtil.addBlock(hessian, 3, 3, block);
+         hessian.addScaledSubMatrix (6, 6, 1.0, outerNd);
+         hessian.addScaledSubMatrix (6, 3, -1.0, outerNd);
+         hessian.addScaledSubMatrix (3, 6, -1.0, outerNd);
+         hessian.addScaledSubMatrix (3, 3, 1.0, outerNd);
       }
       
       return h;
@@ -290,13 +292,9 @@ public class GeometryDerivative {
       if (derivative != null) {
          Vector3d axisV = new Vector3d().cross (axis, v);
          
-         MatrixNd seg = new MatrixNd(1,3);
-         seg.set (axisV);
-         seg.scale (-1.0 / v.normSquared () / axis.norm ());
-         MatrixUtil.addBlock (derivative, 0, 0, seg);
-         
-         seg.scale (-1.0);
-         MatrixUtil.addBlock (derivative, 0, 3, seg);
+         MatrixNd seg = new MatrixNd(axisV);
+         derivative.addScaledSubMatrix (0, 0, -1.0 / v.normSquared () / axis.norm (), seg);
+         derivative.addScaledSubMatrix (0, 3, +1.0 / v.normSquared () / axis.norm (), seg);
          
          seg.setZero ();
          derivative.setSubMatrix (0, 6, seg);
@@ -308,22 +306,25 @@ public class GeometryDerivative {
          Vector3d axisV = new Vector3d().cross (axis, v);
          Vector3d axisW = new Vector3d().cross (axis, w);
          
-         Matrix3d block = new Matrix3d();
-         block.outerProduct (axisV, v);
-         block.scale (2.0 / v.normSquared () / v.normSquared () / axis.norm ());
-         MatrixUtil.add3x3Block (hessian, 0, 0, block);
+         MatrixNd block = new MatrixNd();
+         Matrix3d op = new Matrix3d();
          
-         block.outerProduct (axisW, w);
-         block.scale (-2.0 / w.normSquared() / w.normSquared() / axis.norm ());
-         MatrixUtil.add3x3Block (hessian, 3, 3, block);
+         op.outerProduct (axisV, v);
+         block.set (op);
+         hessian.addScaledSubMatrix(0, 0, 
+            2.0 / v.normSquared () / v.normSquared () / axis.norm (), block);
          
-         block = MatrixUtil.crossMatrix (axis);
-         block.scale (-1.0 / v.normSquared () / axis.norm ());
-         MatrixUtil.add3x3Block (hessian, 0, 0, block);
+         op.outerProduct (axisW, w);
+         block.set (op);
+         hessian.addScaledSubMatrix(3, 3, 
+            -2.0 / w.normSquared() / w.normSquared() / axis.norm (), block);
          
-         block = MatrixUtil.crossMatrix (axis);
-         block.scale (1 / w.normSquared () / axis.norm ());
-         MatrixUtil.add3x3Block (hessian, 3, 3, block);
+         block = MatrixUtil.crossMatrixNd (axis);
+         hessian.addScaledSubMatrix(0, 0, 
+            -1.0 / v.normSquared () / axis.norm (), block);
+         
+         hessian.addScaledSubMatrix(3, 3, 
+            1 / w.normSquared () / axis.norm (), block);
          
          // dahat
          
@@ -334,12 +335,12 @@ public class GeometryDerivative {
          // Last 2 blocks
          
          block.mul (MatrixUtil.crossMatrix (v), dahat);
-         block.scale (1.0 / v.normSquared ());
-         MatrixUtil.add3x3Block (hessian, 0, 6, block);
+         hessian.addScaledSubMatrix(0, 6, 
+            1.0 / v.normSquared (), block);
          
          block.mul (MatrixUtil.crossMatrix (w), dahat);
-         block.scale (-1.0 / w.normSquared ());
-         MatrixUtil.add3x3Block (hessian, 3, 6, block);
+         hessian.addScaledSubMatrix(3, 6, 
+            -1.0 / w.normSquared (), block);
       }
       
       return theta;

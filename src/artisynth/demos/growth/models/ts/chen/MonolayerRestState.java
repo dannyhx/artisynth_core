@@ -7,6 +7,9 @@ import artisynth.core.femmodels.ShellElement3d;
 import artisynth.demos.growth.models.ts.chen.GeometryDerivative.FirstFundamentalFormRv;
 import maspack.matrix.Matrix2d;
 
+/**
+ * RestState.h :: MonolayerRestState 
+ */
 public class MonolayerRestState extends RestState {
    public ArrayList<Double> thicknesses;
    

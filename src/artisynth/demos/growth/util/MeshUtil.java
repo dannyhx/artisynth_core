@@ -209,7 +209,7 @@ public class MeshUtil {
     * needing to inspect two half edges per edge. 
     */
    public static HalfEdge getHalfEdgeWithMinHeadIdx(HalfEdge he) {
-      if (he.head.getIndex () < he.tail.getIndex ()) {
+      if (isHalfEdgeWithMinHeadIdx(he)) {
          return he;
       }
       else if (he.opposite != null) {
@@ -218,6 +218,10 @@ public class MeshUtil {
       else {
          return he;
       }
+   }
+   
+   public static boolean isHalfEdgeWithMinHeadIdx(HalfEdge he) {
+      return (he.head.getIndex () < he.tail.getIndex ());
    }
    
    /**
@@ -545,6 +549,23 @@ public class MeshUtil {
       }
       
       return null;
+   }
+
+   public static int numEdges(PolygonalMesh mesh) {
+      int nEdges = 0;
+      
+      for (Face evenFace : mesh.getFaces ()) {
+         for (int h = 0; h < 3; h++) {
+            HalfEdge he = MeshUtil.getHalfEdgeWithMinHeadIdx (
+               evenFace.getEdge (h));
+            
+            if (he.head.getIndex () < he.tail.getIndex ()) {
+               nEdges++;
+            }
+         }
+      }
+      
+      return nEdges;
    }
    
    /**
