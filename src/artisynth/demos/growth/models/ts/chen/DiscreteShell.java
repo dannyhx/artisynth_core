@@ -1,15 +1,17 @@
 package artisynth.demos.growth.models.ts.chen;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.demos.growth.models.ts.ThinShellBase;
-import artisynth.demos.growth.models.ts.chen.DiscreteShellMaterial.StretchingEnergyRv;
 import artisynth.demos.growth.models.ts.chen.GeometryDerivative.FirstFundamentalFormRv;
 import artisynth.demos.growth.util.MeshUtil;
+import maspack.geometry.Face;
 import maspack.geometry.PolygonalMesh;
+import maspack.geometry.Vertex3d;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.VectorNd;
@@ -20,6 +22,9 @@ public class DiscreteShell extends ThinShellBase {
    protected DiscreteShellMaterial mMat;
    
    protected final int mNumExtraDOFs = 1;
+   
+   // FE[f,e] = 'global edge index'
+   protected int[][] mFE = null;
    
    public DiscreteShell(FemModel3d model, PolygonalMesh mesh) {
      super(model, mesh);
@@ -38,8 +43,10 @@ public class DiscreteShell extends ThinShellBase {
      for (int i = 0; i < mRestState.bbars.size (); i++) {
         mRestState.bbars.get (0).setZero ();
      }
+     
+     mFE = MeshUtil.createGlobalEdgeIndices (mesh);
    }
-
+   
    @Override
    public void setMaterialProperties (
       double youngsModulus, double poissonsRatio, double thickness) {
@@ -57,8 +64,7 @@ public class DiscreteShell extends ThinShellBase {
       
       // double energy = LibShell::ElasticShell<SFF>::elasticEnergy(
       // mesh, curPos, curEdgeDOFs, mat, restState, &derivative, &hessian);
-      
-      int nNodes = 3 * this.mModel.numNodes ();
+      int nNodes = this.mModel.numNodes ();
       int nEdges = MeshUtil.numEdges (mMesh);
       
       derivative.adjustSize (3 * nNodes + mNumExtraDOFs * nEdges);
@@ -74,12 +80,11 @@ public class DiscreteShell extends ThinShellBase {
          VectorNd deriv = new VectorNd(9);
          MatrixNd hess = new MatrixNd(9, 9);
          
-         StretchingEnergyRv rv = mMat.stretchingEnergy (
+         result += mMat.stretchingEnergy (
             ele, mRestState, f, 
             (derivative != null) ? deriv : null, 
             (hessian != null) ? hess : null
          );
-         result += rv.Result;
          
          if (derivative != null) {
             VectorNd deriv_seg = new VectorNd(3);
@@ -123,10 +128,94 @@ public class DiscreteShell extends ThinShellBase {
       int nedgedofs = this.mNumExtraDOFs;
       
       for (int f = 0; f < mMesh.numFaces (); f++) {
-         MatrixNd deriv = new MatrixNd(1, 18 + 3 * nedgedofs);
-         MatrixNd hess = new MatrixNd(18 + 3 * nedgedofs, 18 + 3 * nedgedofs);
+         Face face = mMesh.getFace (f);
+         ShellElement3d ele = mModel.getShellElement (f);
          
-         // material bending energy 
+         VectorNd deriv = new VectorNd(18 + 3 * nedgedofs);
+         MatrixNd hess = new MatrixNd(18 + 3 * nedgedofs, 18 + 3 * nedgedofs);
+
+         this.mMat.bendingEnergy (mModel, ele, mRestState, face, f, nedgedofs, 
+            (derivative != null) ? deriv : null, 
+            (hessian != null) ? hess : null);
+         
+         if (derivative != null) {
+            VectorNd deriv_seg = new VectorNd(3);
+            VectorNd derivative_seg = new VectorNd(3);
+            VectorNd seg_sum = new VectorNd(3);
+            
+            for (int j = 0; j < 3; j++) {
+               FemNode3d node = ele.getNodes ()[j];
+               int n = node.getIndex ();
+               
+               deriv.getSubVector (3*j, deriv_seg);
+               derivative.getSubVector (3*n, derivative_seg);
+               
+               seg_sum.add (deriv_seg, derivative_seg);
+               derivative.setSubVector (3*n, seg_sum);
+               
+               // Get opposite node index.
+               Vertex3d oppVtx = MeshUtil.getOppositeVtx (mMesh.getVertex (n), face);
+               int on = (oppVtx != null) ? oppVtx.getIndex () : -1;
+               
+               if (oppVtx != null) {
+                  deriv.getSubVector(9+3*j, deriv_seg);
+                  derivative.getSubVector (3*on, derivative_seg);
+                  
+                  seg_sum.add (deriv_seg, derivative_seg);
+                  derivative.setSubVector (3*on, seg_sum);
+               }
+               
+               for (int k = 0; k < nedgedofs; k++) {
+                  double s = derivative.get (3 * nNodes + nedgedofs * n + k);
+                  s += deriv.get (18 + nedgedofs * j + k);
+                  derivative.set (3 * nNodes + nedgedofs * mFE[f][j] + k, s);
+               }
+            }
+         }
+         
+         if (hessian != null) {
+            for (int j = 0; j < 3; j++) {
+               int n = ele.getNodes ()[j].getIndex ();
+               Vertex3d oVtx = MeshUtil.getOppositeVtx (mMesh.getVertex (n), face);
+               int o = (oVtx != null) ? oVtx.getIndex () : -1;
+               
+               for (int k = 0; k < 3; k++) {
+                  int nk = ele.getNodes ()[k].getIndex();
+                  Vertex3d okVtx = MeshUtil.getOppositeVtx (mMesh.getVertex (nk), face);
+                  int ok = (okVtx != null) ? okVtx.getIndex () : -1;
+                  
+                  for (int l = 0; l < 3; l++) {
+                     for (int m = 0; m < 3; m++) { 
+                        hessian.add (new double[] {
+                           3*n+l, 3*nk+m, hess.get(3*j+l, 3*k+m)});
+                        
+                        if (okVtx != null) {
+                           hessian.add (new double[] {
+                              3*n+l, 3*ok+m, hess.get (3*j+l,9+3*k+m)});
+                        }
+                        
+                        if (oVtx != null) {
+                           hessian.add (new double[] {
+                              3*o+l, 3*ok+m, hess.get (9+3*j+l,3*k+m)});
+                        }
+                        
+                        if (oVtx != null && okVtx != null) {
+                           hessian.add (new double[] {
+                              3*o+l, 3*ok+m, hess.get (9+3*j+l, 9+3*k+m)});
+                        }
+                     }
+                     
+                     for (int m = 0; m < nedgedofs; m++) {
+                        hessian.add (new double[] {
+                           3*n+l, 3*nNodes+nedgedofs * mFE[f][k] + m, 
+                           hess.get (3*j*l, 18+nedgedofs*k+m)
+                        });
+                     }
+                  }
+               }
+            }
+                          
+         }
       }
       
       
@@ -143,8 +232,8 @@ public class DiscreteShell extends ThinShellBase {
       for (int f = 0; f < this.mModel.numShellElements (); f++) {
          ShellElement3d ele = this.mModel.getShellElement (f);
          
-         FirstFundamentalFormRv ffrv = GeometryDerivative.firstFundamentalForm (ele);
-         abars.set (f, ffrv.Result);
+         Matrix2d I = GeometryDerivative.firstFundamentalForm (ele, null, null);
+         abars.set (f, I);
       }
    }
    

@@ -5,7 +5,6 @@ import static java.lang.Math.sqrt;
 
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.ShellElement3d;
-import artisynth.demos.growth.models.ts.chen.GeometryDerivative.FirstFundamentalFormRv;
 import maspack.geometry.Face;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.MatrixNd;
@@ -24,12 +23,12 @@ public class StVKMaterial extends DiscreteShellMaterial {
     * @param f
     * Array index of the element. 
     */
-   public StretchingEnergyRv stretchingEnergy(
+   public double stretchingEnergy(
       ShellElement3d ele, 
       RestState rs, 
       int f,
-      VectorNd derivative, 
-      MatrixNd hessian
+      VectorNd derivative, // 1x9
+      MatrixNd hessian     // 9x9
    ) {
       MonolayerRestState biRs = (MonolayerRestState)rs;
       
@@ -37,13 +36,10 @@ public class StVKMaterial extends DiscreteShellMaterial {
       
       MatrixNd aderiv = new MatrixNd(4, 9);
       MatrixNd[] ahess = new MatrixNd[0];
-      FirstFundamentalFormRv ffrv = GeometryDerivative.firstFundamentalForm (
+      Matrix2d a = GeometryDerivative.firstFundamentalForm (
          ele, 
          (derivative != null) ? aderiv : null, 
          (hessian != null) ? ahess : null);
-      Matrix2d a = ffrv.Result;
-      aderiv = ffrv.Derivative;
-      ahess = ffrv.Hessian;
       
       //
       
@@ -168,15 +164,10 @@ public class StVKMaterial extends DiscreteShellMaterial {
          hessian.scale (coeff * dA);
       }
 
-      StretchingEnergyRv rv = new StretchingEnergyRv();
-      rv.Result = result;
-      rv.Derivative = derivative;
-      rv.Hessian = hessian;
-      
-      return rv;
+      return result;
    }
    
-   public BendingEnergyRv bendingEnergy(
+   public double bendingEnergy(
       FemModel3d model,
       ShellElement3d ele, 
       RestState rs, 
@@ -195,7 +186,7 @@ public class StVKMaterial extends DiscreteShellMaterial {
       MatrixNd bderiv = new MatrixNd(4, 18+3*nedgedofs);
       MatrixNd[] bhess = new MatrixNd[4];
       
-      MidedgeAngleTanFormulation.secondFundamentalForm (
+      Matrix2d b = MidedgeAngleTanFormulation.secondFundamentalForm (
          model, 
          ele, 
          face, 
@@ -203,16 +194,88 @@ public class StVKMaterial extends DiscreteShellMaterial {
          (hessian != null) ? bhess : null
       );
       
+      Matrix2d M = new Matrix2d();
+      M.sub (b, mrs.bbars.get (f));
+      M.mul(abarinv, M);
+      double dA = 0.5 * mrs.abars.get (f).determinant ();
       
+      Matrix2d M2 = new Matrix2d();
+      M2.mul (M, M);
       
+      double StVK = 0.5 * this.lameAlpha_ * pow(M.trace (), 2) + 
+         this.lameBeta_ * M2.trace();
+      double result = coeff * dA * StVK;
       
+      if (derivative != null) {
+         Matrix2d temp = new Matrix2d();
+         temp.mul(M, abarinv);
+         temp.scale (2 * lameBeta_);
+         temp.scaledAdd (lameAlpha_ * M.trace(), abarinv);
+         
+         VectorNd temp_vec = MatrixUtil.m2x2_to_vec4_colMaj (temp);
+         derivative.mulTranspose (bderiv, temp_vec);
+         derivative.scale (coeff * dA);
+      }
       
+      if (hessian != null) {
+         MatrixNd abarinv_vec = MatrixUtil.m2x2_to_mat4x1_colMaj (abarinv);
+         
+         MatrixNd inner = new MatrixNd(1, 18 + 3 * nedgedofs);
+         inner.mulTransposeLeft (bderiv, abarinv_vec);
+         
+         hessian.mulTransposeLeft (inner, inner);
+         hessian.scale (lameAlpha_);
+         
+         Matrix2d Mainv = new Matrix2d();
+         Mainv.mul (M, abarinv);
+         for (int i = 0; i < 4; i++) {
+            hessian.scaledAdd (
+               lameAlpha_ * M.trace() * abarinv.get (i/2, i%2) + 
+               2 * lameBeta_ * Mainv.get (i/2, i%2), 
+               bhess[i]);
+         }
+         
+         VectorNd bderiv_row = new VectorNd();
+         MatrixNd[] bderiv_rows = new MatrixNd[4];
+         for (int i = 0; i < 4; i++) {
+            bderiv.getRow (i, bderiv_row);
+            bderiv_rows[i] = new MatrixNd(1, 18 + 3 * nedgedofs);
+            bderiv_rows[i].setRow (i, bderiv_row);
+         }
+         
+         MatrixNd inner00 = new MatrixNd(1, 18 + 3 * nedgedofs);
+         inner00.scaledAdd (abarinv.get (0, 0), bderiv_rows[0]);
+         inner00.scaledAdd (abarinv.get (0, 1), bderiv_rows[2]);
+         
+         MatrixNd inner01 = new MatrixNd(1, 18 + 3 * nedgedofs);
+         inner01.scaledAdd (abarinv.get (0, 0), bderiv_rows[1]);
+         inner01.scaledAdd (abarinv.get (0, 1), bderiv_rows[3]);
+         
+         MatrixNd inner10 = new MatrixNd(1, 18 + 3 * nedgedofs);
+         inner10.scaledAdd (abarinv.get (1, 0), bderiv_rows[0]);
+         inner10.scaledAdd (abarinv.get (1, 1), bderiv_rows[2]);
+         
+         MatrixNd inner11 = new MatrixNd(1, 18 + 3 * nedgedofs);
+         inner10.scaledAdd (abarinv.get (1, 0), bderiv_rows[1]);
+         inner10.scaledAdd (abarinv.get (1, 1), bderiv_rows[3]);
+         
+         MatrixNd hessian_operand = new MatrixNd();
+         
+         hessian_operand.mulTransposeLeft (inner00, inner00);
+         hessian.scaledAdd (2 * lameBeta_, hessian_operand);
+         
+         hessian_operand.mulTransposeLeft (inner01, inner10);
+         hessian_operand.scale (2 * lameBeta_);
+         hessian_operand.mulTransposeLeftAdd (inner10, inner01);
+         hessian.add (hessian_operand);
+         
+         hessian_operand.mulTransposeLeft (inner11, inner11);
+         hessian_operand.scale (2 * lameBeta_);
+         hessian.add (hessian_operand);
+         
+         hessian.scale (coeff * dA);
+      }
       
-      
-      
-      
-      
-      BendingEnergyRv rv = new BendingEnergyRv();
-      return rv;
+      return result;
    }
 }

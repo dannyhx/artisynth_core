@@ -1,17 +1,13 @@
 package artisynth.demos.growth.models.ts.chen;
 
+import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.ShellElement3d;
+import maspack.geometry.Face;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.VectorNd;
 
 public abstract class DiscreteShellMaterial {
-   public class StretchingEnergyRv {
-      double Result;
-      VectorNd Derivative;  // 1x9 
-      MatrixNd Hessian;     // 9x9
-   }
-   
-   public abstract StretchingEnergyRv stretchingEnergy(
+   public abstract double stretchingEnergy(
       ShellElement3d ele, 
       RestState rs, 
       int f,
@@ -19,9 +15,14 @@ public abstract class DiscreteShellMaterial {
       MatrixNd hessian   
    );
    
-   public class BendingEnergyRv {
-      double Result;
-      VectorNd Derivative;  
-      MatrixNd Hessian;     
-   }
+   public abstract double bendingEnergy(
+      FemModel3d model,
+      ShellElement3d ele, 
+      RestState rs, 
+      Face face,
+      int f,
+      int numExtraDOFs,
+      VectorNd derivative, 
+      MatrixNd hessian
+   );
 }

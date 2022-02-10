@@ -1,5 +1,8 @@
 package artisynth.demos.growth.models.ts.chen;
 
+import static java.lang.Math.cos;
+import static java.lang.Math.tan;
+
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
@@ -7,11 +10,9 @@ import artisynth.demos.growth.util.MeshUtil;
 import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
 import maspack.geometry.Vertex3d;
+import maspack.matrix.Matrix2d;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Vector3d;
-
-import static java.lang.Math.cos;
-import static java.lang.Math.tan;
 
 public class MidedgeAngleTanFormulation {
    
@@ -181,7 +182,7 @@ public class MidedgeAngleTanFormulation {
       return II;
    }
    
-   public static MatrixNd secondFundamentalForm(
+   public static Matrix2d secondFundamentalForm(
       FemModel3d model, 
       ShellElement3d ele, 
       Face face, 
@@ -209,10 +210,10 @@ public class MidedgeAngleTanFormulation {
          model, ele, face, 
          derivative != null ? IIderiv : null, hessian != null ? IIhess : null);
       
-      MatrixNd result = new MatrixNd(new double[][] {
-         {II.x + II.y}, {II.x},
-         {II.x},        {II.x + II.z}
-      });
+      Matrix2d result = new Matrix2d(
+         II.x + II.y, II.x,
+         II.x,        II.x + II.z
+      );
       
       if (derivative != null) {
          MatrixNd IIderiv_row0 = new MatrixNd(1, 21);

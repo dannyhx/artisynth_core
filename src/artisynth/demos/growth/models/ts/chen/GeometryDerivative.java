@@ -13,13 +13,7 @@ import maspack.matrix.Vector3d;
  */
 public class GeometryDerivative {
    
-   public static class FirstFundamentalFormRv {
-      MatrixNd Derivative;
-      MatrixNd[] Hessian;
-      Matrix2d Result;
-   }
-   
-   public static FirstFundamentalFormRv firstFundamentalForm(
+   public static Matrix2d firstFundamentalForm(
       ShellElement3d ele, 
       MatrixNd derivative, 
       MatrixNd[] hessian
@@ -56,7 +50,7 @@ public class GeometryDerivative {
       
       if (hessian != null) {
          if (hessian.length != 4) {
-            hessian = new MatrixNd[4];
+            throw new RuntimeException("Unexpected length");
          }
          
          for (int i = 0; i < 4; i++) {
@@ -98,12 +92,7 @@ public class GeometryDerivative {
          hessian[3].addSubMatrix (6, 0, negI2);
       }
       
-      FirstFundamentalFormRv rv = new FirstFundamentalFormRv();
-      rv.Derivative = derivative;
-      rv.Hessian = hessian;
-      rv.Result = result; 
-      
-      return rv;
+      return result;
    }
    
    /**
