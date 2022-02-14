@@ -25,8 +25,6 @@ public class EdgeDataMap {
       this.mMap = new HashMap<HalfEdge,EdgeData>();
       this.mModel = model;
       
-      //
-      
       for (Face face : mesh.getFaces ()) {
          for (int e = 0; e < 3; e++) {
             HalfEdge edge = face.getEdge (e);

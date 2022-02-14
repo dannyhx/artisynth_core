@@ -13,6 +13,7 @@ import maspack.geometry.Vertex3d;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Vector3d;
+import maspack.matrix.VectorNd;
 
 public class MidedgeAngleTanFormulation {
    
@@ -23,14 +24,26 @@ public class MidedgeAngleTanFormulation {
     * @param hessian 21x21
     */
    public static Vector3d secondFundamentalFormEntries(
-      FemModel3d model, ShellElement3d ele, Face face, MatrixNd derivative, MatrixNd[] hessian) 
-   {
+      FemModel3d model, 
+      ShellElement3d ele, 
+      VectorNd extraDOFs,
+      Face face, 
+      MatrixNd derivative,  // 3x21
+      MatrixNd[] hessian    // 21x21
+   ) {
       if (derivative != null) {
          derivative.setZero ();
       }
       
       if (hessian != null) {
+         if (hessian.length != 3) {
+            throw new RuntimeException("Unexpected length");
+         }
+         
          for (int i = 0; i < hessian.length; i++) {
+            if (hessian[i] == null) {
+               hessian[i] = new MatrixNd(21,21);
+            }
             hessian[i].setZero ();
          }
       }
@@ -185,11 +198,15 @@ public class MidedgeAngleTanFormulation {
    public static Matrix2d secondFundamentalForm(
       FemModel3d model, 
       ShellElement3d ele, 
+      VectorNd extraDOFs,
       Face face, 
-      MatrixNd derivative, 
-      MatrixNd[] hessian
+      MatrixNd derivative,    // 4, 18+3*nedgedofs
+      MatrixNd[] hessian      // 18+3*nedgedofs, 18+3*nedgedofs
    ) {
       if (derivative != null) {
+         if (derivative.rowSize () != 4 || derivative.colSize () != 21) {
+            throw new RuntimeException("Unexpected size");
+         }
          derivative.setZero ();
       }
       
@@ -199,6 +216,12 @@ public class MidedgeAngleTanFormulation {
          }
          
          for (int i = 0; i < hessian.length; i++) {
+            if (hessian[i] == null) {
+               hessian[i] = new MatrixNd(21, 21);
+            }
+            if (hessian[i].rowSize () != 21 || hessian[i].colSize () != 21) {
+               throw new RuntimeException("Unexpected size");
+            }
             hessian[i].setZero ();
          }
       }
@@ -207,7 +230,7 @@ public class MidedgeAngleTanFormulation {
       MatrixNd IIhess[] = new MatrixNd[3];
       
       Vector3d II = secondFundamentalFormEntries(
-         model, ele, face, 
+         model, ele, extraDOFs, face, 
          derivative != null ? IIderiv : null, hessian != null ? IIhess : null);
       
       Matrix2d result = new Matrix2d(

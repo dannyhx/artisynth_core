@@ -21,8 +21,12 @@ public abstract class ThinShellBase {
    
    public abstract void setMaterialProperties(double youngsModulus, double poissonsRatio, double thickness);
    
-   public abstract void addStretchingForceAndStiffness();
-   public abstract void addBendingForceAndStiffness();
+   public abstract void addForceAndStiffness();
+   
+   // Useful if shell implementation has its own advance strategy.
+   public void advance() {
+      
+   }
    
    /** Remeshing **/
    

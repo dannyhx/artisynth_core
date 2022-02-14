@@ -13,6 +13,16 @@ import maspack.matrix.Vector3d;
  */
 public class GeometryDerivative {
    
+   /**
+    * Calculate the first fundamental form for the given face.
+    * 
+    * Verified.
+    * 
+    * @param ele
+    * @param derivative M(4,9)
+    * @param hessian M(9,9)[4]
+    * @return
+    */
    public static Matrix2d firstFundamentalForm(
       ShellElement3d ele, 
       MatrixNd derivative, 
@@ -65,7 +75,7 @@ public class GeometryDerivative {
          MatrixNd negI2 = new MatrixNd(I);
          negI2.scale (-2);
 
-         hessian[0].addSubMatrix (0, 0, derivative);
+         hessian[0].addSubMatrix (0, 0, I2);
          hessian[0].addSubMatrix (3, 3, I2);
          hessian[0].addSubMatrix (0, 3, negI2);
          hessian[0].addSubMatrix (3, 0, negI2);
@@ -98,8 +108,13 @@ public class GeometryDerivative {
    /**
     * Calculate the triangle altitude.
     * 
+    * Verified.
+    * 
     * @param ele
-    * @param edgeIdx
+    * @param edgeIdx 
+    * One of the three edges of the given element. 0,1,2. 
+    * i.e. local edgeIdx relative to element.
+    * 
     * @param derivative 1x9
     * @param hessian 9x9
     * @return
@@ -147,8 +162,8 @@ public class GeometryDerivative {
             derivative.scaledAdd (n.get (i) / nnorm / enorm, nderiv_irow);
          }
          
-         MatrixNd eT = new MatrixNd();
-         eT.set (e);  // Should be (1,3)
+         MatrixNd eT = new MatrixNd(1,3);
+         eT.setRow (0, e);  
          derivative.addScaledSubMatrix (0, 6, -nnorm / enorm / enorm / enorm, eT);
          derivative.addScaledSubMatrix (0, 3, nnorm / enorm / enorm / enorm, eT);
       }
@@ -165,44 +180,45 @@ public class GeometryDerivative {
          P.scale (1/nnorm );
          
          Matrix3d _n_nT = new Matrix3d();
-         _n_nT.outerProduct(n, n);
+         _n_nT.outerProduct(n, n);   // n.nT is the outer product of n and n.
          _n_nT.scale (1/nnorm/nnorm/nnorm);
          
          P.sub (new MatrixNd(_n_nT));
          
          //
          
-         MatrixNd nT_P = new MatrixNd(9, 9);
-         nT_P.mulTransposeLeft (nderiv, P);
-         hessian.add (nT_P);
+         MatrixNd hessian_operand = new MatrixNd(9, 9);
+         hessian_operand.mulTransposeLeft (nderiv, P);
+         hessian_operand.mul (nderiv);
+         hessian.scaledAdd (1/enorm, hessian_operand);
          
          // Hessian blocks.
          
          Matrix3d e_nT = new Matrix3d();
          e_nT.outerProduct (e, n);
-         e_nT.scale (1.0);
+ 
          MatrixNd block = new MatrixNd(3,9);
          block.mul (e_nT, nderiv);
          hessian.addScaledSubMatrix(6, 0, -1*nnorm/enorm/enorm/enorm, block);
          hessian.addScaledSubMatrix(3, 0, +1/nnorm/enorm/enorm/enorm, block);
          
          Matrix3d n_eT = new Matrix3d();
-         n_eT.mul (n, e);
+         n_eT.outerProduct (n, e);   // n.eT is the outer product of n and e.
          MatrixNd nderivT = new MatrixNd(9, 3);
          nderiv.transpose(nderivT);
          block.mul (nderivT, n_eT);
-         hessian.addScaledSubMatrix(0, 6, -1.0 / nnorm / enorm / enorm/ enorm, block);
-         hessian.addScaledSubMatrix(0, 3, +1.0 / nnorm / enorm / enorm/ enorm, block);
+         hessian.addScaledSubMatrix(0, 6, -1.0 / nnorm / enorm / enorm / enorm, block);
+         hessian.addScaledSubMatrix(0, 3, +1.0 / nnorm / enorm / enorm / enorm, block);
          
          block.set (Matrix3d.IDENTITY);
-         hessian.addScaledSubMatrix(6, 6, -1.0 * nnorm / enorm / enorm / enorm, block);
-         hessian.addScaledSubMatrix(6, 3, +1.0 * nnorm / enorm / enorm / enorm, block);
-         hessian.addScaledSubMatrix (3, 6, nnorm / enorm / enorm / enorm, block);
+         hessian.addScaledSubMatrix (6, 6, -1.0 * nnorm / enorm / enorm / enorm, block);
+         hessian.addScaledSubMatrix (6, 3, +1.0 * nnorm / enorm / enorm / enorm, block);
+         hessian.addScaledSubMatrix (3, 6, +1.0 * nnorm / enorm / enorm / enorm, block);
          hessian.addScaledSubMatrix (3, 3, -1.0 * nnorm / enorm / enorm / enorm, block);
          
          Matrix3d outer = new Matrix3d();
          outer.outerProduct (e, e);
-         outer.scale (3.0 / nnorm / enorm / enorm / enorm / enorm / enorm);
+         outer.scale (3.0 * nnorm / enorm / enorm / enorm / enorm / enorm);
          MatrixNd outerNd = new MatrixNd(outer);
          
          hessian.addScaledSubMatrix (6, 6, 1.0, outerNd);
@@ -214,13 +230,24 @@ public class GeometryDerivative {
       return h;
    }
    
-   public static Vector3d faceNormal(ShellElement3d ele, MatrixNd derivative, MatrixNd[] hessian) {
+   /**
+    * Calculate the normal for the given face.
+    * 
+    * @param ele
+    * @param derivative
+    * @param hessian
+    * @return
+    */
+   public static Vector3d faceNormal(
+      ShellElement3d ele,
+      MatrixNd derivative,   // 3x9
+      MatrixNd[] hessian     // 9x9
+   ) {
       if (derivative != null) {
          derivative.setZero ();
       }
       
       if (hessian != null) {
-         hessian = new MatrixNd[3];
          for (int i = 0; i < 3; i++) {
             hessian[i].setZero ();
          }
@@ -267,8 +294,8 @@ public class GeometryDerivative {
    
    public static Matrix3d crossMatrix3d(Vector3d v) {
       return new Matrix3d(
-         0, -v.z, v.y,
-         v.z, 0, -v.x, 
+          0,  -v.z, v.y,
+          v.z, 0,  -v.x, 
          -v.y, v.x, 0
       );
    }

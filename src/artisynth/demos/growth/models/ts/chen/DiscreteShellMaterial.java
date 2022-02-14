@@ -18,6 +18,7 @@ public abstract class DiscreteShellMaterial {
    public abstract double bendingEnergy(
       FemModel3d model,
       ShellElement3d ele, 
+      VectorNd extraDOFs,
       RestState rs, 
       Face face,
       int f,

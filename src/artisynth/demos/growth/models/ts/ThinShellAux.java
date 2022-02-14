@@ -2,6 +2,7 @@ package artisynth.demos.growth.models.ts;
 
 import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel3d;
+import artisynth.demos.growth.models.ts.chen.DiscreteShell;
 import artisynth.demos.growth.models.ts.narain.NarainShell;
 import artisynth.demos.growth.remesh.RemeshOps.OpRv;
 import maspack.geometry.Face;
@@ -19,7 +20,7 @@ public class ThinShellAux {
          this.mTS = new NarainShell(model, mesh);
       } 
       else if (type == ThinShellType.CHEN) {
-         throw new UnsupportedOperationException("Unimplemented");
+         this.mTS = new DiscreteShell(model, mesh);
       } else {
          throw new UnsupportedOperationException("Unimplemented");
       }
@@ -32,9 +33,12 @@ public class ThinShellAux {
    }
    
    public void addForceAndStiffness() {
-      this.mTS.addStretchingForceAndStiffness ();
-      this.mTS.addBendingForceAndStiffness ();
+      this.mTS.addForceAndStiffness ();
    }   
+   
+   public void advance() {
+      this.mTS.advance ();
+   }
    
    /** Remeshing **/
    

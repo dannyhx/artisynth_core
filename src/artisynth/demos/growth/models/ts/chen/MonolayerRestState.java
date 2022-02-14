@@ -4,7 +4,6 @@ import java.util.ArrayList;
 
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.ShellElement3d;
-import artisynth.demos.growth.models.ts.chen.GeometryDerivative.FirstFundamentalFormRv;
 import maspack.matrix.Matrix2d;
 
 /**
@@ -29,10 +28,14 @@ public class MonolayerRestState extends RestState {
       for (int f = 0; f < model.numShellElements (); f++) {
          ShellElement3d ele = model.getShellElement (f);
          
-         this.thicknesses.set (f, thickness);
+         this.thicknesses.add (thickness);
          
-         FirstFundamentalFormRv ffrv = GeometryDerivative.firstFundamentalForm (ele);
-         this.abars.set (f, ffrv.Result);
+         // main.cpp::runSimulation
+         Matrix2d I = GeometryDerivative.firstFundamentalForm (ele, null, null);
+         this.abars.add (I);
+         
+         // Flat.
+         this.bbars.add (new Matrix2d());
       }
    }
 }

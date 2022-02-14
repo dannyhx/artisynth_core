@@ -15,8 +15,18 @@ public class StVKMaterial extends DiscreteShellMaterial {
    public double lameAlpha_;
    public double lameBeta_;
    
+   public StVKMaterial(double poissons) {
+      // main.cpp::lameParameters
+      double young = 1.0; // "doesn't matter for static solves"
+      this.lameAlpha_ = young * poissons / (1.0 - poissons * poissons);
+      this.lameBeta_ = young / 2.0 / (1.0 + poissons);
+   }
+   
    /**
     * Calculate the stretching energy for the given element.
+    * 
+    * Called by DiscreteShell.elasticEnergy().
+    * Verified.
     * 
     * @param ele 
     * @param rs 
@@ -32,17 +42,6 @@ public class StVKMaterial extends DiscreteShellMaterial {
    ) {
       MonolayerRestState biRs = (MonolayerRestState)rs;
       
-      //
-      
-      MatrixNd aderiv = new MatrixNd(4, 9);
-      MatrixNd[] ahess = new MatrixNd[0];
-      Matrix2d a = GeometryDerivative.firstFundamentalForm (
-         ele, 
-         (derivative != null) ? aderiv : null, 
-         (hessian != null) ? ahess : null);
-      
-      //
-      
       double coeff = biRs.thicknesses.get (f) / 4.0;
       
       Matrix2d abar = biRs.abars.get (f);
@@ -51,6 +50,17 @@ public class StVKMaterial extends DiscreteShellMaterial {
       if (!isInvert) {
          throw new AssertionError("Failed to invert");
       }
+      
+      //
+      
+      MatrixNd aderiv = new MatrixNd(4, 9);
+      MatrixNd[] ahess = new MatrixNd[4];
+      Matrix2d a = GeometryDerivative.firstFundamentalForm (
+         ele, 
+         (derivative != null) ? aderiv : null, 
+         (hessian != null) ? ahess : null);
+      
+      //
       
       Matrix2d M = new Matrix2d();
       M.sub (a, abar);
@@ -76,7 +86,6 @@ public class StVKMaterial extends DiscreteShellMaterial {
          
          VectorNd temp_vec4 = MatrixUtil.m2x2_to_vec4_colMaj (temp);
          derivative.mulTranspose (aderiv, temp_vec4);
-//         derivative.mulTransposeLeft (aderiv, temp_4x1);
          derivative.scale (coeff * dA);
       }
       
@@ -95,7 +104,7 @@ public class StVKMaterial extends DiscreteShellMaterial {
          Matrix2d Mainv = new Matrix2d();
          Mainv.mul (M, abarinv);
          
-         // Iterate over Mainv and abarinv as if they were vectors.
+         // "iterate over Mainv and abarinv as if they were vectors"
          
          VectorNd abarinv_vec = MatrixUtil.m2x2_to_vec4_colMaj (abarinv);
          VectorNd Mainv_vec = MatrixUtil.m2x2_to_vec4_colMaj (Mainv);
@@ -103,7 +112,8 @@ public class StVKMaterial extends DiscreteShellMaterial {
          for (int i = 0; i < 4; i++) {
             hessian.scaledAdd (
                lameAlpha_ * M.trace() * abarinv_vec.get (i) +
-               2 * lameBeta_ * Mainv_vec.get(i), ahess[i]);
+               2 * lameBeta_ * Mainv_vec.get(i), 
+               ahess[i]);
          }
          
          VectorNd aderiv_row0 = new VectorNd(9);
@@ -170,25 +180,30 @@ public class StVKMaterial extends DiscreteShellMaterial {
    public double bendingEnergy(
       FemModel3d model,
       ShellElement3d ele, 
+      VectorNd extraDOFs,
       RestState rs, 
       Face face,
       int f,
       int numExtraDOFs,
-      VectorNd derivative, 
-      MatrixNd hessian
+      VectorNd derivative,   // 18+3*numExtraDOFs
+      MatrixNd hessian       // 18+3*numExtraDOFs x 18+3*numExtraDOFs
    ) {
       MonolayerRestState mrs = (MonolayerRestState) rs;
       
       double coeff = pow(mrs.thicknesses.get (f), 3) / 12;
       int nedgedofs = numExtraDOFs;
       Matrix2d abarinv = new Matrix2d();
-      abarinv.invert(mrs.abars.get (f));
+      boolean isInverted = abarinv.invert(mrs.abars.get (f));
+      if (!isInverted) {
+         throw new RuntimeException("Failed to invert");
+      }
       MatrixNd bderiv = new MatrixNd(4, 18+3*nedgedofs);
       MatrixNd[] bhess = new MatrixNd[4];
       
       Matrix2d b = MidedgeAngleTanFormulation.secondFundamentalForm (
          model, 
          ele, 
+         extraDOFs,
          face, 
          (derivative != null) ? bderiv : null, 
          (hessian != null) ? bhess : null

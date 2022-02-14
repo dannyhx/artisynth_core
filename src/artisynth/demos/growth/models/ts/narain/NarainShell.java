@@ -170,6 +170,11 @@ public class NarainShell extends ThinShellBase {
 //      }
    }
    
+   public void addForceAndStiffness() {
+      this.addStretchingForceAndStiffness ();
+      this.addBendingForceAndStiffness ();
+   }
+   
    /** Compute and add the stretching force and stiffness of the FE model. */
    public void addStretchingForceAndStiffness() {
       for (Face face : mMesh.getFaces ()) {
