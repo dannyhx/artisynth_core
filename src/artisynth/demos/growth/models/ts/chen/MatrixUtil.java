@@ -56,6 +56,14 @@ public class MatrixUtil {
       return new VectorNd(M.m00, M.m10, M.m01, M.m11);
    }
    
+   /**
+    * GeometryDerivatives.cpp::crossMatrix
+    * 
+    * Verified
+    * 
+    * @param v
+    * @return
+    */
    public static Matrix3d crossMatrix(Vector3d v) {
       return new Matrix3d(
            0, -v.z,  v.y, 
@@ -63,6 +71,14 @@ public class MatrixUtil {
         -v.y,  v.x,  0);
    }
    
+   /**
+    * GeometryDerivatives.cpp::crossMatrix
+    * 
+    * Verified
+    * 
+    * @param v
+    * @return
+    */
    public static MatrixNd crossMatrixNd(Vector3d v) {
       MatrixNd M = new MatrixNd(3, 3);
       M.set(new double[] {

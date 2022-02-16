@@ -177,16 +177,25 @@ public class StVKMaterial extends DiscreteShellMaterial {
       return result;
    }
    
+   /**
+    * Calculate the bending energy for the given face.
+    * 
+    * Verified.
+    * 
+    * @param derivative [18+3*numExtraDOFs]
+    * @param hessian    [18+3*numExtraDOFs, 18+3*numExtraDOFs]
+    */
    public double bendingEnergy(
       FemModel3d model,
       ShellElement3d ele, 
       VectorNd extraDOFs,
+      int[][] FE,
       RestState rs, 
       Face face,
       int f,
       int numExtraDOFs,
-      VectorNd derivative,   // 18+3*numExtraDOFs
-      MatrixNd hessian       // 18+3*numExtraDOFs x 18+3*numExtraDOFs
+      VectorNd derivative,   
+      MatrixNd hessian        
    ) {
       MonolayerRestState mrs = (MonolayerRestState) rs;
       
@@ -204,6 +213,7 @@ public class StVKMaterial extends DiscreteShellMaterial {
          model, 
          ele, 
          extraDOFs,
+         FE,
          face, 
          (derivative != null) ? bderiv : null, 
          (hessian != null) ? bhess : null
@@ -212,7 +222,7 @@ public class StVKMaterial extends DiscreteShellMaterial {
       Matrix2d M = new Matrix2d();
       M.sub (b, mrs.bbars.get (f));
       M.mul(abarinv, M);
-      double dA = 0.5 * mrs.abars.get (f).determinant ();
+      double dA = 0.5 * sqrt(mrs.abars.get (f).determinant ());
       
       Matrix2d M2 = new Matrix2d();
       M2.mul (M, M);
@@ -244,18 +254,17 @@ public class StVKMaterial extends DiscreteShellMaterial {
          Matrix2d Mainv = new Matrix2d();
          Mainv.mul (M, abarinv);
          for (int i = 0; i < 4; i++) {
+            // iterate over Mainv and abarinv as if they were vectors
             hessian.scaledAdd (
                lameAlpha_ * M.trace() * abarinv.get (i/2, i%2) + 
                2 * lameBeta_ * Mainv.get (i/2, i%2), 
                bhess[i]);
          }
          
-         VectorNd bderiv_row = new VectorNd();
          MatrixNd[] bderiv_rows = new MatrixNd[4];
          for (int i = 0; i < 4; i++) {
-            bderiv.getRow (i, bderiv_row);
             bderiv_rows[i] = new MatrixNd(1, 18 + 3 * nedgedofs);
-            bderiv_rows[i].setRow (i, bderiv_row);
+            bderiv.getSubMatrix (i, 0, bderiv_rows[i]);
          }
          
          MatrixNd inner00 = new MatrixNd(1, 18 + 3 * nedgedofs);
@@ -280,8 +289,8 @@ public class StVKMaterial extends DiscreteShellMaterial {
          hessian.scaledAdd (2 * lameBeta_, hessian_operand);
          
          hessian_operand.mulTransposeLeft (inner01, inner10);
-         hessian_operand.scale (2 * lameBeta_);
          hessian_operand.mulTransposeLeftAdd (inner10, inner01);
+         hessian_operand.scale (2 * lameBeta_);
          hessian.add (hessian_operand);
          
          hessian_operand.mulTransposeLeft (inner11, inner11);

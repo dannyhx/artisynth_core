@@ -19,14 +19,17 @@ public class MidedgeAngleTanFormulation {
    
    /**
     * 
+    * Verified.
+    * 
     * @param f
     * @param derivative 3x21
-    * @param hessian 21x21
+    * @param hessian[3] 21x21
     */
    public static Vector3d secondFundamentalFormEntries(
       FemModel3d model, 
       ShellElement3d ele, 
       VectorNd extraDOFs,
+      int[][] FE,
       Face face, 
       MatrixNd derivative,  // 3x21
       MatrixNd[] hessian    // 21x21
@@ -50,10 +53,12 @@ public class MidedgeAngleTanFormulation {
       
       Vector3d II = new Vector3d();
       for (int i = 0; i < 3; i++) {
+         // CHENTODO: Ensure hderiv and hhess ordering is consistent.
          MatrixNd hderiv = new MatrixNd(1, 9);
          MatrixNd hhess = new MatrixNd(9, 9);
          double altitude = GeometryDerivative.triangleAltitude(ele, i, hderiv, hhess);
          
+         int gEdgeIdx = FE[face.idx][i];
          HalfEdge edge = face.getEdge (i);
          MatrixNd thetaderiv = new MatrixNd(1, 12);
          MatrixNd thetahess = new MatrixNd(12, 12);
@@ -61,7 +66,7 @@ public class MidedgeAngleTanFormulation {
          
          // DANTODO: Needs review, including edgeThetas.
          double orient = (MeshUtil.isHalfEdgeWithMinHeadIdx (edge)) ? 1.0 : -1.0;
-         double alpha = 0.5 * theta;  // + orient * edgeThetas[edge]
+         double alpha = 0.5 * theta + orient * extraDOFs.get (gEdgeIdx);
          II.set (i, 2.0 * altitude * tan(alpha));
          
          if (derivative != null) {
@@ -77,7 +82,6 @@ public class MidedgeAngleTanFormulation {
             derivative.addScaledSubMatrix (i, 3 * hv1, 2.0 * tan(alpha), block);
             
             hderiv.getSubMatrix (0, 6, block);
-            block.scale (2.0 * tan(alpha));
             derivative.addScaledSubMatrix (i, 3 * hv2, 2.0 * tan(alpha), block);
             
             int av0 = 0;
@@ -91,10 +95,10 @@ public class MidedgeAngleTanFormulation {
                av2 = i;
                av3 = 3 + i;
             } else {
-              av0 = (i + 2) % 3;
-              av1 = (i + 1) % 3;
-              av2 = 3 + i;
-              av3 = i;
+               av0 = (i + 2) % 3;
+               av1 = (i + 1) % 3;
+               av2 = 3 + i;
+               av3 = i;
             }
             
             thetaderiv.getSubMatrix (0, 0, block);
@@ -134,10 +138,10 @@ public class MidedgeAngleTanFormulation {
                av[2] = i;
                av[3] = 3 + i;
             } else {
-                av[0] = (i + 2) % 3;
-                av[1] = (i + 1) % 3;
-                av[2] = 3 + i;
-                av[3] = i;
+               av[0] = (i + 2) % 3;
+               av[1] = (i + 1) % 3;
+               av[2] = 3 + i;
+               av[3] = i;
             }
             
             MatrixNd thetaderiv_block = new MatrixNd(1,3);
@@ -150,36 +154,40 @@ public class MidedgeAngleTanFormulation {
                    thetaderiv.getSubMatrix (0, 3 * j, thetaderiv_block);
 
                    block.mulTransposeLeft (thetaderiv_block, hderiv_block);
-                   hessian[i].addScaledSubMatrix (3 * av[j], 3 * hv[k], 1.0 / cos(alpha) / cos(alpha), block);
+                   hessian[i].addScaledSubMatrix (3 * av[j], 3 * hv[k], 
+                      1.0 / cos(alpha) / cos(alpha), block);
                    
                    block.mulTransposeLeft (hderiv_block, thetaderiv_block);
-                   hessian[i].addScaledSubMatrix (3 * hv[k], 3 * av[j], 1.0 / cos(alpha) / cos(alpha), block);
+                   hessian[i].addScaledSubMatrix (3 * hv[k], 3 * av[j], 
+                      1.0 / cos(alpha) / cos(alpha), block);
                 }
                 
-                hessian[i].addScaledSubMatrix (18 + i, 3 * hv[k], 2.0 / cos(alpha) / cos(alpha) * orient, hderiv_block);
+                hessian[i].addScaledSubMatrix (18 + i, 3 * hv[k], 
+                   2.0 / cos(alpha) / cos(alpha) * orient, hderiv_block);
                 
                 block = new MatrixNd(hderiv_block);
                 block.transpose ();
-                hessian[i].addScaledSubMatrix (3 * hv[k], 18 + i, 2.0 / cos(alpha) / cos(alpha) * orient, block);
+                hessian[i].addScaledSubMatrix (3 * hv[k], 18 + i, 
+                   2.0 / cos(alpha) / cos(alpha) * orient, block);
             }
             
             MatrixNd thetahess_block = new MatrixNd(3,3);
             
             for (int k = 0; k < 4; k++) {
-                thetaderiv.getSubMatrix (0, 3*k, hderiv_block);
+                thetaderiv.getSubMatrix (0, 3*k, thetaderiv_block);
                
                 for (int j = 0; j < 4; j++) {
                    thetahess.getSubMatrix (3*j, 3*k, thetahess_block);
-                   hessian[i].addScaledSubMatrix (3 * av[j], 3 * av[k], altitude / cos(alpha) / cos(alpha), thetahess_block);
+                   hessian[i].addScaledSubMatrix (3 * av[j], 3 * av[k], 
+                      altitude / cos(alpha) / cos(alpha), thetahess_block);
                    
-                   thetaderiv_block.setSize (1, 3);
-                   thetaderiv.getSubMatrix (0, 3*j, thetaderiv_block);
-                   thetaderiv_block.transpose ();
-                   hessian[i].addScaledSubMatrix (3 * av[j], 3 * av[k], altitude * tan(alpha) / cos(alpha) / cos(alpha), thetaderiv);
+                   thetaderiv.getSubMatrix (0, 3*j, block);
+                   block.transpose (); 
+                   block.mul (thetaderiv_block);
+                   hessian[i].addScaledSubMatrix (3 * av[j], 3 * av[k], 
+                      altitude * tan(alpha) / cos(alpha) / cos(alpha), block);
                 }
                 
-                thetaderiv_block.setSize (1, 3);
-                thetaderiv.getSubMatrix (0, 3 * k, thetaderiv_block);
                 hessian[i].addScaledSubMatrix (18 + i, 3 * av[k], 
                    2.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha) * orient, thetaderiv_block);
                 
@@ -188,6 +196,7 @@ public class MidedgeAngleTanFormulation {
                    2.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha) * orient, thetaderiv_block);
             }
             
+            // Edge hessian.
             hessian[i].add (18 + i, 18 + i, 4.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha));
          }
       }
@@ -195,13 +204,27 @@ public class MidedgeAngleTanFormulation {
       return II;
    }
    
+   /**
+    * 
+    * Verified.
+    * 
+    * @param model
+    * @param ele
+    * @param extraDOFs
+    * @param FE
+    * @param face
+    * @param derivative [4,18+3*nedgedofs]
+    * @param hessian    [18+3*nedgedofs, 18+3*nedgedofs]
+    * @return
+    */
    public static Matrix2d secondFundamentalForm(
       FemModel3d model, 
       ShellElement3d ele, 
       VectorNd extraDOFs,
+      int[][] FE,
       Face face, 
-      MatrixNd derivative,    // 4, 18+3*nedgedofs
-      MatrixNd[] hessian      // 18+3*nedgedofs, 18+3*nedgedofs
+      MatrixNd derivative,    
+      MatrixNd[] hessian      
    ) {
       if (derivative != null) {
          if (derivative.rowSize () != 4 || derivative.colSize () != 21) {
@@ -230,7 +253,7 @@ public class MidedgeAngleTanFormulation {
       MatrixNd IIhess[] = new MatrixNd[3];
       
       Vector3d II = secondFundamentalFormEntries(
-         model, ele, extraDOFs, face, 
+         model, ele, extraDOFs, FE, face, 
          derivative != null ? IIderiv : null, hessian != null ? IIhess : null);
       
       Matrix2d result = new Matrix2d(
@@ -273,7 +296,23 @@ public class MidedgeAngleTanFormulation {
    
    /////////////
    
-   protected static double edgeTheta(FemModel3d model, HalfEdge edge, MatrixNd derivative, MatrixNd hessian) {
+   /**
+    * Measure the bend for a given angle.
+    * 
+    * Verified.
+    * 
+    * @param model
+    * @param edge
+    * @param derivative 1x12
+    * @param hessian 12x12
+    * @return
+    */
+   protected static double edgeTheta(
+      FemModel3d model, 
+      HalfEdge edge, 
+      MatrixNd derivative, 
+      MatrixNd hessian
+   ) {
       if (derivative != null) {
          derivative.setZero ();
       }
@@ -409,7 +448,7 @@ public class MidedgeAngleTanFormulation {
               
               block.mulTransposeLeft (wqm[i], anghess_block_33);
               block.mul (wqm[j]);
-              hessian.addSubMatrix(windices[i], vindices[j], block);
+              hessian.addSubMatrix(windices[i], windices[j], block);
             }
             
             block.mulTransposeLeft (vqm[i], anghess_block_06);

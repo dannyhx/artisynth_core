@@ -300,30 +300,53 @@ public class GeometryDerivative {
       );
    }
    
-   public static double angle(Vector3d v, Vector3d w, Vector3d axis, MatrixNd derivative, MatrixNd hessian) {
+   /**
+    * Compute the angle between two 3D vectors.
+    * 
+    * Verified
+    * 
+    * @param v
+    * @param w
+    * @param axis 
+    * Rotational axis shared by v and w. (e.g. edge shared by two faces)
+    * 
+    * @param derivative  // 1x9
+    * @param hessian     // 9x9
+    * @return
+    */
+   public static double angle(
+      Vector3d v, 
+      Vector3d w, 
+      Vector3d axis,
+      MatrixNd derivative, 
+      MatrixNd hessian
+   ) {
       Vector3d vw = new Vector3d().cross (v, w);
       
       double theta = 2.0 * Math.atan2 ((vw.dot (axis) / axis.norm()), v.dot (w) + v.norm() * w.norm());
    
+      Vector3d axisV = new Vector3d().cross (axis, v);
+      Vector3d axisW = new Vector3d().cross (axis, w);
+      
       if (derivative != null) {
-         Vector3d axisV = new Vector3d().cross (axis, v);
+         MatrixNd axisV_1x3 = new MatrixNd(1, 3);
+         axisV_1x3.setRow (0, axisV);
          
-         MatrixNd seg = new MatrixNd(axisV);
-         derivative.addScaledSubMatrix (0, 0, -1.0 / v.normSquared () / axis.norm (), seg);
-         derivative.addScaledSubMatrix (0, 3, +1.0 / v.normSquared () / axis.norm (), seg);
+         MatrixNd axisW_1x3 = new MatrixNd(1, 3);
+         axisW_1x3.setRow (0, axisW);
          
-         seg.setZero ();
-         derivative.setSubMatrix (0, 6, seg);
+         derivative.addScaledSubMatrix (0, 0, -1.0 / v.normSquared () / axis.norm (), axisV_1x3);
+         derivative.addScaledSubMatrix (0, 3, +1.0 / w.normSquared () / axis.norm (), axisW_1x3);
+         
+         MatrixNd zero1x3 = new MatrixNd(1,3);
+         derivative.setSubMatrix (0, 6, zero1x3);
       }
       
       if (hessian != null) {
          hessian.setZero ();
-         
-         Vector3d axisV = new Vector3d().cross (axis, v);
-         Vector3d axisW = new Vector3d().cross (axis, w);
-         
+
          MatrixNd block = new MatrixNd();
-         Matrix3d op = new Matrix3d();
+         Matrix3d op = new Matrix3d();  // Outer Product
          
          op.outerProduct (axisV, v);
          block.set (op);
@@ -340,7 +363,7 @@ public class GeometryDerivative {
             -1.0 / v.normSquared () / axis.norm (), block);
          
          hessian.addScaledSubMatrix(3, 3, 
-            1 / w.normSquared () / axis.norm (), block);
+            1.0 / w.normSquared () / axis.norm (), block);
          
          // dahat
          

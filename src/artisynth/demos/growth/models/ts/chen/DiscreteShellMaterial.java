@@ -19,6 +19,7 @@ public abstract class DiscreteShellMaterial {
       FemModel3d model,
       ShellElement3d ele, 
       VectorNd extraDOFs,
+      int[][] FE,
       RestState rs, 
       Face face,
       int f,

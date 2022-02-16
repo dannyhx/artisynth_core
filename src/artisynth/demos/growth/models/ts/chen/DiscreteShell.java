@@ -100,12 +100,14 @@ public class DiscreteShell extends ThinShellBase {
       
       VectorNd maxvals = new VectorNd(freeDOFs);
       maxvals.setZero ();
+      // For each row
       for (int r = 0; r < freeDOFs; r++) {
          SparseMatrixCell row = H.getRow (r);
          if (row == null) {
             continue;
          }
          
+         // For each column of row.
          for (SparseMatrixCell cell = row; row != null; row = row.next) {
             maxvals.set (r, max(maxvals.get (r), abs(cell.value)));
          }
@@ -141,6 +143,7 @@ public class DiscreteShell extends ThinShellBase {
       VectorNd descentDir = new VectorNd();
       descentDir.mul (D, x);
 
+      // Update node positions.
       Point3d newPos = new Point3d();
       for (int n = 0; n < mModel.numNodes (); n++) {
          FemNode3d node = mModel.getNode (n);
@@ -148,11 +151,18 @@ public class DiscreteShell extends ThinShellBase {
          descentDir.getSubVector (3*n, newPos);
          node.setPosition (newPos);
       }
+      
+      // Update edge DoFs.
+      VectorNd descentDir_seg = new VectorNd(mEdgeDOFs.size ()); 
+      descentDir.getSubVector (3 * mModel.numNodes (), descentDir_seg);
+      mEdgeDOFs.add (descentDir_seg);
    }
    
    
    /**
     * ElasticShell.cpp :: elasticEnergy
+    * 
+    * Verified.
     */
    public double elasticEnergy (
       VectorNd derivative,
@@ -235,7 +245,7 @@ public class DiscreteShell extends ThinShellBase {
          VectorNd deriv = new VectorNd(18 + 3 * nedgedofs);
          MatrixNd hess = new MatrixNd(18 + 3 * nedgedofs, 18 + 3 * nedgedofs);
 
-         this.mMat.bendingEnergy (mModel, ele, mEdgeDOFs, mRestState, face, f, nedgedofs, 
+         this.mMat.bendingEnergy (mModel, ele, mEdgeDOFs, mFE, mRestState, face, f, nedgedofs, 
             (derivative != null) ? deriv : null, 
             (hessian != null) ? hess : null);
          
@@ -267,9 +277,11 @@ public class DiscreteShell extends ThinShellBase {
                }
                
                for (int k = 0; k < nedgedofs; k++) {
-                  double s = derivative.get (3 * nNodes + nedgedofs * n + k);
-                  s += deriv.get (18 + nedgedofs * j + k);
-                  derivative.set (3 * nNodes + nedgedofs * mFE[f][j] + k, s);
+                  int derivative_idx = 3 * nNodes + nedgedofs * mFE[f][j] + k;
+                  double derivative_i = derivative.get (derivative_idx);
+                  
+                  derivative_i += deriv.get (18 + nedgedofs * j + k);
+                  derivative.set (derivative_idx, derivative_i);
                }
             }
          }
@@ -297,7 +309,7 @@ public class DiscreteShell extends ThinShellBase {
                         
                         if (oVtx != null) {
                            hessian.add (new MatrixCell (
-                              3*o+l, 3*ok+m, hess.get (9+3*j+l,3*k+m)));
+                              3*o+l, 3*k+m, hess.get (9+3*j+l,3*k+m)));
                         }
                         
                         if (oVtx != null && okVtx != null) {
@@ -335,7 +347,7 @@ public class DiscreteShell extends ThinShellBase {
                      for (int ni = 0; ni < nedgedofs; ni++) {
                         hessian.add (new MatrixCell (
                            3*nNodes+nedgedofs*mFE[f][j]+m, 3*nNodes+nedgedofs*mFE[f][k]+ni, 
-                           hess.get (18 + nedgedofs * j + m, 18 +nedgedofs * k + n)
+                           hess.get (18 + nedgedofs * j + m, 18 + nedgedofs * k + n)
                         ));
                      }
                   }
