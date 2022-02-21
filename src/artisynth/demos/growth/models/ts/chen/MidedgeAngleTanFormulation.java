@@ -181,6 +181,7 @@ public class MidedgeAngleTanFormulation {
                    hessian[i].addScaledSubMatrix (3 * av[j], 3 * av[k], 
                       altitude / cos(alpha) / cos(alpha), thetahess_block);
                    
+                   block.setSize (1, 3);
                    thetaderiv.getSubMatrix (0, 3*j, block);
                    block.transpose (); 
                    block.mul (thetaderiv_block);
@@ -192,8 +193,9 @@ public class MidedgeAngleTanFormulation {
                    2.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha) * orient, thetaderiv_block);
                 
                 thetaderiv_block.transpose ();
-                hessian[i].addScaledSubMatrix (3 + av[k], 18 * i, 
+                hessian[i].addScaledSubMatrix (3 + av[k], 18 + i, 
                    2.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha) * orient, thetaderiv_block);
+                thetaderiv_block.setSize (1, 3);
             }
             
             // Edge hessian.
@@ -338,6 +340,12 @@ public class MidedgeAngleTanFormulation {
       Vector3d q2 = node2.getPosition ();
       Vector3d q3 = node3.getPosition ();
       
+      // DANTEMP
+//      q0.set (-0.5,0.5,-0.5);
+//      q1.set (0.5, 0.5, -0.5);
+//      q2.set (-0.5, -0.5, -0.5);
+//      q3.set (0.5, 0.5, 0.5);
+      
       Vector3d q0_q2 = new Vector3d().sub (q0,  q2);
       Vector3d q1_q3 = new Vector3d().sub (q1,  q3);
       Vector3d q1_q2 = new Vector3d().sub (q1,  q2);
@@ -377,6 +385,8 @@ public class MidedgeAngleTanFormulation {
          derivative.addSubMatrix (0, 6, block);
          
          //
+         
+         angderiv.getSubMatrix (0, 3, angderiv_row);
          
          block.mul (angderiv_row, MatrixUtil.crossMatrixNd (q1_q3));
          derivative.addSubMatrix (0, 0, block);

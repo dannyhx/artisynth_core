@@ -93,8 +93,9 @@ public class StVKMaterial extends DiscreteShellMaterial {
       
       if (hessian != null) {
          MatrixNd abarinv_4x1 = MatrixUtil.m2x2_to_mat4x1_colMaj (abarinv);
-         MatrixNd inner = new MatrixNd(1, 9);
+         MatrixNd inner = new MatrixNd();
          inner.mulTransposeLeft (aderiv, abarinv_4x1);
+         inner.transpose ();  // 9x1 to 1x9
 
          MatrixNd hessian_operand = new MatrixNd(9, 9);
          hessian_operand.mulTransposeLeft (inner, inner);
@@ -245,8 +246,9 @@ public class StVKMaterial extends DiscreteShellMaterial {
       if (hessian != null) {
          MatrixNd abarinv_vec = MatrixUtil.m2x2_to_mat4x1_colMaj (abarinv);
          
-         MatrixNd inner = new MatrixNd(1, 18 + 3 * nedgedofs);
+         MatrixNd inner = new MatrixNd();
          inner.mulTransposeLeft (bderiv, abarinv_vec);
+         inner.transpose ();  // [1, 18 + 3 * nedgedofs]
          
          hessian.mulTransposeLeft (inner, inner);
          hessian.scale (lameAlpha_);

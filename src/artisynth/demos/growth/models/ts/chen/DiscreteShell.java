@@ -41,9 +41,6 @@ public class DiscreteShell extends ThinShellBase {
    public DiscreteShell(FemModel3d model, PolygonalMesh mesh) {
      super(model, mesh);
      
-     // MidedgeAngleTanForumulation.cpp::initializeExtraDOFs
-     mEdgeDOFs = new VectorNd(this.mEDM.mMap.size ());
-     
      double thickness = model.getShellElement (0).getDefaultThickness ();  // 1e-1
      double poissonRatio = ((LinearMaterial)model.getMaterial ()).getPoissonsRatio (); // 1/2
      
@@ -63,6 +60,17 @@ public class DiscreteShell extends ThinShellBase {
      }
      
      mFE = MeshUtil.createGlobalEdgeIndices (mesh);
+     
+     // MidedgeAngleTanForumulation.cpp::initializeExtraDOFs
+     int maxGlobalEdgeIdx = -1;
+     for (int f = 0; f < mFE.length; f++) {
+        for (int e = 0; e < 3; e++) {
+           if (mFE[f][e] > maxGlobalEdgeIdx) {
+              maxGlobalEdgeIdx = mFE[f][e];
+           }
+        }
+     }
+     mEdgeDOFs = new VectorNd(maxGlobalEdgeIdx+1);
    }
    
    @Override
@@ -135,7 +143,7 @@ public class DiscreteShell extends ThinShellBase {
       VectorNd x = new VectorNd(rhs.size ());
       
       PardisoSolver solver = new PardisoSolver();
-      solver.analyze (DHDT, freeDOFs, Matrix.SPD);
+      solver.analyze (DHDT, freeDOFs, Matrix.POSITIVE_DEFINITE);
       solver.factor ();
       solver.solve(x, rhs);
       solver.dispose ();
@@ -149,6 +157,8 @@ public class DiscreteShell extends ThinShellBase {
          FemNode3d node = mModel.getNode (n);
          
          descentDir.getSubVector (3*n, newPos);
+         newPos.add (node.getPosition ());
+         
          node.setPosition (newPos);
       }
       
@@ -347,7 +357,7 @@ public class DiscreteShell extends ThinShellBase {
                      for (int ni = 0; ni < nedgedofs; ni++) {
                         hessian.add (new MatrixCell (
                            3*nNodes+nedgedofs*mFE[f][j]+m, 3*nNodes+nedgedofs*mFE[f][k]+ni, 
-                           hess.get (18 + nedgedofs * j + m, 18 + nedgedofs * k + n)
+                           hess.get (18 + nedgedofs * j + m, 18 + nedgedofs * k + ni)
                         ));
                      }
                   }

@@ -6,6 +6,7 @@ import java.io.IOException;
 import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.demos.growth.models.base.GrowDemo;
 import artisynth.demos.growth.models.ts.ThinShellType;
+import maspack.geometry.MeshFactory;
 import maspack.geometry.PolygonalMesh;
 
 public class DiscreteShellTest extends GrowDemo {
@@ -33,15 +34,19 @@ public class DiscreteShellTest extends GrowDemo {
          
          try {
             mMesh[m].read (new File("C:\\Users\\dan\\pj\\libshell\\example\\bunny.obj"));
+            mMesh[m] = MeshFactory.createBox (1, 1, 1);
+            mMesh[0].write (new File("C:\\Users\\dan\\pj\\libshell\\example\\box.obj"));
+            
          }
          catch (IOException e) {
             e.printStackTrace();
          }
       }
+      
    }
    
    protected void build_post() {
-      mMechModel.setDynamicsEnabled (false);
+//      mMechModel.setDynamicsEnabled (false);
    }
    
    public void advanceCustom(double t0, double t1, int flags) {
