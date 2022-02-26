@@ -18,7 +18,7 @@ public class MonolayerRestState extends RestState {
    // Second fundamental form, in barycentric coordinates for each mesh face.
    public ArrayList<Matrix2d> bbars;
 
-   public MonolayerRestState(FemModel3d model, double thickness) {
+   public MonolayerRestState(MeshConnectivity MC, FemModel3d model, double thickness) {
       int nfaces = model.numShellElements ();
       
       this.thicknesses = new ArrayList<Double>(nfaces);
@@ -26,12 +26,10 @@ public class MonolayerRestState extends RestState {
       this.bbars = new ArrayList<Matrix2d>(nfaces);
       
       for (int f = 0; f < model.numShellElements (); f++) {
-         ShellElement3d ele = model.getShellElement (f);
-         
          this.thicknesses.add (thickness);
          
          // main.cpp::runSimulation
-         Matrix2d I = GeometryDerivative.firstFundamentalForm (ele, null, null);
+         Matrix2d I = GeometryDerivative.firstFundamentalForm (MC, model, f, null, null);
          this.abars.add (I);
          
          // Flat.

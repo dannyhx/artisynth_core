@@ -34,7 +34,8 @@ public class StVKMaterial extends DiscreteShellMaterial {
     * Array index of the element. 
     */
    public double stretchingEnergy(
-      ShellElement3d ele, 
+      MeshConnectivity MC, 
+      FemModel3d model,
       RestState rs, 
       int f,
       VectorNd derivative, // 1x9
@@ -56,7 +57,7 @@ public class StVKMaterial extends DiscreteShellMaterial {
       MatrixNd aderiv = new MatrixNd(4, 9);
       MatrixNd[] ahess = new MatrixNd[4];
       Matrix2d a = GeometryDerivative.firstFundamentalForm (
-         ele, 
+         MC, model, f,
          (derivative != null) ? aderiv : null, 
          (hessian != null) ? ahess : null);
       
@@ -188,9 +189,8 @@ public class StVKMaterial extends DiscreteShellMaterial {
     */
    public double bendingEnergy(
       FemModel3d model,
-      ShellElement3d ele, 
       VectorNd extraDOFs,
-      int[][] FE,
+      MeshConnectivity MC,
       RestState rs, 
       Face face,
       int f,
@@ -212,13 +212,17 @@ public class StVKMaterial extends DiscreteShellMaterial {
       
       Matrix2d b = MidedgeAngleTanFormulation.secondFundamentalForm (
          model, 
-         ele, 
          extraDOFs,
-         FE,
+         MC,
          face, 
          (derivative != null) ? bderiv : null, 
          (hessian != null) ? bhess : null
       );
+      
+//      System.out.println (bhess[0].toString ("%.5f"));
+//      System.out.println (bhess[1].toString ("%.5f"));
+//      System.out.println (bhess[2].toString ("%.5f"));
+//      System.out.println (bhess[3].toString ("%.5f"));
       
       Matrix2d M = new Matrix2d();
       M.sub (b, mrs.bbars.get (f));

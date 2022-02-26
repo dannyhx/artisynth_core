@@ -4,12 +4,7 @@ import static java.lang.Math.cos;
 import static java.lang.Math.tan;
 
 import artisynth.core.femmodels.FemModel3d;
-import artisynth.core.femmodels.FemNode3d;
-import artisynth.core.femmodels.ShellElement3d;
-import artisynth.demos.growth.util.MeshUtil;
 import maspack.geometry.Face;
-import maspack.geometry.HalfEdge;
-import maspack.geometry.Vertex3d;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Vector3d;
@@ -27,9 +22,8 @@ public class MidedgeAngleTanFormulation {
     */
    public static Vector3d secondFundamentalFormEntries(
       FemModel3d model, 
-      ShellElement3d ele, 
       VectorNd extraDOFs,
-      int[][] FE,
+      MeshConnectivity MC,
       Face face, 
       MatrixNd derivative,  // 3x21
       MatrixNd[] hessian    // 21x21
@@ -56,18 +50,22 @@ public class MidedgeAngleTanFormulation {
          // CHENTODO: Ensure hderiv and hhess ordering is consistent.
          MatrixNd hderiv = new MatrixNd(1, 9);
          MatrixNd hhess = new MatrixNd(9, 9);
-         double altitude = GeometryDerivative.triangleAltitude(ele, i, hderiv, hhess);
+         double altitude = GeometryDerivative.triangleAltitude(MC, model, face, i, hderiv, hhess);
          
-         int gEdgeIdx = FE[face.idx][i];
-         HalfEdge edge = face.getEdge (i);
+         int gEdgeIdx = MC.FE[face.idx][i];
          MatrixNd thetaderiv = new MatrixNd(1, 12);
          MatrixNd thetahess = new MatrixNd(12, 12);
-         double theta = edgeTheta(model, edge, thetaderiv, thetahess);
+         double theta = edgeTheta(MC, model, gEdgeIdx, thetaderiv, thetahess);
          
          // DANTODO: Needs review, including edgeThetas.
-         double orient = (MeshUtil.isHalfEdgeWithMinHeadIdx (edge)) ? 1.0 : -1.0;
+         double orient = (MC.FEorient[face.idx][i] == 0) ? 1.0 : -1.0;
          double alpha = 0.5 * theta + orient * extraDOFs.get (gEdgeIdx);
          II.set (i, 2.0 * altitude * tan(alpha));
+         
+//         System.out.println (hderiv.toString ("%.5f"));
+//         System.out.println (hhess.toString ("%.5f"));
+//         System.out.println (thetaderiv.toString ("%.5f"));
+//         System.out.println (thetahess.toString ("%.5f"));
          
          if (derivative != null) {
             int hv0 = i;
@@ -89,7 +87,7 @@ public class MidedgeAngleTanFormulation {
             int av2 = 0;
             int av3 = 0;
             
-            if (MeshUtil.isHalfEdgeWithMinHeadIdx (edge)) {
+            if (MC.FEorient[face.idx][i] == 0) {
                av0 = (i + 1) % 3;
                av1 = (i + 2) % 3;
                av2 = i;
@@ -100,6 +98,10 @@ public class MidedgeAngleTanFormulation {
                av2 = 3 + i;
                av3 = i;
             }
+            
+//            if (face.idx == 0 && i == 2) {
+//               System.out.println ("here");
+//            }
             
             thetaderiv.getSubMatrix (0, 0, block);
             derivative.addScaledSubMatrix (i, 3 * av0, altitude / cos(alpha) / cos(alpha), block);
@@ -132,7 +134,7 @@ public class MidedgeAngleTanFormulation {
             }
             
             int av[] = new int[4];
-            if (MeshUtil.isHalfEdgeWithMinHeadIdx (edge)) {
+            if (MC.FEorient[face.idx][i] == 0) {
                av[0] = (i + 1) % 3;
                av[1] = (i + 2) % 3;
                av[2] = i;
@@ -200,6 +202,11 @@ public class MidedgeAngleTanFormulation {
             
             // Edge hessian.
             hessian[i].add (18 + i, 18 + i, 4.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha));
+            
+//            if (i == 0) {
+//               System.out.println (hessian[i].toString ("%.5f"));
+//               System.out.println ("here");
+//            }
          }
       }
      
@@ -213,7 +220,7 @@ public class MidedgeAngleTanFormulation {
     * @param model
     * @param ele
     * @param extraDOFs
-    * @param FE
+    * @param MC
     * @param face
     * @param derivative [4,18+3*nedgedofs]
     * @param hessian    [18+3*nedgedofs, 18+3*nedgedofs]
@@ -221,9 +228,8 @@ public class MidedgeAngleTanFormulation {
     */
    public static Matrix2d secondFundamentalForm(
       FemModel3d model, 
-      ShellElement3d ele, 
       VectorNd extraDOFs,
-      int[][] FE,
+      MeshConnectivity MC,
       Face face, 
       MatrixNd derivative,    
       MatrixNd[] hessian      
@@ -255,8 +261,13 @@ public class MidedgeAngleTanFormulation {
       MatrixNd IIhess[] = new MatrixNd[3];
       
       Vector3d II = secondFundamentalFormEntries(
-         model, ele, extraDOFs, FE, face, 
+         model, extraDOFs, MC, face, 
          derivative != null ? IIderiv : null, hessian != null ? IIhess : null);
+      
+//      System.out.println (IIhess[0].toString ("%.2f"));
+//      System.out.println (IIhess[1].toString ("%.2f")); 
+//      System.out.println (IIhess[2].toString ("%.2f")); 
+      
       
       Matrix2d result = new Matrix2d(
          II.x + II.y, II.x,
@@ -293,6 +304,11 @@ public class MidedgeAngleTanFormulation {
          hessian[3].add(IIhess[2]);
       }
       
+//    System.out.println (hessian[0].toString ("%.2f"));
+//    System.out.println (hessian[1].toString ("%.2f"));
+//    System.out.println (hessian[2].toString ("%.2f"));
+//    System.out.println (hessian[3].toString ("%.2f"));
+      
       return result;
    }
    
@@ -310,8 +326,9 @@ public class MidedgeAngleTanFormulation {
     * @return
     */
    protected static double edgeTheta(
+      MeshConnectivity MC,
       FemModel3d model, 
-      HalfEdge edge, 
+      int edge, 
       MatrixNd derivative, 
       MatrixNd hessian
    ) {
@@ -323,29 +340,24 @@ public class MidedgeAngleTanFormulation {
          hessian.setZero ();
       }
       
-      FemNode3d node0 = model.getNode( edge.head.getIndex () );
-      FemNode3d node1 = model.getNode( edge.tail.getIndex () );
-      Vertex3d[] oppVtxs = MeshUtil.getOppositeVtxs (edge);
-      if (oppVtxs.length == 1) {
-         // Boundary edge.
+      int v0 = MC.EV[edge][0];
+      int v1 = MC.EV[edge][1];
+      int v2 = MC.EOpp[edge][0];
+      int v3 = MC.EOpp[edge][1];
+      if (v2 == -1 || v3 == -1) {
+         // boundary edge.
          return 0;
       }
-      FemNode3d node2 = model.getNode( oppVtxs[0].getIndex () );
-      FemNode3d node3 = model.getNode( oppVtxs[1].getIndex () );
       
       //
       
-      Vector3d q0 = node0.getPosition ();
-      Vector3d q1 = node1.getPosition ();
-      Vector3d q2 = node2.getPosition ();
-      Vector3d q3 = node3.getPosition ();
+      Vector3d q0 = model.getNode (v0).getPosition ();
+      Vector3d q1 = model.getNode (v1).getPosition ();
+      Vector3d q2 = model.getNode (v2).getPosition ();
+      Vector3d q3 = model.getNode (v3).getPosition ();
       
       // DANTEMP
-//      q0.set (-0.5,0.5,-0.5);
-//      q1.set (0.5, 0.5, -0.5);
-//      q2.set (-0.5, -0.5, -0.5);
-//      q3.set (0.5, 0.5, 0.5);
-      
+
       Vector3d q0_q2 = new Vector3d().sub (q0,  q2);
       Vector3d q1_q3 = new Vector3d().sub (q1,  q3);
       Vector3d q1_q2 = new Vector3d().sub (q1,  q2);

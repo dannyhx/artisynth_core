@@ -1,7 +1,9 @@
 package artisynth.demos.growth.models.ts.chen;
 
+import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellElement3d;
+import maspack.geometry.Face;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
@@ -18,22 +20,21 @@ public class GeometryDerivative {
     * 
     * Verified.
     * 
-    * @param ele
     * @param derivative M(4,9)
     * @param hessian M(9,9)[4]
     * @return
     */
    public static Matrix2d firstFundamentalForm(
-      ShellElement3d ele, 
+      MeshConnectivity MC, 
+      FemModel3d model,
+      int f,
       MatrixNd derivative, 
       MatrixNd[] hessian
    ) {
-      FemNode3d[] nodes = ele.getNodes ();
-      
       // Nodal positions.
       Vector3d[] q = new Vector3d[3];
       for (int i = 0; i < 3; i++) {
-         q[i] = nodes[i].getPosition ();
+         q[i] = model.getNode (MC.F[f][i]).getPosition ();
       }
       
       Vector3d q1_q0 = new Vector3d().sub (q[1], q[0]);
@@ -108,7 +109,7 @@ public class GeometryDerivative {
    /**
     * Calculate the triangle altitude.
     * 
-    * Verified.
+    * Verified2.
     * 
     * @param ele
     * @param edgeIdx 
@@ -120,7 +121,8 @@ public class GeometryDerivative {
     * @return
     */
    public static double triangleAltitude(
-      ShellElement3d ele, int edgeIdx, MatrixNd derivative, MatrixNd hessian) 
+      MeshConnectivity MC, FemModel3d model, Face face, int edgeIdx, MatrixNd derivative, 
+      MatrixNd hessian) 
    {
       if (derivative != null) {
          derivative.setZero ();
@@ -132,19 +134,22 @@ public class GeometryDerivative {
       
       // Face normal.
       
+//      if (edgeIdx == 2) {
+//         System.out.println ("here");
+//      }
+      
       MatrixNd nderiv = new MatrixNd(3, 9);
       MatrixNd[] nhess = new MatrixNd[3];
       for (int i = 0; i < 3; i++) {
          nhess[i] = new MatrixNd(9, 9);
       }
-      Vector3d n = faceNormal(ele, nderiv, nhess);
+      Vector3d n = faceNormal(MC, model, face, edgeIdx, nderiv, nhess);
       
       int v1 = (edgeIdx + 1) % 3;
       int v2 = (edgeIdx + 2) % 3;
       
-      FemNode3d[] nodes = ele.getNodes ();
-      Vector3d q1 = nodes[v1].getPosition ();
-      Vector3d q2 = nodes[v2].getPosition ();
+      Vector3d q1 = model.getNode (MC.F[face.idx][v1]).getPosition ();
+      Vector3d q2 = model.getNode (MC.F[face.idx][v2]).getPosition ();
       
       Vector3d e = new Vector3d().sub (q2, q1);
       
@@ -167,6 +172,19 @@ public class GeometryDerivative {
          derivative.addScaledSubMatrix (0, 6, -nnorm / enorm / enorm / enorm, eT);
          derivative.addScaledSubMatrix (0, 3, nnorm / enorm / enorm / enorm, eT);
       }
+      
+//      System.out.println (nderiv.toString ("%.5f"));
+//      System.out.println (nhess[0].toString ("%.5f"));
+//      System.out.println (nhess[1].toString ("%.5f"));
+//      System.out.println (nhess[2].toString ("%.5f"));
+//      System.out.println (n);
+//      System.out.println (v1);
+//      System.out.println (v2);
+//      System.out.println (q1);
+//      System.out.println (q2);
+//      System.out.println (e);
+//      System.out.println (nnorm);
+//      System.out.println (enorm);
       
       if (hessian != null) {
          for (int i = 0; i < 3; i++) {
@@ -192,7 +210,9 @@ public class GeometryDerivative {
          hessian_operand.mul (nderiv);
          hessian.scaledAdd (1/enorm, hessian_operand);
          
-         // Hessian blocks.
+//         System.out.println (hessian.toString ("%.5f"));
+         
+         // Hessian blocks
          
          Matrix3d e_nT = new Matrix3d();
          e_nT.outerProduct (e, n);
@@ -200,21 +220,40 @@ public class GeometryDerivative {
          MatrixNd block = new MatrixNd(3,9);
          block.mul (e_nT, nderiv);
          hessian.addScaledSubMatrix(6, 0, -1*nnorm/enorm/enorm/enorm, block);
+//         System.out.println (hessian.toString ("%.5f"));
          hessian.addScaledSubMatrix(3, 0, +1/nnorm/enorm/enorm/enorm, block);
+//         System.out.println (hessian.toString ("%.5f"));
          
          Matrix3d n_eT = new Matrix3d();
          n_eT.outerProduct (n, e);   // n.eT is the outer product of n and e.
          MatrixNd nderivT = new MatrixNd(9, 3);
-         nderiv.transpose(nderivT);
-         block.mul (nderivT, n_eT);
+         nderivT.transpose(nderiv);
+         block.mul (nderivT, n_eT);  // 3.9
+         
+         System.out.println (n_eT.toString ("%.5f"));
+         System.out.println (block.toString ("%.5f"));
+         nderivT.scale (-1);
+         block.mul (nderivT, n_eT);  // 3.9
+         System.out.println (block.toString ("%.5f"));
+         
+         
+         
          hessian.addScaledSubMatrix(0, 6, -1.0 / nnorm / enorm / enorm / enorm, block);
+//         System.out.println (hessian.toString ("%.5f"));
          hessian.addScaledSubMatrix(0, 3, +1.0 / nnorm / enorm / enorm / enorm, block);
+//         System.out.println (hessian.toString ("%.5f"));
          
          block.set (Matrix3d.IDENTITY);
          hessian.addScaledSubMatrix (6, 6, -1.0 * nnorm / enorm / enorm / enorm, block);
+//         System.out.println (hessian.toString ("%.5f"));
          hessian.addScaledSubMatrix (6, 3, +1.0 * nnorm / enorm / enorm / enorm, block);
          hessian.addScaledSubMatrix (3, 6, +1.0 * nnorm / enorm / enorm / enorm, block);
          hessian.addScaledSubMatrix (3, 3, -1.0 * nnorm / enorm / enorm / enorm, block);
+         
+//         System.out.println (hessian.toString ("%.5f"));
+         
+         
+         // outer
          
          Matrix3d outer = new Matrix3d();
          outer.outerProduct (e, e);
@@ -225,6 +264,10 @@ public class GeometryDerivative {
          hessian.addScaledSubMatrix (6, 3, -1.0, outerNd);
          hessian.addScaledSubMatrix (3, 6, -1.0, outerNd);
          hessian.addScaledSubMatrix (3, 3, 1.0, outerNd);
+         
+//         System.out.println (hessian.toString ("%.5f"));
+//         System.out.println ("here");
+         
       }
       
       return h;
@@ -239,7 +282,10 @@ public class GeometryDerivative {
     * @return
     */
    public static Vector3d faceNormal(
-      ShellElement3d ele,
+      MeshConnectivity MC, 
+      FemModel3d model, 
+      Face face,
+      int edgeIdx,
       MatrixNd derivative,   // 3x9
       MatrixNd[] hessian     // 9x9
    ) {
@@ -253,11 +299,13 @@ public class GeometryDerivative {
          }
       }
       
-      FemNode3d[] nodes = ele.getNodes ();
+      int v0 = edgeIdx % 3;
+      int v1 = (edgeIdx + 1) % 3;
+      int v2 = (edgeIdx + 2) % 3;
       
-      Point3d qi0 = nodes[0].getPosition ();
-      Point3d qi1 = nodes[1].getPosition ();
-      Point3d qi2 = nodes[2].getPosition ();
+      Point3d qi0 = model.getNode (MC.F[face.idx][v0]).getPosition ();
+      Point3d qi1 = model.getNode (MC.F[face.idx][v1]).getPosition ();
+      Point3d qi2 = model.getNode (MC.F[face.idx][v2]).getPosition ();
 
       Vector3d qi1_qi0 = new Vector3d().sub (qi1, qi0);
       Vector3d qi2_qi0 = new Vector3d().sub (qi2, qi0);

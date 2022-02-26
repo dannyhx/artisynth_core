@@ -5,6 +5,7 @@ import java.util.Map;
 
 import maspack.geometry.Face;
 import maspack.geometry.PolygonalMesh;
+import maspack.geometry.Vertex3d;
 
 public class MeshConnectivity {
    
@@ -38,7 +39,7 @@ public class MeshConnectivity {
       int nfaces = mesh.numFaces ();
       
       F = new int[nfaces][3];
-      for (int f = 0; f < 3; f++) {
+      for (int f = 0; f < nfaces; f++) {
          Face face = mesh.getFace (f);
          F[f] = face.getVertexIndices ();
       }
@@ -62,6 +63,7 @@ public class MeshConnectivity {
             }
             
             String p = this.edgeStr (v0, v1);
+            
             if (edgeFaces.get (p) == null) {
                int[] hef = new int[2];
                hef[idx] = f;
@@ -99,7 +101,7 @@ public class MeshConnectivity {
          idx++;
       }
       
-      for (int f = 0; f < 3; f++) {
+      for (int f = 0; f < nfaces; f++) {
          for (int j = 0; j < 3; j++) {
             int v0 = F[f][(j+1)%3];
             int v1 = F[f][(j+2)%3];
@@ -134,6 +136,14 @@ public class MeshConnectivity {
             }
          }
       }
+   }
+   
+   /////////////////////
+   
+   public int vertexOppositeFaceEdge(int f, int vertidx) {
+      int edge = FE[f][vertidx];
+      int edgeorient = FEorient[f][vertidx];
+      return EOpp[edge][1 - edgeorient];
    }
    
    

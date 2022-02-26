@@ -601,54 +601,6 @@ public class MeshUtil {
    }
    
    /**
-    * Assign a unique index to each full edge of the mesh.
-    * 
-    * @return 
-    * FE[f,e] = 'global edge index' where e is one of the 3 edges of face f.
-    */
-   public static int[][] createGlobalEdgeIndices(PolygonalMesh mesh) {
-      int nfaces = mesh.numFaces ();
-      
-      // Edge to its global index.
-      HashMap<String,Integer> EI = new HashMap<String,Integer>();
-      
-      // FE[faceIdx,edgeIdx] = global edge index
-      int[][] FE = new int[nfaces][3];
-      
-      int nextEdgeIdx = 0;
-      for (int f = 0; f < nfaces; f++) {
-         for (int e = 0; e < 3; e++) {
-            Face face = mesh.getFace (f);
-            HalfEdge edge = face.getEdge (e);
-            
-            int v0 = edge.head.getIndex ();
-            int v1 = edge.tail.getIndex ();
-            
-            if (v0 > v1) {
-               // Swap.
-               int tmp_v0 = v0;
-               v0 = v1;
-               v1 = tmp_v0;
-            }
-            
-            String v0v1 = String.format ("%d-%d", v0, v1);
-            
-            Integer edgeIdx = EI.get (v0v1);
-            if (edgeIdx == null) {
-               edgeIdx = nextEdgeIdx;
-               nextEdgeIdx++;
-               
-               EI.put (v0v1, nextEdgeIdx);
-            }
-            
-            FE[f][e] = edgeIdx; 
-         }
-      }
-      
-      return FE;
-   }
-   
-   /**
     * Print the edges of a mesh.
     */
    public static void printEdges(PolygonalMesh mesh) {
