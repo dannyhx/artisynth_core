@@ -228,15 +228,14 @@ public class GeometryDerivative {
          n_eT.outerProduct (n, e);   // n.eT is the outer product of n and e.
          MatrixNd nderivT = new MatrixNd(9, 3);
          nderivT.transpose(nderiv);
-         block.mul (nderivT, n_eT);  // 3.9
+         block.mul (nderivT, new MatrixNd(n_eT));  // 3.9
          
-         System.out.println (n_eT.toString ("%.5f"));
-         System.out.println (block.toString ("%.5f"));
-         nderivT.scale (-1);
-         block.mul (nderivT, n_eT);  // 3.9
-         System.out.println (block.toString ("%.5f"));
-         
-         
+//         System.out.println (n_eT.toString ("%.5f"));
+//         System.out.println (nderivT.toString ("%.5f"));
+//         System.out.println (block.toString ("%.5f"));
+//         nderivT.scale (-1);
+//         block.mul (nderivT, n_eT);  // 3.9
+//         System.out.println (block.toString ("%.5f"));
          
          hessian.addScaledSubMatrix(0, 6, -1.0 / nnorm / enorm / enorm / enorm, block);
 //         System.out.println (hessian.toString ("%.5f"));

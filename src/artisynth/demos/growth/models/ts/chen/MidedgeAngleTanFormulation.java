@@ -167,12 +167,12 @@ public class MidedgeAngleTanFormulation {
                 hessian[i].addScaledSubMatrix (18 + i, 3 * hv[k], 
                    2.0 / cos(alpha) / cos(alpha) * orient, hderiv_block);
                 
-                block = new MatrixNd(hderiv_block);
+                block.set(hderiv_block);
                 block.transpose ();
                 hessian[i].addScaledSubMatrix (3 * hv[k], 18 + i, 
                    2.0 / cos(alpha) / cos(alpha) * orient, block);
             }
-            
+                        
             MatrixNd thetahess_block = new MatrixNd(3,3);
             
             for (int k = 0; k < 4; k++) {
@@ -190,15 +190,17 @@ public class MidedgeAngleTanFormulation {
                    hessian[i].addScaledSubMatrix (3 * av[j], 3 * av[k], 
                       altitude * tan(alpha) / cos(alpha) / cos(alpha), block);
                 }
-                
+                                
                 hessian[i].addScaledSubMatrix (18 + i, 3 * av[k], 
                    2.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha) * orient, thetaderiv_block);
                 
-                thetaderiv_block.transpose ();
-                hessian[i].addScaledSubMatrix (3 + av[k], 18 + i, 
-                   2.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha) * orient, thetaderiv_block);
-                thetaderiv_block.setSize (1, 3);
+                block.set(thetaderiv_block);
+                block.transpose ();
+                hessian[i].addScaledSubMatrix (3 * av[k], 18 + i, 
+                   2.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha) * orient, block);
             }
+            
+//            System.out.println (hessian[i].toString ("%.5f"));
             
             // Edge hessian.
             hessian[i].add (18 + i, 18 + i, 4.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha));

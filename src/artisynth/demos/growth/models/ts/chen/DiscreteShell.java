@@ -83,9 +83,6 @@ public class DiscreteShell extends ThinShellBase {
       
       SparseMatrixNd H = MatrixCell.BuildSparseMatrixNd(freeDOFs, freeDOFs, hessian);
       
-//      System.out.println (
-//         MatrixCell.BuildMatrixNd (freeDOFs, freeDOFs, hessian).toString ("%.5f"));
-      
       VectorNd force = new VectorNd(derivative);
       force.negate ();
       

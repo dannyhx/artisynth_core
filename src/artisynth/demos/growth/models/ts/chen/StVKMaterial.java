@@ -253,7 +253,7 @@ public class StVKMaterial extends DiscreteShellMaterial {
          MatrixNd inner = new MatrixNd();
          inner.mulTransposeLeft (bderiv, abarinv_vec);
          inner.transpose ();  // [1, 18 + 3 * nedgedofs]
-         
+                  
          hessian.mulTransposeLeft (inner, inner);
          hessian.scale (lameAlpha_);
          
@@ -266,7 +266,7 @@ public class StVKMaterial extends DiscreteShellMaterial {
                2 * lameBeta_ * Mainv.get (i/2, i%2), 
                bhess[i]);
          }
-         
+                  
          MatrixNd[] bderiv_rows = new MatrixNd[4];
          for (int i = 0; i < 4; i++) {
             bderiv_rows[i] = new MatrixNd(1, 18 + 3 * nedgedofs);
@@ -286,22 +286,19 @@ public class StVKMaterial extends DiscreteShellMaterial {
          inner10.scaledAdd (abarinv.get (1, 1), bderiv_rows[2]);
          
          MatrixNd inner11 = new MatrixNd(1, 18 + 3 * nedgedofs);
-         inner10.scaledAdd (abarinv.get (1, 0), bderiv_rows[1]);
-         inner10.scaledAdd (abarinv.get (1, 1), bderiv_rows[3]);
+         inner11.scaledAdd (abarinv.get (1, 0), bderiv_rows[1]);
+         inner11.scaledAdd (abarinv.get (1, 1), bderiv_rows[3]);
          
          MatrixNd hessian_operand = new MatrixNd();
-         
          hessian_operand.mulTransposeLeft (inner00, inner00);
          hessian.scaledAdd (2 * lameBeta_, hessian_operand);
-         
+
          hessian_operand.mulTransposeLeft (inner01, inner10);
          hessian_operand.mulTransposeLeftAdd (inner10, inner01);
-         hessian_operand.scale (2 * lameBeta_);
-         hessian.add (hessian_operand);
+         hessian.scaledAdd (2 * lameBeta_, hessian_operand);
          
          hessian_operand.mulTransposeLeft (inner11, inner11);
-         hessian_operand.scale (2 * lameBeta_);
-         hessian.add (hessian_operand);
+         hessian.scaledAdd (2 * lameBeta_, hessian_operand);
          
          hessian.scale (coeff * dA);
       }
