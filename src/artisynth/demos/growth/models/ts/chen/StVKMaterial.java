@@ -303,6 +303,8 @@ public class StVKMaterial extends DiscreteShellMaterial {
          hessian.scale (coeff * dA);
       }
       
+//      System.out.println (hessian.toString ("%.5f"));
+      
       return result;
    }
 }

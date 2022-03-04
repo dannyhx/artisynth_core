@@ -1,11 +1,11 @@
 package artisynth.demos.growth.models.ts.chen;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import maspack.geometry.Face;
 import maspack.geometry.PolygonalMesh;
-import maspack.geometry.Vertex3d;
 
 public class MeshConnectivity {
    
@@ -45,7 +45,7 @@ public class MeshConnectivity {
       }
       
       // edgeFaces[edgeStr][0,1 halfEdge] = f
-      HashMap<String, int[]> edgeFaces = new HashMap<String, int[]>();
+      LinkedHashMap<String, int[]> edgeFaces = new LinkedHashMap<String, int[]>();
       
       for (int f = 0; f < nfaces; f++) {
          for (int j = 0; j < 3; j++) {
@@ -114,12 +114,14 @@ public class MeshConnectivity {
             
             String edgeStr = this.edgeStr (v0, v1);
             FE[f][j] = edgeIndices.get (edgeStr);
+//            System.out.printf ("FE[%d,%d] = %d\n", f, j, FE[f][j]);
          }
       }
       
       for (int e = 0; e < nedges; e++) {
          for (int j = 0; j < 2; j++) {
             EOpp[e][j] = oppositeVertex(e, j);
+//            System.out.printf ("EOpp[%d,%d] = %d\n", e, j, EOpp[e][j]);
          }
       }
       
@@ -134,8 +136,11 @@ public class MeshConnectivity {
                // 
                FEorient[f][j] = 1;
             }
+            
+//            System.out.printf ("FEorient[%d,%d] = %d\n", f, j, FEorient[f][j]);
          }
       }
+      
    }
    
    /////////////////////

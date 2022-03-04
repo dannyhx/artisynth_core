@@ -74,4 +74,10 @@ public class ThinShellAux {
    public void useResidualPlasticStrain() {
       this.mTS.useResidualPlasticStrain ();
    };
+   
+   /* --- Setters and Getters --- */ 
+   
+   public ThinShellBase getThinShellBase() {
+      return this.mTS;
+   }
 }

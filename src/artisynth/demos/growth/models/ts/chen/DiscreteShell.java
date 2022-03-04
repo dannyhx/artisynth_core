@@ -55,11 +55,23 @@ public class DiscreteShell extends ThinShellBase {
      
      // Initialize second fundamental forms to rest flat.
      for (int i = 0; i < mRestState.bbars.size (); i++) {
-        mRestState.bbars.get (0).setZero ();
+        mRestState.bbars.get (i).setZero ();
      }
      
      // MidedgeAngleTanForumulation.cpp::initializeExtraDOFs
      mEdgeDOFs = new VectorNd(mMC.EF.length);
+   }
+   
+   public void setI(Matrix2d I) {
+      for (Matrix2d M : mRestState.abars) {
+         M.set (I);
+      }
+   }
+   
+   public void setII(Matrix2d II) {
+      for (Matrix2d M : mRestState.bbars) {
+         M.set (II);
+      }
    }
    
    @Override
@@ -82,6 +94,7 @@ public class DiscreteShell extends ThinShellBase {
       int freeDOFs = derivative.size ();
       
       SparseMatrixNd H = MatrixCell.BuildSparseMatrixNd(freeDOFs, freeDOFs, hessian);
+      System.out.println (MatrixCell.BuildMatrixNd (freeDOFs, freeDOFs, hessian).toString ("%.5f"));
       
       VectorNd force = new VectorNd(derivative);
       force.negate ();
@@ -216,16 +229,7 @@ public class DiscreteShell extends ThinShellBase {
                 }
             }
          }
-         
-//         if (f == 4) {
-//            System.out.println (
-//               MatrixCell.BuildMatrixNd (derivative.size (), derivative.size (), hessian).
-//               toString ("%.4f"));
-//            System.out.println ("here");
-//         }
       }
-      
-//      hessian.clear ();
       
       // Bending terms      
       
@@ -290,46 +294,78 @@ public class DiscreteShell extends ThinShellBase {
                         hessian.add (new MatrixCell (
                            3*mMC.F[f][j]+l, 3*mMC.F[f][k]+m, hess.get(3*j+l, 3*k+m)));
                         
+//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
+                        
                         if (oppidxk != -1) {
                            hessian.add (new MatrixCell (
                               3*mMC.F[f][j]+l, 3*oppidxk+m, hess.get (3*j+l,9+3*k+m)));
                         }
                         
+//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
+                                                
                         if (oppidxj != -1) {
                            hessian.add (new MatrixCell (
                               3*oppidxj+l, 3*mMC.F[f][k]+m, hess.get (9+3*j+l,3*k+m)));
                         }
                         
+//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
+                        
+                        
                         if (oppidxj != -1 && oppidxk != -1) {
                            hessian.add (new MatrixCell (
                               3*oppidxj+l, 3*oppidxk+m, hess.get (9+3*j+l, 9+3*k+m)));
                         }
+                        
+//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
+                        
                      }
+                     
+                     // matches
                      
                      for (int m = 0; m < nedgedofs; m++) {
                         hessian.add (new MatrixCell (
                            3*mMC.F[f][j]+l, 3*nNodes+nedgedofs * mMC.FE[f][k] + m, 
-                           hess.get (3*j*l, 18+nedgedofs*k+m)
+                           hess.get (3*j+l, 18+nedgedofs*k+m)
                         ));
+                        
+//                        if (f == 0 && j == 0 && l == 1) { 
+//                           System.out.println (hessian.get (hessian.size ()-1).val); 
+//                        }                        
                         
                         hessian.add (new MatrixCell (
                            3*nNodes+nedgedofs*mMC.FE[f][k]+m, 3*mMC.F[f][j]+l, 
                            hess.get (18+nedgedofs*k+m, 3*j+l)
                         ));
                         
+//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
+                                                
                         if (oppidxj != -1) {
                            hessian.add (new MatrixCell (
                               3*oppidxj+l,3*nNodes+nedgedofs*mMC.FE[f][k]+m, 
                               hess.get(9+3*j+l, 18+nedgedofs*k+m)
                            ));
                            
+//                           if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
+                                                      
                            hessian.add (new MatrixCell (
                               3*nNodes+nedgedofs*mMC.FE[f][k]+m, 3*oppidxj+l,
                               hess.get(18+nedgedofs*k+m, 9+3*j+l)
                            ));
+                           
+//                           if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }                           
                         }
                      }
+                     
+//                     if (f == 0 && j == 0 && l == 1) {
+//                        int dofs = derivative.size ();
+//                        System.out.println (MatrixCell.BuildMatrixNd (dofs, dofs, hessian).toString ("%.5f"));
+//                        System.out.println ("here");
+//                     }
+//                     
+                     // OK
                   }
+              
+                  // wrong
                   
                   for (int m = 0; m < nedgedofs; m++) {
                      for (int ni = 0; ni < nedgedofs; ni++) {
@@ -340,6 +376,7 @@ public class DiscreteShell extends ThinShellBase {
                      }
                   }
                }
+              
             }
          }
       }
