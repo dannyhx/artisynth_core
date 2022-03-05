@@ -13,6 +13,7 @@ import maspack.matrix.VectorNd;
 public class MidedgeAngleTanFormulation {
    
    /**
+    * Measures the tangent plane at a given face.
     * 
     * Verified.
     * 
@@ -46,18 +47,23 @@ public class MidedgeAngleTanFormulation {
       }
       
       Vector3d II = new Vector3d();
+      
+      // For each edge      
       for (int i = 0; i < 3; i++) {
-         // CHENTODO: Ensure hderiv and hhess ordering is consistent.
          MatrixNd hderiv = new MatrixNd(1, 9);
          MatrixNd hhess = new MatrixNd(9, 9);
-         double altitude = GeometryDerivative.triangleAltitude(MC, model, face, i, hderiv, hhess);
+         double altitude = GeometryDerivative.triangleAltitude(
+            MC, model, face, i, 
+            (derivative != null) ? hderiv : null, 
+            (hessian != null) ? hhess : null);
          
          int gEdgeIdx = MC.FE[face.idx][i];
          MatrixNd thetaderiv = new MatrixNd(1, 12);
          MatrixNd thetahess = new MatrixNd(12, 12);
-         double theta = edgeTheta(MC, model, gEdgeIdx, thetaderiv, thetahess);
+         double theta = edgeTheta(MC, model, gEdgeIdx, 
+            (derivative != null) ? thetaderiv : null, 
+            (hessian != null) ? thetahess : null);
          
-         // DANTODO: Needs review, including edgeThetas.
          double orient = (MC.FEorient[face.idx][i] == 0) ? 1.0 : -1.0;
          double alpha = 0.5 * theta + orient * extraDOFs.get (gEdgeIdx);
          II.set (i, 2.0 * altitude * tan(alpha));
@@ -270,7 +276,6 @@ public class MidedgeAngleTanFormulation {
 //      System.out.println (IIhess[1].toString ("%.2f")); 
 //      System.out.println (IIhess[2].toString ("%.2f")); 
       
-      
       Matrix2d result = new Matrix2d(
          II.x + II.y, II.x,
          II.x,        II.x + II.z
@@ -317,7 +322,7 @@ public class MidedgeAngleTanFormulation {
    /////////////
    
    /**
-    * Measure the bend for a given angle.
+    * Measure the bend at a given edge.
     * 
     * Verified.
     * 

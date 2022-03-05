@@ -23,6 +23,14 @@ import maspack.matrix.VectorNd;
 import maspack.solvers.PardisoSolver;
 
 
+/**
+ * Implementation of Discrete Shells where DoFs are expressed in terms of
+ * nodal positions and surface curvature (e.g. 1st and 2nd fundamental forms).
+ * 
+ * See https://github.com/evouga/libshell
+ * 
+ * DEV: reg is modified.
+ */
 public class DiscreteShell extends ThinShellBase {
    
    protected MonolayerRestState mRestState;
@@ -60,6 +68,13 @@ public class DiscreteShell extends ThinShellBase {
      
      // MidedgeAngleTanForumulation.cpp::initializeExtraDOFs
      mEdgeDOFs = new VectorNd(mMC.EF.length);
+     
+     for (int f = 0; f < mRestState.bbars.size (); f++) { 
+        Face face = mMesh.getFace (f);
+        Matrix2d II = MidedgeAngleTanFormulation.secondFundamentalForm (
+           model, mEdgeDOFs, mMC, face, null, null);
+        mRestState.bbars.set (f, II);
+     }
    }
    
    public void setI(Matrix2d I) {
@@ -83,6 +98,7 @@ public class DiscreteShell extends ThinShellBase {
    @Override
    public void advance() {
       double reg = 1e-6;  // main.cpp
+      reg = 0.025;
       
       // StaticSolve.h::takeOneStep
       
@@ -94,7 +110,8 @@ public class DiscreteShell extends ThinShellBase {
       int freeDOFs = derivative.size ();
       
       SparseMatrixNd H = MatrixCell.BuildSparseMatrixNd(freeDOFs, freeDOFs, hessian);
-      System.out.println (MatrixCell.BuildMatrixNd (freeDOFs, freeDOFs, hessian).toString ("%.5f"));
+//      System.out.println (MatrixCell.BuildMatrixNd (freeDOFs, freeDOFs, hessian).toString ("%.5f"));
+//      System.out.println (derivative.toString ("%.5f"));
       
       VectorNd force = new VectorNd(derivative);
       force.negate ();
@@ -115,7 +132,7 @@ public class DiscreteShell extends ThinShellBase {
          }
          
          // For each column of row.
-         for (SparseMatrixCell cell = row; row != null; row = row.next) {
+         for (SparseMatrixCell cell = row; cell != null; cell = cell.next) {
             maxvals.set (r, max(maxvals.get (r), abs(cell.value)));
          }
       }
@@ -143,6 +160,9 @@ public class DiscreteShell extends ThinShellBase {
       solver.factor ();
       solver.solve(x, rhs);
       solver.dispose ();
+      
+//      System.out.println (maxvals.toString ("%.5f"));
+//      System.out.println (new MatrixNd(D).toString ("%.5f"));
       
       VectorNd descentDir = new VectorNd();
       descentDir.mul (D, x);

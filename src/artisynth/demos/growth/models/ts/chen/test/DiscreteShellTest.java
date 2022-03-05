@@ -30,10 +30,14 @@ public class DiscreteShellTest extends GrowDemo {
       m_shellThickness = 1e-1;
       m_poissonsRatio = 1.0/2.0;
       
-      //
+      // Bending
+      
+      m_shellThickness = 1e-2;
+      II.set(0, 0, 0, 0.5);
+      
+      // Free
       
 //      m_shellThickness = 5e-4;
-//      II.set(1, 0, 1, 0);
    }
    
    protected void build_modelSkeleton() {
@@ -43,9 +47,9 @@ public class DiscreteShellTest extends GrowDemo {
          
          try {
             mMesh[m].read (new File("C:\\Users\\dan\\pj\\libshell\\example\\bunny.obj"));
-            mMesh[m] = MeshFactory.createBox (1, 1, 1);
-//            mMesh[m] = MeshFactory.createPlane (1, 1, 10, 10);
-//            mMesh[0].write (new File("C:\\Users\\dan\\pj\\libshell\\example\\box.obj"));
+//            mMesh[m] = MeshFactory.createBox (1, 1, 1);
+            mMesh[m] = MeshFactory.createPlane (1, 1, 2, 2);
+//            mMesh[0].write (new File("C:\\Users\\dan\\pj\\libshell\\example\\plane.obj"));
             
          }
          catch (IOException e) {
@@ -56,7 +60,7 @@ public class DiscreteShellTest extends GrowDemo {
    }
    
    protected void build_post() {
-      mMechModel.setDynamicsEnabled (false);
+      mMechModel.setDynamicsEnabled (true);
       
 //      ((DiscreteShell)mFemModel[0].myThinShellAux.mTS).setI (Matrix2d.IDENTITY);
       ((DiscreteShell)mFemModel[0].myThinShellAux.getThinShellBase ()).setII (this.II);

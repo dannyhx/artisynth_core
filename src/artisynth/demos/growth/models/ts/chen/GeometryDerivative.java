@@ -143,7 +143,9 @@ public class GeometryDerivative {
       for (int i = 0; i < 3; i++) {
          nhess[i] = new MatrixNd(9, 9);
       }
-      Vector3d n = faceNormal(MC, model, face, edgeIdx, nderiv, nhess);
+      Vector3d n = faceNormal(MC, model, face, edgeIdx, 
+         (derivative != null) ? nderiv : null, 
+         (hessian != null) ? nhess : null);
       
       int v1 = (edgeIdx + 1) % 3;
       int v2 = (edgeIdx + 2) % 3;
