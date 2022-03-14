@@ -4,10 +4,10 @@ import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;
 
 import artisynth.core.femmodels.FemModel3d;
-import artisynth.core.femmodels.ShellElement3d;
 import maspack.geometry.Face;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.MatrixNd;
+import maspack.matrix.Vector2d;
 import maspack.matrix.VectorNd;
 
 public class StVKMaterial extends DiscreteShellMaterial {
@@ -224,14 +224,19 @@ public class StVKMaterial extends DiscreteShellMaterial {
 //      System.out.println (bhess[2].toString ("%.5f"));
 //      System.out.println (bhess[3].toString ("%.5f"));
       
+      // M = a_inv . (b - _b) 
+      // See E_elastic(v) in paper.
+      
       Matrix2d M = new Matrix2d();
       M.sub (b, mrs.bbars.get (f));
       M.mul(abarinv, M);
+      
       double dA = 0.5 * sqrt(mrs.abars.get (f).determinant ());
       
       Matrix2d M2 = new Matrix2d();
       M2.mul (M, M);
       
+      // StVk norm (||M||SV)
       double StVK = 0.5 * this.lameAlpha_ * pow(M.trace (), 2) + 
          this.lameBeta_ * M2.trace();
       double result = coeff * dA * StVK;

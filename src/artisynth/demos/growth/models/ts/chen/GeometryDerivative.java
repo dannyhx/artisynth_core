@@ -107,7 +107,8 @@ public class GeometryDerivative {
    }
    
    /**
-    * Calculate the triangle altitude.
+    * Calculate the triangle altitude, which is the length of the triangle's
+    * normal (not normalized) relative to the given edge's length. 
     * 
     * Verified2.
     * 
@@ -121,8 +122,8 @@ public class GeometryDerivative {
     * @return
     */
    public static double triangleAltitude(
-      MeshConnectivity MC, FemModel3d model, Face face, int edgeIdx, MatrixNd derivative, 
-      MatrixNd hessian) 
+      MeshConnectivity MC, FemModel3d model, Face face, int edgeIdx, 
+      MatrixNd derivative, MatrixNd hessian) 
    {
       if (derivative != null) {
          derivative.setZero ();
@@ -133,10 +134,6 @@ public class GeometryDerivative {
       }
       
       // Face normal.
-      
-//      if (edgeIdx == 2) {
-//         System.out.println ("here");
-//      }
       
       MatrixNd nderiv = new MatrixNd(3, 9);
       MatrixNd[] nhess = new MatrixNd[3];
@@ -175,19 +172,6 @@ public class GeometryDerivative {
          derivative.addScaledSubMatrix (0, 3, nnorm / enorm / enorm / enorm, eT);
       }
       
-//      System.out.println (nderiv.toString ("%.5f"));
-//      System.out.println (nhess[0].toString ("%.5f"));
-//      System.out.println (nhess[1].toString ("%.5f"));
-//      System.out.println (nhess[2].toString ("%.5f"));
-//      System.out.println (n);
-//      System.out.println (v1);
-//      System.out.println (v2);
-//      System.out.println (q1);
-//      System.out.println (q2);
-//      System.out.println (e);
-//      System.out.println (nnorm);
-//      System.out.println (enorm);
-      
       if (hessian != null) {
          for (int i = 0; i < 3; i++) {
             hessian.scaledAdd (n.get (i) / nnorm / enorm, nhess[i]);
@@ -212,8 +196,6 @@ public class GeometryDerivative {
          hessian_operand.mul (nderiv);
          hessian.scaledAdd (1/enorm, hessian_operand);
          
-//         System.out.println (hessian.toString ("%.5f"));
-         
          // Hessian blocks
          
          Matrix3d e_nT = new Matrix3d();
@@ -222,37 +204,23 @@ public class GeometryDerivative {
          MatrixNd block = new MatrixNd(3,9);
          block.mul (e_nT, nderiv);
          hessian.addScaledSubMatrix(6, 0, -1*nnorm/enorm/enorm/enorm, block);
-//         System.out.println (hessian.toString ("%.5f"));
          hessian.addScaledSubMatrix(3, 0, +1/nnorm/enorm/enorm/enorm, block);
-//         System.out.println (hessian.toString ("%.5f"));
          
          Matrix3d n_eT = new Matrix3d();
          n_eT.outerProduct (n, e);   // n.eT is the outer product of n and e.
          MatrixNd nderivT = new MatrixNd(9, 3);
          nderivT.transpose(nderiv);
          block.mul (nderivT, new MatrixNd(n_eT));  // 3.9
-         
-//         System.out.println (n_eT.toString ("%.5f"));
-//         System.out.println (nderivT.toString ("%.5f"));
-//         System.out.println (block.toString ("%.5f"));
-//         nderivT.scale (-1);
-//         block.mul (nderivT, n_eT);  // 3.9
-//         System.out.println (block.toString ("%.5f"));
+
          
          hessian.addScaledSubMatrix(0, 6, -1.0 / nnorm / enorm / enorm / enorm, block);
-//         System.out.println (hessian.toString ("%.5f"));
          hessian.addScaledSubMatrix(0, 3, +1.0 / nnorm / enorm / enorm / enorm, block);
-//         System.out.println (hessian.toString ("%.5f"));
          
          block.set (Matrix3d.IDENTITY);
          hessian.addScaledSubMatrix (6, 6, -1.0 * nnorm / enorm / enorm / enorm, block);
-//         System.out.println (hessian.toString ("%.5f"));
          hessian.addScaledSubMatrix (6, 3, +1.0 * nnorm / enorm / enorm / enorm, block);
          hessian.addScaledSubMatrix (3, 6, +1.0 * nnorm / enorm / enorm / enorm, block);
          hessian.addScaledSubMatrix (3, 3, -1.0 * nnorm / enorm / enorm / enorm, block);
-         
-//         System.out.println (hessian.toString ("%.5f"));
-         
          
          // outer
          
@@ -265,10 +233,6 @@ public class GeometryDerivative {
          hessian.addScaledSubMatrix (6, 3, -1.0, outerNd);
          hessian.addScaledSubMatrix (3, 6, -1.0, outerNd);
          hessian.addScaledSubMatrix (3, 3, 1.0, outerNd);
-         
-//         System.out.println (hessian.toString ("%.5f"));
-//         System.out.println ("here");
-         
       }
       
       return h;

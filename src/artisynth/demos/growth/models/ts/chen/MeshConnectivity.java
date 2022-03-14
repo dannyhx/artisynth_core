@@ -6,6 +6,9 @@ import java.util.Map;
 
 import maspack.geometry.Face;
 import maspack.geometry.PolygonalMesh;
+import maspack.matrix.Matrix2d;
+import maspack.matrix.Vector2d;
+import maspack.matrix.Vector3d;
 
 public class MeshConnectivity {
    
@@ -30,6 +33,9 @@ public class MeshConnectivity {
    /** EOpp[f][0,1] = vertex that's opposite of e */ 
    public int[][] EOpp;
    
+   public final Vector2d d = new Vector2d(0,1);
+   public Matrix2d[] T;
+   
    public MeshConnectivity(PolygonalMesh mesh) {
       this.mesh = mesh;
       this.refresh ();
@@ -39,9 +45,12 @@ public class MeshConnectivity {
       int nfaces = mesh.numFaces ();
       
       F = new int[nfaces][3];
+      T = new Matrix2d[nfaces];
       for (int f = 0; f < nfaces; f++) {
          Face face = mesh.getFace (f);
          F[f] = face.getVertexIndices ();
+         
+         T[f] = new Matrix2d();
       }
       
       // edgeFaces[edgeStr][0,1 halfEdge] = f

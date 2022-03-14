@@ -8,10 +8,17 @@ import java.util.LinkedList;
 import artisynth.core.modelbase.ModelComponentBase;
 import maspack.geometry.Face;
 import maspack.geometry.HalfEdge;
+import maspack.geometry.MeshFactory;
 import maspack.geometry.PolygonalMesh;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.MatrixNd;
+import maspack.matrix.RotationMatrix2d;
 import maspack.matrix.Vector3d;
+
+import static java.lang.Math.cos;
+import static java.lang.Math.sin;
+import static java.lang.Math.tan;
+import static java.lang.Math.PI;
 
 /**
  * Collection of standalone methods regarding mesh connectivity, traversal, and
@@ -836,5 +843,50 @@ public class MeshUtil {
       x = x % ((c+1)*circRes);   // Make point index ciricular 
       return ((circRes/2)*c*(c+1)+x+1);
    }
+
+   /**
+    * Create a plane and bend it into a cylinder. 
+    * 
+    * @param wx
+    * @param wy
+    * @param xdiv
+    * @param ydiv
+    * @return
+    */
+   public static PolygonalMesh createCylinderFromPlane(
+      double wx, double wy, int xdiv, int ydiv, double overlapMultiplier
+   ) {
+      PolygonalMesh mesh = MeshFactory.createPlane (wx, wy, xdiv, ydiv);
+      
+      // Within the plane, the vertices are x-major (i.e. vertices 0,1,2,3... 
+      // move along the first x-axis first.
+      // y-bin index = vtx.idx % (xdiv + 1)
+      
+      // To get all the vertices for a y-bin (Y):
+      //   vtx.idx = Y + (xdiv+1)*n
+      
+      // Group vertices by x coordinate.
+      
+      double dx = wx/xdiv;
+      double interiorAng = ((xdiv-2) * PI) / xdiv * overlapMultiplier;  // Angle between 2 polygon sides. 
+      
+      // Rotation angle.
+      double thetaDiv = 2*PI/xdiv * overlapMultiplier;
+
+      double radius = (dx/2) / cos(interiorAng/2);
+      
+      for (Vertex3d vtx : mesh.getVertices ()) {
+         int v = vtx.getIndex ();
+         
+         int yBin = v % (xdiv+1);
+         double binTheta = yBin* thetaDiv; 
+         
+         vtx.pnt.x = cos(binTheta - PI/2) * radius;
+         vtx.pnt.z = sin(binTheta - PI/2) * radius;
+      }
+      
+      return mesh;
+   }
    
+
 }

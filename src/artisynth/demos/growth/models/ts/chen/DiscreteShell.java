@@ -4,11 +4,15 @@ import static java.lang.Math.abs;
 import static java.lang.Math.max;
 import static java.lang.Math.sqrt;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
-import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.materials.LinearMaterial;
 import artisynth.demos.growth.models.ts.ThinShellBase;
 import maspack.geometry.Face;
@@ -19,8 +23,11 @@ import maspack.matrix.MatrixNd;
 import maspack.matrix.Point3d;
 import maspack.matrix.SparseMatrixCell;
 import maspack.matrix.SparseMatrixNd;
+import maspack.matrix.Vector2d;
+import maspack.matrix.Vector3d;
 import maspack.matrix.VectorNd;
 import maspack.solvers.PardisoSolver;
+import maspack.util.Pair;
 
 
 /**
@@ -58,8 +65,32 @@ public class DiscreteShell extends ThinShellBase {
      // Initial rest geometry of shell.
      mRestState = new MonolayerRestState(mMC, model, thickness);
      
-     // Initialize first fundamental forms of mesh.
-     firstFundamentalForms(mRestState.abars);
+     
+     for (int f = 0; f < this.mModel.numShellElements (); f++) {
+        // Initialize first fundamental form of the face.
+        Matrix2d I = GeometryDerivative.firstFundamentalForm (mMC, mModel, f, null, null);
+        mRestState.abars.set (f, I);
+        
+        // Assuming the model is a 2D plane initially, assume its principle fiber 
+        // direction is mMC.d. To follow, calculate the orthogonal direction of mMC.d
+        // while using the first fundamental form as the basis. Both vectors
+        // are stored in mMC.T.
+
+        Vector2d dI = new Vector2d();
+        dI.set (mMC.d);
+        I.mul (dI);  // Input: d, Output: dI
+        
+        // Assume dO.x is 1 
+        
+        double dOy = dI.x / -dI.y;
+        
+        Vector2d dO = new Vector2d(1, dOy);
+
+        mMC.T[f].setColumns (mMC.d, dO);
+        if (!mMC.T[f].invert ()) {
+           throw new RuntimeException();
+        }
+     }
      
      // Initialize second fundamental forms to rest flat.
      for (int i = 0; i < mRestState.bbars.size (); i++) {
@@ -68,24 +99,39 @@ public class DiscreteShell extends ThinShellBase {
      
      // MidedgeAngleTanForumulation.cpp::initializeExtraDOFs
      mEdgeDOFs = new VectorNd(mMC.EF.length);
-     
-     for (int f = 0; f < mRestState.bbars.size (); f++) { 
-        Face face = mMesh.getFace (f);
-        Matrix2d II = MidedgeAngleTanFormulation.secondFundamentalForm (
-           model, mEdgeDOFs, mMC, face, null, null);
-        mRestState.bbars.set (f, II);
-     }
    }
    
-   public void setI(Matrix2d I) {
-      for (Matrix2d M : mRestState.abars) {
-         M.set (I);
-      }
-   }
-   
-   public void setII(Matrix2d II) {
-      for (Matrix2d M : mRestState.bbars) {
-         M.set (II);
+   /**
+    * Set the rest curvative of all the faces. The principle direction of each
+    * face will be respected.
+    * 
+    * @param M
+    */
+   public void setBarycentricRestII(Matrix2d M) {
+      for (int f = 0; f < mRestState.bbars.size (); f++) { 
+         Matrix2d T = mMC.T[f];
+         
+         Matrix2d Tinv = new Matrix2d(T);
+         if (!Tinv.invert ()) {
+            throw new RuntimeException();
+         }
+         
+         
+         Matrix2d a0_hb0 = new Matrix2d();
+         a0_hb0.set (mRestState.abars.get (f));
+//         a0_hb0.sub (b);  // Assume flat curvature basis.
+         
+         Matrix2d g_pos = new Matrix2d();
+         g_pos.setIdentity ();
+         g_pos.mulTranspose (T);
+         g_pos.mul (M);
+         g_pos.mulTranspose (Tinv); 
+         g_pos.mul (a0_hb0);
+         g_pos.mul (Tinv);
+         g_pos.mul (M);
+         g_pos.mul (T);
+
+         mRestState.bbars.set (f, g_pos);
       }
    }
    
@@ -99,6 +145,8 @@ public class DiscreteShell extends ThinShellBase {
    public void advance() {
       double reg = 1e-6;  // main.cpp
       reg = 0.025;
+//      reg = 1e-3;
+//      reg = 1;
       
       // StaticSolve.h::takeOneStep
       
@@ -110,8 +158,6 @@ public class DiscreteShell extends ThinShellBase {
       int freeDOFs = derivative.size ();
       
       SparseMatrixNd H = MatrixCell.BuildSparseMatrixNd(freeDOFs, freeDOFs, hessian);
-//      System.out.println (MatrixCell.BuildMatrixNd (freeDOFs, freeDOFs, hessian).toString ("%.5f"));
-//      System.out.println (derivative.toString ("%.5f"));
       
       VectorNd force = new VectorNd(derivative);
       force.negate ();
@@ -160,9 +206,6 @@ public class DiscreteShell extends ThinShellBase {
       solver.factor ();
       solver.solve(x, rhs);
       solver.dispose ();
-      
-//      System.out.println (maxvals.toString ("%.5f"));
-//      System.out.println (new MatrixNd(D).toString ("%.5f"));
       
       VectorNd descentDir = new VectorNd();
       descentDir.mul (D, x);
@@ -314,30 +357,20 @@ public class DiscreteShell extends ThinShellBase {
                         hessian.add (new MatrixCell (
                            3*mMC.F[f][j]+l, 3*mMC.F[f][k]+m, hess.get(3*j+l, 3*k+m)));
                         
-//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
-                        
                         if (oppidxk != -1) {
                            hessian.add (new MatrixCell (
                               3*mMC.F[f][j]+l, 3*oppidxk+m, hess.get (3*j+l,9+3*k+m)));
                         }
-                        
-//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
                                                 
                         if (oppidxj != -1) {
                            hessian.add (new MatrixCell (
                               3*oppidxj+l, 3*mMC.F[f][k]+m, hess.get (9+3*j+l,3*k+m)));
                         }
                         
-//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
-                        
-                        
                         if (oppidxj != -1 && oppidxk != -1) {
                            hessian.add (new MatrixCell (
                               3*oppidxj+l, 3*oppidxk+m, hess.get (9+3*j+l, 9+3*k+m)));
                         }
-                        
-//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
-                        
                      }
                      
                      // matches
@@ -348,45 +381,25 @@ public class DiscreteShell extends ThinShellBase {
                            hess.get (3*j+l, 18+nedgedofs*k+m)
                         ));
                         
-//                        if (f == 0 && j == 0 && l == 1) { 
-//                           System.out.println (hessian.get (hessian.size ()-1).val); 
-//                        }                        
-                        
                         hessian.add (new MatrixCell (
                            3*nNodes+nedgedofs*mMC.FE[f][k]+m, 3*mMC.F[f][j]+l, 
                            hess.get (18+nedgedofs*k+m, 3*j+l)
                         ));
                         
-//                        if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
-                                                
                         if (oppidxj != -1) {
                            hessian.add (new MatrixCell (
                               3*oppidxj+l,3*nNodes+nedgedofs*mMC.FE[f][k]+m, 
                               hess.get(9+3*j+l, 18+nedgedofs*k+m)
                            ));
                            
-//                           if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }
-                                                      
                            hessian.add (new MatrixCell (
                               3*nNodes+nedgedofs*mMC.FE[f][k]+m, 3*oppidxj+l,
                               hess.get(18+nedgedofs*k+m, 9+3*j+l)
                            ));
-                           
-//                           if (f == 0 && j == 0 && l == 1) { System.out.println (hessian.get (hessian.size ()-1).val); }                           
                         }
                      }
-                     
-//                     if (f == 0 && j == 0 && l == 1) {
-//                        int dofs = derivative.size ();
-//                        System.out.println (MatrixCell.BuildMatrixNd (dofs, dofs, hessian).toString ("%.5f"));
-//                        System.out.println ("here");
-//                     }
-//                     
-                     // OK
                   }
               
-                  // wrong
-                  
                   for (int m = 0; m < nedgedofs; m++) {
                      for (int ni = 0; ni < nedgedofs; ni++) {
                         hessian.add (new MatrixCell (
@@ -410,13 +423,74 @@ public class DiscreteShell extends ThinShellBase {
       
    }
    
-   ///////////// Helper functions
+   //////////// IO
    
-   protected void firstFundamentalForms(ArrayList<Matrix2d> abars) {
-      for (int f = 0; f < this.mModel.numShellElements (); f++) {
-         Matrix2d I = GeometryDerivative.firstFundamentalForm (mMC, mModel, f, null, null);
-         abars.set (f, I);
+   public void saveState(String fp) {
+      ArrayList<MatrixNd> faceStates = new ArrayList<MatrixNd>();
+      
+      for (int f = 0; f < mMesh.numFaces (); f++) {
+         Matrix2d I = getI (f);
+         Matrix2d II = getII (f);
+         
+         MatrixNd faceState = new MatrixNd(2,4);
+         faceState.setSubMatrix (0, 0, I);
+         faceState.setSubMatrix (0, 2, II);
+         
+         faceStates.add (faceState);
+      }
+      
+      try {
+         ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(fp));
+         oos.writeObject (faceStates); 
+         oos.close ();
+      } catch (IOException ex) {
+         throw new RuntimeException(ex);
       }
    }
    
+   @SuppressWarnings("unchecked")
+   public void loadRestState(String fp) {
+      ArrayList<MatrixNd> faceStates = null;
+      
+      try {
+         ObjectInputStream oos = new ObjectInputStream(new FileInputStream(fp));
+         faceStates = (ArrayList<MatrixNd>) oos.readObject ();
+         oos.close ();
+      } catch (IOException ex) {
+         throw new RuntimeException(ex);
+      } catch (ClassNotFoundException ex) {
+         throw new RuntimeException(ex);
+      }
+      
+      for (int f = 0; f < mMesh.numFaces (); f++) {
+         Matrix2d I = new Matrix2d();
+         Matrix2d II = new Matrix2d();
+         
+         faceStates.get (f).getSubMatrix (0, 0, I);
+         faceStates.get (f).getSubMatrix (0, 2, II);
+         
+         mRestState.abars.get (f).set (I);
+         mRestState.bbars.get (f).set (II);
+      }
+   }
+   
+   //////////// Debug
+   
+   public Matrix2d getI(int f) {
+      return GeometryDerivative.firstFundamentalForm (mMC, mModel, f, null, null);
+   }
+   
+   public Matrix2d getII(int f) {
+      Matrix2d b = MidedgeAngleTanFormulation.secondFundamentalForm (
+         mModel, 
+         mEdgeDOFs,
+         mMC,
+         mMesh.getFace (f),  
+         null, null);
+      return b;
+   }
+
+   public Vector3d getFaceNormal(int f, int edgeIdx) {
+      return GeometryDerivative.faceNormal (mMC, mModel, mMesh.getFace (f), edgeIdx, null, null);
+   }
 }

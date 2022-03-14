@@ -17,6 +17,13 @@ public class MidedgeAngleTanFormulation {
     * 
     * Verified.
     * 
+    * Algorithm:
+    * For each edge e:
+    * 1. Calculate the triangle's altitude (i.e. unnormalized 
+    * normal vector length with respect to edge's length)
+    * 2. Calculate bend angle at edge.
+    * 3. II[e] = 2 * altitude * tan(0.5 * theta) 
+    * 
     * @param f
     * @param derivative 3x21
     * @param hessian[3] 21x21
@@ -67,12 +74,7 @@ public class MidedgeAngleTanFormulation {
          double orient = (MC.FEorient[face.idx][i] == 0) ? 1.0 : -1.0;
          double alpha = 0.5 * theta + orient * extraDOFs.get (gEdgeIdx);
          II.set (i, 2.0 * altitude * tan(alpha));
-         
-//         System.out.println (hderiv.toString ("%.5f"));
-//         System.out.println (hhess.toString ("%.5f"));
-//         System.out.println (thetaderiv.toString ("%.5f"));
-//         System.out.println (thetahess.toString ("%.5f"));
-         
+
          if (derivative != null) {
             int hv0 = i;
             int hv1 = (i + 1) % 3;
@@ -104,10 +106,6 @@ public class MidedgeAngleTanFormulation {
                av2 = 3 + i;
                av3 = i;
             }
-            
-//            if (face.idx == 0 && i == 2) {
-//               System.out.println ("here");
-//            }
             
             thetaderiv.getSubMatrix (0, 0, block);
             derivative.addScaledSubMatrix (i, 3 * av0, altitude / cos(alpha) / cos(alpha), block);
@@ -206,15 +204,8 @@ public class MidedgeAngleTanFormulation {
                    2.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha) * orient, block);
             }
             
-//            System.out.println (hessian[i].toString ("%.5f"));
-            
             // Edge hessian.
             hessian[i].add (18 + i, 18 + i, 4.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha));
-            
-//            if (i == 0) {
-//               System.out.println (hessian[i].toString ("%.5f"));
-//               System.out.println ("here");
-//            }
          }
       }
      
@@ -272,10 +263,6 @@ public class MidedgeAngleTanFormulation {
          model, extraDOFs, MC, face, 
          derivative != null ? IIderiv : null, hessian != null ? IIhess : null);
       
-//      System.out.println (IIhess[0].toString ("%.2f"));
-//      System.out.println (IIhess[1].toString ("%.2f")); 
-//      System.out.println (IIhess[2].toString ("%.2f")); 
-      
       Matrix2d result = new Matrix2d(
          II.x + II.y, II.x,
          II.x,        II.x + II.z
@@ -310,11 +297,6 @@ public class MidedgeAngleTanFormulation {
          hessian[3].add(IIhess[0]);
          hessian[3].add(IIhess[2]);
       }
-      
-//    System.out.println (hessian[0].toString ("%.2f"));
-//    System.out.println (hessian[1].toString ("%.2f"));
-//    System.out.println (hessian[2].toString ("%.2f"));
-//    System.out.println (hessian[3].toString ("%.2f"));
       
       return result;
    }
