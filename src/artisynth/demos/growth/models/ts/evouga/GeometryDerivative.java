@@ -1,4 +1,4 @@
-package artisynth.demos.growth.models.ts.chen;
+package artisynth.demos.growth.models.ts.evouga;
 
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;

@@ -11,15 +11,14 @@ public abstract class ThinShellBase {
    
    protected FemModel3d mModel;
    protected PolygonalMesh mMesh; 
-   public EdgeDataMap mEDM;
    
    public ThinShellBase(FemModel3d model, PolygonalMesh mesh) {
       this.mModel = model;
       this.mMesh = mesh;
-      this.mEDM = new EdgeDataMap(model, mesh);
    }
    
-   public abstract void setMaterialProperties(double youngsModulus, double poissonsRatio, double thickness);
+   public abstract void setMaterialProperties(
+      double youngsModulus, double poissonsRatio, double thickness);
    
    public abstract void addForceAndStiffness();
    

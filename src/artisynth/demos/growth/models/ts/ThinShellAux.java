@@ -2,7 +2,7 @@ package artisynth.demos.growth.models.ts;
 
 import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel3d;
-import artisynth.demos.growth.models.ts.chen.DiscreteShell;
+import artisynth.demos.growth.models.ts.evouga.DiscreteShell;
 import artisynth.demos.growth.models.ts.narain.NarainShell;
 import artisynth.demos.growth.remesh.RemeshOps.OpRv;
 import maspack.geometry.Face;
@@ -19,7 +19,7 @@ public class ThinShellAux {
       if (type == ThinShellType.NARAIN) {
          this.mTS = new NarainShell(model, mesh);
       } 
-      else if (type == ThinShellType.CHEN) {
+      else if (type == ThinShellType.EVOUGA) {
          this.mTS = new DiscreteShell(model, mesh);
       } else {
          throw new UnsupportedOperationException("Unimplemented");

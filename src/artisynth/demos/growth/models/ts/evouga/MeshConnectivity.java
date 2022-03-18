@@ -1,4 +1,4 @@
-package artisynth.demos.growth.models.ts.chen;
+package artisynth.demos.growth.models.ts.evouga;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;

@@ -1,4 +1,4 @@
-package artisynth.demos.growth.models.ts.chen;
+package artisynth.demos.growth.models.ts.evouga;
 
 import static java.lang.Math.cos;
 import static java.lang.Math.tan;

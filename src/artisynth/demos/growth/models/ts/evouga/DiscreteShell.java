@@ -1,4 +1,4 @@
-package artisynth.demos.growth.models.ts.chen;
+package artisynth.demos.growth.models.ts.evouga;
 
 import static java.lang.Math.abs;
 import static java.lang.Math.max;
@@ -27,16 +27,13 @@ import maspack.matrix.Vector2d;
 import maspack.matrix.Vector3d;
 import maspack.matrix.VectorNd;
 import maspack.solvers.PardisoSolver;
-import maspack.util.Pair;
-
 
 /**
  * Implementation of Discrete Shells where DoFs are expressed in terms of
- * nodal positions and surface curvature (e.g. 1st and 2nd fundamental forms).
+ * nodal positions and surface curvature (e.g. 2nd fundamental form).
  * 
  * See https://github.com/evouga/libshell
- * 
- * DEV: reg is modified.
+ * See LICENSE
  */
 public class DiscreteShell extends ThinShellBase {
    
@@ -50,13 +47,15 @@ public class DiscreteShell extends ThinShellBase {
    
    protected MeshConnectivity mMC = null;
    
+   public double mReg = 0.025; //1e-6
+   
    public DiscreteShell(FemModel3d model, PolygonalMesh mesh) {
      super(model, mesh);
      
      double thickness = model.getShellElement (0).getDefaultThickness ();  // 1e-1
      double poissonRatio = ((LinearMaterial)model.getMaterial ()).getPoissonsRatio (); // 1/2
      
-     this.setMaterialProperties (0, poissonRatio, thickness);
+     this.setMaterialProperties (1.0, poissonRatio, thickness);
      
      mMC = new MeshConnectivity(mesh);
      
@@ -101,6 +100,21 @@ public class DiscreteShell extends ThinShellBase {
      mEdgeDOFs = new VectorNd(mMC.EF.length);
    }
    
+   //////////////////////////////////////
+   // Public Setup Operations
+   //////////////////////////////////////
+   
+   @Override
+   public void setMaterialProperties (
+      double youngsModulus, double poissonsRatio, double thickness) {
+      this.mMat = new StVKMaterial(youngsModulus, poissonsRatio);
+   }
+   
+   @Override
+   public void addForceAndStiffness () {
+      // Force and Stiffness are handled in advance(); call that instead.
+   }
+   
    /**
     * Set the rest curvative of all the faces. The principle direction of each
     * face will be respected.
@@ -115,7 +129,6 @@ public class DiscreteShell extends ThinShellBase {
          if (!Tinv.invert ()) {
             throw new RuntimeException();
          }
-         
          
          Matrix2d a0_hb0 = new Matrix2d();
          a0_hb0.set (mRestState.abars.get (f));
@@ -134,20 +147,13 @@ public class DiscreteShell extends ThinShellBase {
          mRestState.bbars.set (f, g_pos);
       }
    }
-   
-   @Override
-   public void setMaterialProperties (
-      double youngsModulus, double poissonsRatio, double thickness) {
-      this.mMat = new StVKMaterial(poissonsRatio);
-   }
+
+   //////////////////////////////////////
+   // Public Advance Operation
+   //////////////////////////////////////
 
    @Override
    public void advance() {
-      double reg = 1e-6;  // main.cpp
-      reg = 0.025;
-//      reg = 1e-3;
-//      reg = 1;
-      
       // StaticSolve.h::takeOneStep
       
       VectorNd derivative = new VectorNd();
@@ -164,7 +170,7 @@ public class DiscreteShell extends ThinShellBase {
       
       SparseMatrixNd sI = new SparseMatrixNd(freeDOFs, freeDOFs);
       sI.setIdentity ();
-      sI.scale (reg);
+      sI.scale (mReg);
      
       H.add (sI);
       
@@ -227,13 +233,16 @@ public class DiscreteShell extends ThinShellBase {
       mEdgeDOFs.add (descentDir_seg);
    }
    
+   //////////////////////////////////////
+   // Internal Operations
+   //////////////////////////////////////
    
    /**
     * ElasticShell.cpp :: elasticEnergy
     * 
     * Verified.
     */
-   public double elasticEnergy (
+   protected double elasticEnergy (
       VectorNd derivative,
       ArrayList<MatrixCell> hessian 
    ) {
@@ -303,9 +312,6 @@ public class DiscreteShell extends ThinShellBase {
          
          VectorNd deriv = new VectorNd(18 + 3 * nedgedofs);
          MatrixNd hess = new MatrixNd(18 + 3 * nedgedofs, 18 + 3 * nedgedofs);
-
-         // C:  f=3, result is 0.001333
-         // J:  f=3, result is 0.00202
          
          result += this.mMat.bendingEnergy (mModel, mEdgeDOFs, mMC, mRestState, face, f, nedgedofs, 
             (derivative != null) ? deriv : null, 
@@ -417,13 +423,9 @@ public class DiscreteShell extends ThinShellBase {
       return result;
    }
 
-   @Override
-   public void addForceAndStiffness () {
-      // TODO Auto-generated method stub
-      
-   }
-   
-   //////////// IO
+   //////////////////////////////////////
+   // IO Operations
+   //////////////////////////////////////
    
    public void saveState(String fp) {
       ArrayList<MatrixNd> faceStates = new ArrayList<MatrixNd>();
@@ -469,12 +471,14 @@ public class DiscreteShell extends ThinShellBase {
          faceStates.get (f).getSubMatrix (0, 0, I);
          faceStates.get (f).getSubMatrix (0, 2, II);
          
-         mRestState.abars.get (f).set (I);
+//         mRestState.abars.get (f).set (I);
          mRestState.bbars.get (f).set (II);
       }
    }
    
-   //////////// Debug
+   //////////////////////////////////////
+   // Debug
+   //////////////////////////////////////
    
    public Matrix2d getI(int f) {
       return GeometryDerivative.firstFundamentalForm (mMC, mModel, f, null, null);

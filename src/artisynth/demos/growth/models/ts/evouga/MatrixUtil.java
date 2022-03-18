@@ -1,4 +1,4 @@
-package artisynth.demos.growth.models.ts.chen;
+package artisynth.demos.growth.models.ts.evouga;
 
 import maspack.matrix.Matrix2d;
 import maspack.matrix.Matrix3d;

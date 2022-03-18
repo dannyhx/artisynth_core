@@ -1,4 +1,4 @@
-package artisynth.demos.growth.models.ts.chen;
+package artisynth.demos.growth.models.ts.evouga;
 
 import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;
@@ -15,11 +15,10 @@ public class StVKMaterial extends DiscreteShellMaterial {
    public double lameAlpha_;
    public double lameBeta_;
    
-   public StVKMaterial(double poissons) {
+   public StVKMaterial(double young, double poissons) {
       // main.cpp::lameParameters
-      double young = 1.0; // "doesn't matter for static solves"
       this.lameAlpha_ = young * poissons / (1.0 - poissons * poissons);
-      this.lameBeta_ = young / 2.0 / (1.0 + poissons);
+      this.lameBeta_ = young / 2.0 / (1.0 + poissons); 
    }
    
    /**

@@ -37,6 +37,14 @@ import maspack.matrix.MatrixNd;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector2d;
 
+/**
+ * Thin-Shell implementation where bending energies are derived from angular 
+ * strain.
+ * 
+ * This is a port of ArcSim 0.3.1.
+ * 
+ * See LICENSE
+ */
 public class NarainShell extends ThinShellBase {
    
    /** Current data-driven material model */
@@ -54,6 +62,9 @@ public class NarainShell extends ThinShellBase {
    
    public static double mBendForceScaling = 1;
    
+   /** Stores edge-specific quantities */
+   public EdgeDataMap mEDM;
+   
    /**
     * Auxiliary helper class to provide thin-shell forces and stiffness to 
     * membranes. 
@@ -62,6 +73,7 @@ public class NarainShell extends ThinShellBase {
     */
    public NarainShell(FemModel3d model, PolygonalMesh mesh) {
       super(model, mesh);
+      this.mEDM = new EdgeDataMap(model, mesh);
       
       if (this.mIsDDE) {
          this.setDDEMaterial ("ribbon");
