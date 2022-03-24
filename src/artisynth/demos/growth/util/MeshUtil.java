@@ -847,6 +847,8 @@ public class MeshUtil {
    /**
     * Create a plane and bend it into a cylinder. 
     * 
+    * The plane's "x-axis" will be curved.
+    * 
     * @param wx
     * @param wy
     * @param xdiv
@@ -888,5 +890,33 @@ public class MeshUtil {
       return mesh;
    }
    
+   /**
+    * Same as createCylinderFromPlane(), but the plane is curved along its
+    * "y-axis".
+    */
+   public static PolygonalMesh createCylinderFromPlane_YAxisCurved(
+      double wx, double wy, int xdiv, int ydiv, double overlapMultiplier
+   ) {
+      PolygonalMesh mesh = MeshFactory.createPlane (wx, wy, xdiv, ydiv);
 
+      double dy = wy/ydiv;
+      double interiorAng = ((ydiv-2) * PI) / ydiv * overlapMultiplier;  // Angle between 2 polygon sides. 
+      
+      // Rotation angle.
+      double thetaDiv = 2*PI/ydiv * overlapMultiplier;
+
+      double radius = (dy/2) / cos(interiorAng/2);
+      
+      for (Vertex3d vtx : mesh.getVertices ()) {
+         int v = vtx.getIndex ();
+         
+         int yBin = v / (ydiv+1); // Integer division
+         double binTheta = yBin * thetaDiv; 
+         
+         vtx.pnt.y = cos(binTheta - PI/2) * radius;
+         vtx.pnt.z = sin(binTheta - PI/2) * radius;
+      }
+      
+      return mesh;
+   }
 }

@@ -9,8 +9,6 @@ import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.femmodels.FemElement3d;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
-import artisynth.core.femmodels.ShellElement3d;
-import artisynth.core.femmodels.WedgeElement;
 import artisynth.core.gui.ControlPanel;
 import artisynth.core.mechmodels.CollisionBehavior;
 import artisynth.core.mechmodels.CollisionBehavior.Method;
@@ -32,6 +30,8 @@ import artisynth.demos.growth.collision.CollisionDetector;
 import artisynth.demos.growth.collision.SweptMeshInfo;
 import artisynth.demos.growth.diffusion.Diffusion;
 import artisynth.demos.growth.diffusion.MeshChemicals;
+import artisynth.demos.growth.models.ts.ThinShellType;
+import artisynth.demos.growth.models.ts.evouga.DiscreteShell;
 import artisynth.demos.growth.util.MathUtil;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.geometry.Face;
@@ -607,8 +607,21 @@ public class GrowDemo extends ShellPatch {
          setStopRequest (true);
       }
       
-      if (t0 > 0.05 && mMinEnergyBeforePausing != 0 && mFemModel[0].getEnergy () < mMinEnergyBeforePausing ) {
-         setStopRequest(true);
+      if (t0 > 0.05 && mMinEnergyBeforePausing != 0) {
+         double energy = 0;
+         
+         if (mEleClass == ElementClass.MEMBRANE && mTsType == ThinShellType.EVOUGA) {
+            DiscreteShell ds = ((DiscreteShell)mFemModel[0].myThinShellAux.getThinShellBase ());
+            energy = ds.getEnergy (t1-t0);
+         } else {
+            energy = mFemModel[0].getEnergy ();
+         }
+      
+         if (energy < mMinEnergyBeforePausing ) {
+            setStopRequest(true);
+         }
+         
+         System.out.printf ("Energy: %.6f\n", energy);
       }
       
       // Setup the collision behavior for each pair of models.

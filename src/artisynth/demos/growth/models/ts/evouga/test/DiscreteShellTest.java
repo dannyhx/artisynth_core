@@ -8,7 +8,11 @@ import artisynth.demos.growth.models.base.GrowDemo;
 import artisynth.demos.growth.models.ts.ThinShellType;
 import artisynth.demos.growth.models.ts.evouga.DiscreteShell;
 import artisynth.demos.growth.util.MeshUtil;
+import maspack.geometry.MeshFactory;
 import maspack.geometry.PolygonalMesh;
+import maspack.matrix.Matrix3x3Block;
+import maspack.matrix.MatrixNdBlock;
+import maspack.matrix.SparseBlockMatrix;
 
 // -model artisynth.demos.growth.models.ts.evouga.test.DiscreteShellTest
 
@@ -47,8 +51,14 @@ public class DiscreteShellTest extends GrowDemo {
          
          try {
             mMesh[m].read (new File("C:\\Users\\dan\\pj\\libshell\\example\\bunny.obj"));
-//            mMesh[m] = MeshFactory.createPlane (1,1,10,10);
-            mMesh[m] = MeshUtil.createCylinderFromPlane(1,1,25,25,1);
+            mMesh[m] = MeshFactory.createPlane (1,1,10,10);
+            mMesh[m] = MeshUtil.createCylinderFromPlane_YAxisCurved(1,1,25,25,5);
+            
+//            RotationMatrix3d R = new RotationMatrix3d();
+//            R.setRotZ (Math.PI / 2);
+//            RigidTransform3d X = new RigidTransform3d ();
+//            X.setRotation (R);
+//            mMesh[m].transform (X);
 //            mMesh[0].write (new File("C:\\Users\\dan\\pj\\libshell\\example\\plane.obj"));
          }
          catch (IOException e) {
@@ -61,10 +71,9 @@ public class DiscreteShellTest extends GrowDemo {
       mMechModel.setDynamicsEnabled (true);
       
       mDS = ((DiscreteShell)mFemModel[0].myThinShellAux.getThinShellBase ());
-      mDS.saveState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder_7.5x.rest");
+      mDS.saveState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
       
-//      mDS.loadRestState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
-      mDS.loadRestState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder_7.5x.rest");
+      mDS.loadRestState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
       
       mDS.mReg = mReg;
    }
@@ -72,5 +81,20 @@ public class DiscreteShellTest extends GrowDemo {
    public void advanceCustom(double t0, double t1, int flags) {
       mFemModel[0].myThinShellAux.advance ();
       super.advanceCustom (t0, t1, flags);
+   }
+   
+   public static void main(String[] args) {
+      Matrix3x3Block block3x3 = new Matrix3x3Block();
+      block3x3.setIdentity ();
+      
+      MatrixNdBlock blockNd = new MatrixNdBlock(6, 6);
+      blockNd.setIdentity ();
+      
+      SparseBlockMatrix M = new SparseBlockMatrix();
+      M.addBlock (0, 0, block3x3);
+      M.addBlock (1, 1, blockNd);
+      
+      System.out.println (M.toString ("%.2f"));
+      
    }
 }

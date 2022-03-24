@@ -18,9 +18,12 @@ import artisynth.demos.growth.util.MeshUtil;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.Point3d;
+import maspack.matrix.RigidTransform3d;
+import maspack.matrix.RotationMatrix3d;
 import maspack.matrix.Vector3d;
 
 // -model artisynth.demos.growth.models.ts.test.DualCurl
+// -playFor 20.00
 
 /**
  * Simulation to make a square patch curl into a cylinder.
@@ -51,7 +54,7 @@ import maspack.matrix.Vector3d;
  */
 public class DualCurl extends Basic_Base {
 
-   protected final double AMPLIFIED_STRESS_MULTIPLIER = 7.5;
+   protected final double AMPLIFIED_STRESS_MULTIPLIER = 5.0; // 7.5
    
    /** Thickness option to simulate */
    protected int t;
@@ -70,23 +73,8 @@ public class DualCurl extends Basic_Base {
    
    /** 
     * Inverse timestep size. 
-    *
-    * meshDiv = 5 AMP -> 0.025
     */
-   protected double mReg = 0.025;  // 0.10  
-   
-   /*
-
-
-
-reg=0.025 youngs=0.5    // fail
-reg=0.025 youngs=0.25
-reg=0.025 youngs=0.10
-reg=0.25
-
--playFor 20.00
-
-    */
+   protected double mReg = 0.20;
 
    protected void build_pre() {
       super.build_pre();
@@ -95,19 +83,19 @@ reg=0.25
       
       t = 3;
       
-//      mEleClass = ElementClass.VOLUMETRIC;
+      mEleClass = ElementClass.VOLUMETRIC;
 //      mEleClass = ElementClass.SHELL;
-      mEleClass = ElementClass.MEMBRANE;
+//      mEleClass = ElementClass.MEMBRANE;
       
 //      this.mTsType = ThinShellType.NARAIN;
       this.mTsType = ThinShellType.EVOUGA;
     
-      int meshDiv = 25;
+      int meshDiv = 50;
       
-//    mMinEnergyBeforePausing = 1e-6;
+    mMinEnergyBeforePausing = 1e-6;
 //    mMinEnergyBeforePausing = -1;
-      mPauseEveryInterval = -1;
-    
+      mPauseEveryInterval = 999;
+      
       // --- Setup --- //
       
       mEnableDiffusion = false;
@@ -143,9 +131,10 @@ reg=0.25
       double angScale = (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1;   // 15 : 1
       double width = (mMeshX/(float)mMeshXDiv);  
       double a = thicknesses[t];
-      double theta = angScale*2*PI / mMeshXDiv;  // /2
-      double o = a * Math.tan (theta);   // absolute units
-      double strain = (o/width);
+      double theta = angScale*2*PI / mMeshXDiv;  // Rotationa angle.
+      double o = a * Math.tan (theta);           // Top-layer stretched length for given side, absolute units.
+      o *= 2;                                    // NEW: 2x to account for both sides.
+      double strain = (o/width);                 // Length relative to unstretched length.
       System.out.printf ("Strain: %.2f \n", strain);
       double[] sidedStrains_vol = new double[] {strain, strain, strain, strain}; 
       double[] sidedStrains_shell = new double[] {strain, strain, strain, strain};
@@ -172,15 +161,10 @@ reg=0.25
       } else if (mEleClass == ElementClass.MEMBRANE && mTsType == ThinShellType.EVOUGA) {
          m_shellThickness = thicknesses_ts[t];  
          m_youngsModulus = youngModuluses_ts[t]; 
-         
-         m_youngsModulus = 1.0;
 //         m_poissonsRatio = 0.5;
 //         m_youngsModulus = 0.5;
 //         m_youngsModulus = 0.25;
 //         m_youngsModulus = 0.1;
-         
-         mReg = 0.25;
-    
       } else if (mEleClass == ElementClass.SHELL) {
          m_shellThickness = thicknesses[t];
          m_youngsModulus = youngModuluses[t];
@@ -226,6 +210,8 @@ reg=0.25
 //         mCameraEye = new Point3d(0.0, 0, 2.1991);
 //         mAxisAlignedRotation = AxisAlignedRotation.NY_X;
       }
+      
+      mPauseEveryInterval = 999;
    }
    
    protected void build_modelSkeleton() {
@@ -242,7 +228,7 @@ reg=0.25
             // Use rest state mesh if doesn't exists.
             if (!Files.exists (getRestStatePath())) {
                mIsBuildingRestState = true;
-               mMesh[0] =  MeshUtil.createCylinderFromPlane(
+               mMesh[0] =  MeshUtil.createCylinderFromPlane_YAxisCurved (
                   mMeshX, mMeshY, mMeshXDiv, mMeshYDiv, (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
             }
          }
@@ -294,7 +280,7 @@ reg=0.25
       mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
       mRendCfg.mNodeRadius = 0.0005;
       
-      mRendCfg.mDirectorLen = 1; 
+      mRendCfg.mDirectorLen = 0; 
       mRendCfg.mFrontMeshColor = Color.LIGHT_GRAY; 
       mRendCfg.mRearMeshColor = Color.GREEN;
       
@@ -304,9 +290,12 @@ reg=0.25
       } else if (mEleClass == ElementClass.SHELL) {
          mRendCfg.mFrontMeshColor = new Color(204, 204, 204); 
          mRendCfg.mRearMeshColor = new Color(0, 102, 153);
-      } else {
+      } else if (this.mTsType == ThinShellType.NARAIN) {
          mRendCfg.mFrontMeshColor = Color.CYAN; 
 //         mRendCfg.mRearMeshColor = Color.CYAN;
+      } else {
+         mRendCfg.mFrontMeshColor = Color.CYAN; 
+         mRendCfg.mRearMeshColor = Color.YELLOW;
       }
    }
    

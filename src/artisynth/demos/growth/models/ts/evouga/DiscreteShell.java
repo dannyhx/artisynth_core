@@ -49,6 +49,9 @@ public class DiscreteShell extends ThinShellBase {
    
    public double mReg = 0.025; //1e-6
    
+   /** Previous node positions. Used to calculate instantaneous velocity. */
+   protected double[] mPrevMeshDOFs; 
+   
    public DiscreteShell(FemModel3d model, PolygonalMesh mesh) {
      super(model, mesh);
      
@@ -63,7 +66,6 @@ public class DiscreteShell extends ThinShellBase {
      
      // Initial rest geometry of shell.
      mRestState = new MonolayerRestState(mMC, model, thickness);
-     
      
      for (int f = 0; f < this.mModel.numShellElements (); f++) {
         // Initialize first fundamental form of the face.
@@ -154,6 +156,8 @@ public class DiscreteShell extends ThinShellBase {
 
    @Override
    public void advance() {
+      syncPrevMeshDOFs ();
+      
       // StaticSolve.h::takeOneStep
       
       VectorNd derivative = new VectorNd();
@@ -230,12 +234,56 @@ public class DiscreteShell extends ThinShellBase {
       // Update edge DoFs.
       VectorNd descentDir_seg = new VectorNd(mEdgeDOFs.size ()); 
       descentDir.getSubVector (3 * mModel.numNodes (), descentDir_seg);
-      mEdgeDOFs.add (descentDir_seg);
+      mEdgeDOFs.add (descentDir_seg);      
+   }
+   
+   //////////////////////////////////////
+   // Public Read Operations
+   //////////////////////////////////////
+   
+   public double getEnergy(double timestep) {
+      for (int n = 0; n < mModel.numNodes (); n++) {
+         FemNode3d node = mModel.getNode (n);
+         
+         Point3d pos = node.getPosition ();
+         Point3d prevPos = new Point3d(
+            mPrevMeshDOFs[n*3 + 0],
+            mPrevMeshDOFs[n*3 + 1], 
+            mPrevMeshDOFs[n*3 + 2]);
+         
+         Vector3d velo = new Vector3d();
+         velo.sub (pos, prevPos);
+         velo.scale (1/timestep);
+         
+         node.setVelocity (velo);
+      }
+      
+      double energy = mModel.getEnergy ();
+      
+      for (FemNode3d node : mModel.getNodes()) {
+         node.getVelocity ().setZero ();
+      }
+      
+      return energy;
    }
    
    //////////////////////////////////////
    // Internal Operations
    //////////////////////////////////////
+   
+   protected void syncPrevMeshDOFs() {
+      if (mPrevMeshDOFs == null) {
+         mPrevMeshDOFs = new double[mModel.numNodes () * 3];
+      }
+      
+      for (int n = 0; n < mModel.numNodes (); n++) {
+         Point3d pos = mModel.getNode (n).getPosition ();
+         
+         mPrevMeshDOFs[n*3 + 0] = pos.x;
+         mPrevMeshDOFs[n*3 + 1] = pos.y;
+         mPrevMeshDOFs[n*3 + 2] = pos.z;
+      }
+   }
    
    /**
     * ElasticShell.cpp :: elasticEnergy
@@ -378,8 +426,6 @@ public class DiscreteShell extends ThinShellBase {
                               3*oppidxj+l, 3*oppidxk+m, hess.get (9+3*j+l, 9+3*k+m)));
                         }
                      }
-                     
-                     // matches
                      
                      for (int m = 0; m < nedgedofs; m++) {
                         hessian.add (new MatrixCell (

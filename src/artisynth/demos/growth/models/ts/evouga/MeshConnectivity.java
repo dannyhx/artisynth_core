@@ -123,14 +123,12 @@ public class MeshConnectivity {
             
             String edgeStr = this.edgeStr (v0, v1);
             FE[f][j] = edgeIndices.get (edgeStr);
-//            System.out.printf ("FE[%d,%d] = %d\n", f, j, FE[f][j]);
          }
       }
       
       for (int e = 0; e < nedges; e++) {
          for (int j = 0; j < 2; j++) {
             EOpp[e][j] = oppositeVertex(e, j);
-//            System.out.printf ("EOpp[%d,%d] = %d\n", e, j, EOpp[e][j]);
          }
       }
       
@@ -142,11 +140,8 @@ public class MeshConnectivity {
             if (EF[edge][0] == f) {
                FEorient[f][j] = 0;
             } else {
-               // 
                FEorient[f][j] = 1;
             }
-            
-//            System.out.printf ("FEorient[%d,%d] = %d\n", f, j, FEorient[f][j]);
          }
       }
       
