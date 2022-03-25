@@ -199,4 +199,10 @@ public class MeshConnectivity {
          Integer.parseInt (tokens[1]),
       };
    }
+   
+   ////////////////////////
+   
+   public int numEdges() {
+      return EV.length;
+   }
 }
