@@ -244,6 +244,16 @@ public class MathUtil {
       }
    }
    
+   public static void mulDiagVecByVec(VectorNd D, VectorNd v, VectorNd rv) {
+      double[] D_ = D.getBuffer ();
+      double[] v_ = v.getBuffer ();
+      double[] rv_ = rv.getBuffer ();
+      
+      for (int i = 0; i < D.size (); i++) {
+         rv_[i] = D_[i] * v_[i];
+      }
+   }
+   
    public static MatrixNd transpose(DenseMatrixBase a) {
       MatrixNd rv = new MatrixNd(a.colSize (), a.rowSize ());
       

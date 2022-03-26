@@ -16,6 +16,7 @@ import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.FemNodeNeighbor;
 import artisynth.core.materials.LinearMaterial;
 import artisynth.demos.growth.models.ts.ThinShellBase;
+import artisynth.demos.growth.util.MathUtil;
 import maspack.geometry.Face;
 import maspack.geometry.PolygonalMesh;
 import maspack.matrix.Matrix;
@@ -60,7 +61,7 @@ public class DiscreteShell extends ThinShellBase {
    protected FemNode3d[] mEdgeDelegates;
    
    protected SparseNumberedBlockMatrix mS;
-   protected double[] mSRowMaxs;
+   protected VectorNd mD;
    
    public DiscreteShell(FemModel3d model, PolygonalMesh mesh) {
      super(model, mesh);
@@ -123,7 +124,8 @@ public class DiscreteShell extends ThinShellBase {
         edgeDelegate.setSolveIndex (mModel.numNodes () + e);
      }
      
-     mSRowMaxs = new double[mModel.numNodes ()];
+     mS = new SparseNumberedBlockMatrix ();
+     mD = new VectorNd(mModel.numNodes ());
    }
    
    //////////////////////////////////////
@@ -180,7 +182,8 @@ public class DiscreteShell extends ThinShellBase {
 
    @Override
    public void advance() {
-      clearStiffness();
+      StiffnessMatrixUtil.clearStiffness(mModel, mEdgeDelegates, mS);
+      mD.setZero ();
       
       syncPrevMeshDOFs ();
       
@@ -194,7 +197,7 @@ public class DiscreteShell extends ThinShellBase {
       int freeDOFs = derivative.size ();
       
 //      SparseMatrixNd H = MatrixCell.BuildSparseMatrixNd(freeDOFs, freeDOFs, hessian);
-      assembleStiffness ();
+      StiffnessMatrixUtil.assembleStiffness(mModel, mEdgeDelegates, mS);
       
       VectorNd force = new VectorNd(derivative);
       force.negate ();
@@ -233,20 +236,22 @@ public class DiscreteShell extends ThinShellBase {
 //      }
 //      
 //      SparseMatrixNd D = MatrixCell.BuildSparseMatrixNd (freeDOFs, freeDOFs, Dcoeffs);
-      double[] SRowMaxs = calcRowMaxs();
+      StiffnessMatrixUtil.getRowMaxs(mModel, mEdgeDelegates, mS, mD);
+      double[] mD_ = mD.getBuffer ();
       for (int i = 0; i < nNodesEdges; i++) {
-         SRowMaxs[i] = (SRowMaxs[i] == 0.0 ? 1.0 : 1.0 / sqrt(SRowMaxs[i]));
+         mD_[i] = (mD_[i] == 0.0 ? 1.0 : 1.0 / sqrt(mD_[i]));
       }
       
 //      SparseMatrixNd DHDT = new SparseMatrixNd(freeDOFs, freeDOFs);
 //      DHDT.set(D);
 //      DHDT.mul (H);
 //      DHDT.mulTranspose (D);
-      mulDiagBySparse (SRowMaxs, mS);
-      mulSparseByDiag (mS, SRowMaxs);
+      StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, true);
+      StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, false);
       
-      VectorNd rhs = new VectorNd();
-      rhs.mul (D, force);
+      VectorNd rhs = new VectorNd(force.size ());
+//      rhs.mul (D, force);
+      MathUtil.mulDiagVecByVec (mD, force, rhs);
       
       VectorNd x = new VectorNd(rhs.size ());
       
@@ -257,8 +262,9 @@ public class DiscreteShell extends ThinShellBase {
       solver.solve(x, rhs);
       solver.dispose ();
       
-      VectorNd descentDir = new VectorNd();
-      descentDir.mul (D, x);
+      VectorNd descentDir = new VectorNd(x.size ());
+//      descentDir.mul (D, x);
+      MathUtil.mulDiagVecByVec (mD, x, descentDir);
 
       // Update node positions.
       Point3d newPos = new Point3d();
@@ -594,175 +600,6 @@ public class DiscreteShell extends ThinShellBase {
       
       return result;
    }
-
-   //////////////////////////////////////
-   // Stiffness
-   //////////////////////////////////////
-   
-   public void clearStiffness() {
-      for (int n = 0; n < mModel.numNodes (); n++) {
-         FemNode3d node = mModel.getNode(n);
-         for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
-            int b = nbr.getBlockNumber ();
-            MatrixBlock B = mS.getBlockByNumber (b);
-            B.setZero ();
-         }
-         for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
-            int b = nbr.getBlockNumber ();
-            MatrixBlock B = mS.getBlockByNumber (b);
-            B.setZero ();
-         }        
-      }
-      
-      for (int e = 0; e < mEdgeDelegates.length; e++) {
-         FemNode3d edgeDelegate = mEdgeDelegates[e];
-         for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
-            int b = nbr.getBlockNumber ();
-            MatrixBlock B = mS.getBlockByNumber (b);
-            B.setZero ();
-         }
-         for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
-            int b = nbr.getBlockNumber ();
-            MatrixBlock B = mS.getBlockByNumber (b);
-            B.setZero ();
-         }        
-      }
-      
-      for (int i = 0; i < mSRowMaxs.length; i++) {
-         mSRowMaxs[i] = 0;
-      }
-   }
-   
-   public void assembleStiffness() {
-      for (int n = 0; n < mModel.numNodes (); n++) {
-         FemNode3d node = mModel.getNode(n);
-         for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
-            nbr.addSolveBlocks (mS, node);
-         }
-         for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
-            nbr.addSolveBlocks (mS, node);
-         }        
-      }
-      
-      for (int e = 0; e < mEdgeDelegates.length; e++) {
-         FemNode3d edgeDelegate = mEdgeDelegates[e];
-         for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
-            nbr.addSolveBlocks (mS, edgeDelegate);
-         }
-         for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
-            nbr.addSolveBlocks (mS, edgeDelegate);
-         }        
-      }
-   }
-   
-   protected void updateRowMaxsByBlock(int ni, int nj, MatrixBlock B) {
-      for (int r = 0; r < 3; r++) {
-         for (int c = 0; c < 3; c++) {
-            double v = B.get (r, c);
-            mSRowMaxs[3*ni + c] = max(mSRowMaxs[3*ni + c], abs(v));
-         }
-      }
-   }
-   
-   public double[] calcRowMaxs() {
-      for (int n = 0; n < mModel.numNodes (); n++) {
-         FemNode3d node = mModel.getNode(n);
-         for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            updateRowMaxsByBlock(n, nb, mS.getBlock (n, nb));
-         }
-         for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            updateRowMaxsByBlock(n, nb, mS.getBlock (n, nb));
-         }        
-      }
-
-      for (int e = 0; e < mEdgeDelegates.length; e++) {
-         FemNode3d edgeDelegate = mEdgeDelegates[e];
-         int ed = edgeDelegate.getSolveIndex();
-         for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            updateRowMaxsByBlock(ed, nb, mS.getBlock (ed, nb));
-         }
-         for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            updateRowMaxsByBlock(ed, nb, mS.getBlock (ed, nb));
-         }        
-      }
-      
-      return mSRowMaxs;
-   }
-   
-   protected void mulDiagByBlock(int ni, int nj, MatrixBlock B, double[] D) {
-      for (int r = 0; r < 3; r++) {
-         for (int c = 0; c < 3; c++) {
-            B.set (r, c, B.get (r, c) * D[3*ni+r]);
-         }
-      }
-   }
-   
-   public void mulDiagBySparse(double[] D, SparseNumberedBlockMatrix S) {
-      for (int n = 0; n < mModel.numNodes (); n++) {
-         FemNode3d node = mModel.getNode(n);
-         for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            mulDiagByBlock(n, nb, mS.getBlock (n, nb), D);
-         }
-         for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            mulDiagByBlock(n, nb, mS.getBlock (n, nb), D);
-         }        
-      }
-
-      for (int e = 0; e < mEdgeDelegates.length; e++) {
-         FemNode3d edgeDelegate = mEdgeDelegates[e];
-         int ed = edgeDelegate.getSolveIndex();
-         for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            mulDiagByBlock(ed, nb, mS.getBlock (ed, nb), D);
-         }
-         for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            mulDiagByBlock(ed, nb, mS.getBlock (ed, nb), D);
-         }        
-      }
-   }
-   
-   protected void mulBlockByDiag(int ni, int nj, MatrixBlock B, double[] D) {
-      for (int r = 0; r < 3; r++) {
-         for (int c = 0; c < 3; c++) {
-            B.set (r, c, B.get (r, c) * D[3*nj+c]);
-         }
-      }
-   }
-   
-   public void mulSparseByDiag(SparseNumberedBlockMatrix S, double[] D) {
-      for (int n = 0; n < mModel.numNodes (); n++) {
-         FemNode3d node = mModel.getNode(n);
-         for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            mulBlockByDiag(n, nb, mS.getBlock (n, nb), D);
-         }
-         for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            mulBlockByDiag(n, nb, mS.getBlock (n, nb), D);
-         }        
-      }
-
-      for (int e = 0; e < mEdgeDelegates.length; e++) {
-         FemNode3d edgeDelegate = mEdgeDelegates[e];
-         int ed = edgeDelegate.getSolveIndex();
-         for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            mulBlockByDiag(ed, nb, mS.getBlock (ed, nb), D);
-         }
-         for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            mulBlockByDiag(ed, nb, mS.getBlock (ed, nb), D);
-         }        
-      }
-   }
-   
    
    //////////////////////////////////////
    // IO Operations
