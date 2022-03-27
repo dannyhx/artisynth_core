@@ -244,13 +244,21 @@ public class MathUtil {
       }
    }
    
+   /**
+    * Multiple a diagonal matrix by a vector.
+    * 
+    * @param D
+    * Diagonal matrix, given as a diagonal vector..
+    * @param v
+    * @param rv
+    */
    public static void mulDiagVecByVec(VectorNd D, VectorNd v, VectorNd rv) {
       double[] D_ = D.getBuffer ();
       double[] v_ = v.getBuffer ();
       double[] rv_ = rv.getBuffer ();
       
-      for (int i = 0; i < D.size (); i++) {
-         rv_[i] = D_[i] * v_[i];
+      for (int r = 0; r < D.size (); r++) {
+         rv_[r] = D_[r] * v_[r];
       }
    }
    

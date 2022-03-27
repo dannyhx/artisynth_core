@@ -3,6 +3,7 @@ package artisynth.demos.growth.models.ts.evouga;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.FemNodeNeighbor;
+import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixBlock;
 import maspack.matrix.SparseNumberedBlockMatrix;
 import maspack.matrix.VectorNd;
@@ -12,6 +13,13 @@ import static java.lang.Math.max;
 
 public class StiffnessMatrixUtil {
    
+   /**
+    * Zero-out the blocks of the given sparse matrix.
+    * 
+    * @param model
+    * @param edgeDelegates
+    * @param S
+    */
    public static void clearStiffness(
       FemModel3d model, FemNode3d[] edgeDelegates, SparseNumberedBlockMatrix S
    ) {
@@ -44,7 +52,14 @@ public class StiffnessMatrixUtil {
       }
    }
    
-   public static void assembleStiffness(
+   /**
+    * Populate the given sparse matrix with the FemNodeNeighbor blocks.
+    * 
+    * @param model
+    * @param edgeDelegates
+    * @param S
+    */
+   public static void initBlocksInSparseMatrix(
       FemModel3d model, FemNode3d[] edgeDelegates, SparseNumberedBlockMatrix S   
    ) {
       for (int n = 0; n < model.numNodes (); n++) {
@@ -79,12 +94,19 @@ public class StiffnessMatrixUtil {
       
       for (int r = 0; r < 3; r++) {
          for (int c = 0; c < 3; c++) {
-            double v = B.get (r, c);
-            maxs_[3*bi + c] = max(maxs_[3*bi + c], abs(v));
+            maxs_[3*bi + r] = max(maxs_[3*bi + r], abs(B.get (r, c)));
          }
       }
    }
    
+   /**
+    * Populate the given vector with the max of each row in sparse matrix S.
+    * 
+    * @param model
+    * @param edgeDelegates
+    * @param S
+    * @param rvMaxs
+    */
    public static void getRowMaxs(
       FemModel3d model, FemNode3d[] edgeDelegates, SparseNumberedBlockMatrix S, 
       VectorNd rvMaxs
@@ -119,6 +141,16 @@ public class StiffnessMatrixUtil {
    // Diagonal Multiplication
    //////////////////////////////////////
    
+   /**
+    * Helper function for mulDiagBySparse. A block from the sparse matrix is
+    * multiplied by its respective sub-vector of the diagonal vector.
+    * 
+    * @param bi
+    * @param bj
+    * @param B
+    * @param D
+    * @param isDiagLeftSide
+    */
    protected static void _mulDiagByBlock(
       int bi, int bj, MatrixBlock B, double[] D, boolean isDiagLeftSide
    ) {
@@ -133,6 +165,17 @@ public class StiffnessMatrixUtil {
       }
    }
    
+   /**
+    * Multiple a diagonal matrix with a sparse matrix.
+    * 
+    * @param D
+    * Diagonal matrix, given as a diagonal vector.
+    * @param model
+    * @param edgeDelegates
+    * @param S
+    * @param isDiagLeftSide
+    * D*S is perform if true, otherwise S*D.
+    */
    public static void mulDiagBySparse(
       VectorNd D, FemModel3d model, FemNode3d[] edgeDelegates, 
       SparseNumberedBlockMatrix S, boolean isDiagLeftSide
@@ -163,5 +206,17 @@ public class StiffnessMatrixUtil {
             _mulDiagByBlock(ed, nb, S.getBlock (ed, nb), D_, isDiagLeftSide);
          }        
       }
+   }
+   
+   //////////////////////////////////////
+   // Convenience methods
+   //////////////////////////////////////
+   
+   public static Matrix3d getIndirectNeighborK00(FemNode3d nodeA, FemNode3d nodeB) {
+      FemNodeNeighbor neigh = nodeA.getIndirectNeighbor (nodeB);
+      if (neigh == null) {
+         neigh = nodeA.addIndirectNeighbor (nodeB);
+      }
+      return neigh.getK00 ();
    }
 }
