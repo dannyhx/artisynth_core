@@ -1,10 +1,11 @@
 package artisynth.demos.growth.models.ts.evouga;
 
+import maspack.matrix.Matrix1x3;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.Matrix3d;
+import maspack.matrix.Matrix3x1;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Vector3d;
-import maspack.matrix.Vector4d;
 import maspack.matrix.VectorNd;
 
 public class MatrixUtil {
@@ -86,5 +87,41 @@ public class MatrixUtil {
          v.z,    0, -v.x, 
         -v.y,  v.x,  0});
       return M; 
+   }
+   
+   public static void addColToMtx3d(Matrix3d M, int c, Matrix3x1 v) {
+      if (c == 0) {
+         M.m00 += v.m00; 
+         M.m10 += v.m10;
+         M.m20 += v.m20;
+      } else if (c == 1) {
+         M.m01 += v.m00; 
+         M.m11 += v.m10;
+         M.m21 += v.m20;
+      } else if (c == 2) {
+         M.m02 += v.m00; 
+         M.m12 += v.m10;
+         M.m22 += v.m20;
+      } else {
+         throw new RuntimeException("Out of bound offset.");
+      }
+   }
+   
+   public static void addRowToMtx3d(Matrix3d M, int r, Matrix1x3 v) {
+      if (r == 0) {
+         M.m00 += v.m00; 
+         M.m01 += v.m01;
+         M.m02 += v.m02;
+      } else if (r == 1) {
+         M.m10 += v.m00; 
+         M.m11 += v.m01;
+         M.m12 += v.m02;
+      } else if (r == 2) {
+         M.m20 += v.m00; 
+         M.m21 += v.m01;
+         M.m22 += v.m02;
+      } else {
+         throw new RuntimeException("Out of bound offset.");
+      }
    }
 }

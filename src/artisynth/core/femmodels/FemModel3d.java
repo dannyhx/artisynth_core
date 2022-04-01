@@ -4236,7 +4236,7 @@ PointAttachable, ConnectableBody {
       return num;
    }
 
-   private boolean setNodalIncompBlocksAllocated(boolean allocated) {
+   protected boolean setNodalIncompBlocksAllocated(boolean allocated) {
       if (myNodalIncompBlocksAllocatedP != allocated) {
          for (FemNode3d n : myNodes) {
             if (allocated) {

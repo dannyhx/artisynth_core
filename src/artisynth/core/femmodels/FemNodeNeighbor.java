@@ -121,6 +121,11 @@ public class FemNodeNeighbor {
 //   }
 //   
 
+   public FemNodeNeighbor () {
+      myNode = null;
+      myK00 = null;
+   }
+   
    public FemNodeNeighbor (FemNode3d node) {
       myNode = node;
       myK00 = new Matrix3d();
@@ -134,7 +139,7 @@ public class FemNodeNeighbor {
       return myBlkNum;
    }
 
-   private int getOrCreateBlock (SparseNumberedBlockMatrix S, int bi, int bj) {
+   protected int getOrCreateBlock (SparseNumberedBlockMatrix S, int bi, int bj) {
       Matrix3x3Block blk = (Matrix3x3Block)S.getBlock(bi, bj);
       if (blk == null) {
          blk = new Matrix3x3Block();

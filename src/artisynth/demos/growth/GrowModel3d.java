@@ -4,16 +4,16 @@ import artisynth.core.femmodels.FemDeformedPoint;
 import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
+import artisynth.core.femmodels.FemNodeNeighbor;
 import artisynth.core.femmodels.IntegrationPoint3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.WedgeElement;
-import artisynth.demos.growth.models.ts.EdgeDataMap;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
+import maspack.matrix.SparseNumberedBlockMatrix;
 import maspack.render.Renderer;
 import maspack.render.Renderer.DrawMode;
-import maspack.util.DataBuffer;
 
 /** 
  * Extension of FemModel3d to account for growth. 
@@ -192,5 +192,77 @@ public class GrowModel3d extends FemModel3d {
    
    protected FemDeformedPoint createFemDeformedPoint() {
       return new GrowDeformedPoint();
+   }
+   
+   // Discrete Shell. Ignore edge delegate nodes.
+   
+   public void addSolveBlocks(SparseNumberedBlockMatrix S) {
+      setNodalIncompBlocksAllocated(getSoftIncompMethod() == IncompMethod.NODAL);
+
+      for (int i = 0; i < myNodes.size(); i++) {
+         FemNode3d node = myNodes.get(i);
+         for (FemNodeNeighbor nbr : getNodeNeighbors(node)) {
+            nbr.addSolveBlocks (S, node);
+         }
+         // used for soft nodal-based incompressibilty:
+         for (FemNodeNeighbor nbr : getIndirectNeighbors(node)) {
+            if (nbr.getNode ().getName () == "EdgeDelegate") {
+               continue;
+            }
+            nbr.addSolveBlocks (S, node);
+         }        
+      }
+      // System.out.println ("sparsity=\n" + S.getBlockPattern());
+   }
+   
+   public void addVelJacobian(
+      SparseNumberedBlockMatrix M, double s) {
+
+      if (!myStressesValidP || !myStiffnessesValidP) {
+         updateStressAndStiffness();
+      }
+      double sm = -s*myMassDamping;
+      double sk = -s*myStiffnessDamping;
+      for (int i = 0; i < myNodes.size(); i++) {
+         FemNode3d node = myNodes.get(i);
+         if (node.getLocalSolveIndex() != -1) {
+            for (FemNodeNeighbor nbr : getNodeNeighbors(node)) {
+               //addNeighborVelJacobian(M, node, nbr, s);
+               nbr.addVelJacobian (M, node, sm, sk, myUseConsistentMass);
+            }
+            // used for soft nodal-based incompressibilty:
+            for (FemNodeNeighbor nbr : getIndirectNeighbors(node)) {
+               //addNeighborVelJacobian(M, node, nbr, s);
+               if (nbr.getNode ().getName () == "EdgeDelegate") {
+                  continue;
+               }
+               nbr.addVelJacobian (M, node, sm, sk, false);
+            }
+         }
+      }
+   }
+
+   public void addPosJacobian(
+      SparseNumberedBlockMatrix M, double s) {
+
+      if (!myStressesValidP || !myStiffnessesValidP) {
+         updateStressAndStiffness();
+      }
+      for (int i = 0; i < myNodes.size(); i++) {
+         FemNode3d node = myNodes.get(i);
+         if (node.getLocalSolveIndex() != -1) {
+            for (FemNodeNeighbor nbr : getNodeNeighbors(node)) {
+               nbr.addPosJacobian (M, node, -s);
+            }
+            // used for soft nodal-based incompressibilty:
+            for (FemNodeNeighbor nbr : getIndirectNeighbors(node)) {
+               if (nbr.getNode ().getName () == "EdgeDelegate") {
+                  continue;
+               }
+               nbr.addPosJacobian (M, node, -s);
+            }
+         }
+      }
+      // System.out.println ("symmetric=" + mySolveMatrix.isSymmetric(1e-6));
    }
 }

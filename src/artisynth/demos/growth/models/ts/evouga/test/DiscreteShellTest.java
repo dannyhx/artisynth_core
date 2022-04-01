@@ -68,7 +68,7 @@ public class DiscreteShellTest extends GrowDemo {
    }
    
    protected void build_post() {
-      mMechModel.setDynamicsEnabled (true);
+      mMechModel.setDynamicsEnabled (false);
       
       mDS = ((DiscreteShell)mFemModel[0].myThinShellAux.getThinShellBase ());
       mDS.saveState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
