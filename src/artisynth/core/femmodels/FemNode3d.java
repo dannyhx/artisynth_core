@@ -103,7 +103,7 @@ public class FemNode3d extends FemNode implements Boundable {
    protected LinkedList<FemElement3dBase> myElementDeps;
    protected int myShellElemCnt;
    protected LinkedList<FemNodeNeighbor> myNodeNeighbors;
-   private LinkedList<FemNodeNeighbor> myIndirectNeighbors;
+   protected LinkedList<FemNodeNeighbor> myIndirectNeighbors;
    int myIndex = -1;
    private int myIncompressIdx = -1;
    //private int myLocalIncompressIdx = -1;

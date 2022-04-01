@@ -35,13 +35,14 @@ public class DiscreteShellTest extends GrowDemo {
       mEleClass = ElementClass.MEMBRANE;
       mTsType = ThinShellType.EVOUGA;
       
-      m_shellThickness = 1e-1;
-      m_poissonsRatio = 1.0/2.0;
+      m_shellThickness = 5e-2;
+      m_youngsModulus = 1.0;
       
       // Free
       
-      m_shellThickness = 5e-2;
-      m_youngsModulus = 1.0;
+      m_shellThickness = 1e-2;
+      m_youngsModulus = 1e1;
+      mReg = 0.25;
    }
    
    protected void build_modelSkeleton() {
@@ -51,8 +52,8 @@ public class DiscreteShellTest extends GrowDemo {
          
          try {
             mMesh[m].read (new File("C:\\Users\\dan\\pj\\libshell\\example\\bunny.obj"));
-            mMesh[m] = MeshFactory.createPlane (1,1,10,10);
-            mMesh[m] = MeshUtil.createCylinderFromPlane_YAxisCurved(1,1,25,25,5);
+            mMesh[m] = MeshFactory.createPlane (1,1,25,25);
+//            mMesh[m] = MeshUtil.createCylinderFromPlane_YAxisCurved(1,1,25,25,5);
             
 //            RotationMatrix3d R = new RotationMatrix3d();
 //            R.setRotZ (Math.PI / 2);
@@ -71,7 +72,7 @@ public class DiscreteShellTest extends GrowDemo {
       mMechModel.setDynamicsEnabled (false);
       
       mDS = ((DiscreteShell)mFemModel[0].myThinShellAux.getThinShellBase ());
-      mDS.saveState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
+//      mDS.saveState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
       
       mDS.loadRestState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
       

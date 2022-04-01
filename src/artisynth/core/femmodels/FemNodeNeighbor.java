@@ -121,11 +121,6 @@ public class FemNodeNeighbor {
 //   }
 //   
 
-   public FemNodeNeighbor () {
-      myNode = null;
-      myK00 = null;
-   }
-   
    public FemNodeNeighbor (FemNode3d node) {
       myNode = node;
       myK00 = new Matrix3d();

@@ -8,6 +8,7 @@ import artisynth.core.femmodels.FemNodeNeighbor;
 import artisynth.core.femmodels.IntegrationPoint3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.WedgeElement;
+import artisynth.demos.growth.models.ts.evouga.StiffnessMatrixUtil;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
@@ -206,7 +207,7 @@ public class GrowModel3d extends FemModel3d {
          }
          // used for soft nodal-based incompressibilty:
          for (FemNodeNeighbor nbr : getIndirectNeighbors(node)) {
-            if (nbr.getNode ().getName () == "EdgeDelegate") {
+            if (nbr.getNode ().checkFlag (StiffnessMatrixUtil.EDGE_DELEGATE_FLAG)) {
                continue;
             }
             nbr.addSolveBlocks (S, node);
@@ -233,7 +234,7 @@ public class GrowModel3d extends FemModel3d {
             // used for soft nodal-based incompressibilty:
             for (FemNodeNeighbor nbr : getIndirectNeighbors(node)) {
                //addNeighborVelJacobian(M, node, nbr, s);
-               if (nbr.getNode ().getName () == "EdgeDelegate") {
+               if (nbr.getNode ().checkFlag (StiffnessMatrixUtil.EDGE_DELEGATE_FLAG)) {
                   continue;
                }
                nbr.addVelJacobian (M, node, sm, sk, false);
@@ -256,7 +257,7 @@ public class GrowModel3d extends FemModel3d {
             }
             // used for soft nodal-based incompressibilty:
             for (FemNodeNeighbor nbr : getIndirectNeighbors(node)) {
-               if (nbr.getNode ().getName () == "EdgeDelegate") {
+               if (nbr.getNode ().checkFlag (StiffnessMatrixUtil.EDGE_DELEGATE_FLAG)) {
                   continue;
                }
                nbr.addPosJacobian (M, node, -s);

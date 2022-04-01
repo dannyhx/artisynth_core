@@ -306,6 +306,10 @@ public class DualCurl extends Basic_Base {
       mMorphogen2GrowthTensor.zeroStrainAtBottom = true;
       
       System.out.printf ("Element count: %d\n", this.mFemModel[0].numAllElements ());
+      
+      if (mEleClass == ElementClass.MEMBRANE && mTsType == ThinShellType.EVOUGA) {
+         mMechModel.setDynamicsEnabled (false);      
+      }
    }
    
    public boolean isMorphogenSrcNode(int v) {

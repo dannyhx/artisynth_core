@@ -17,7 +17,7 @@ public class FemEdgeNeighbor extends FemNodeNeighbor {
    protected MatrixBase myKE;
    
    public FemEdgeNeighbor (FemNode3d node, FemEdgeNeighborType type) {
-      super();
+      super(node);
       myType = type;
       myKE = createKE();
    }

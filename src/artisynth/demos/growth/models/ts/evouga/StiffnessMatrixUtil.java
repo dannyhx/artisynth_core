@@ -1,17 +1,21 @@
 package artisynth.demos.growth.models.ts.evouga;
 
+import static java.lang.Math.abs;
+import static java.lang.Math.max;
+
 import artisynth.core.femmodels.FemModel3d;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.FemNodeNeighbor;
-import maspack.matrix.Matrix3d;
+import artisynth.demos.growth.GrowNode3d;
+import maspack.matrix.Matrix3x3Block;
+import maspack.matrix.MatrixBase;
 import maspack.matrix.MatrixBlock;
 import maspack.matrix.SparseNumberedBlockMatrix;
 import maspack.matrix.VectorNd;
 
-import static java.lang.Math.abs;
-import static java.lang.Math.max;
-
 public class StiffnessMatrixUtil {
+   
+   public final static int EDGE_DELEGATE_FLAG = 256;
    
    /**
     * Zero-out the blocks of the given sparse matrix.
@@ -52,49 +56,49 @@ public class StiffnessMatrixUtil {
       }
    }
    
-   /**
-    * Populate the given sparse matrix with the FemNodeNeighbor blocks.
-    * 
-    * @param model
-    * @param edgeDelegates
-    * @param S
-    */
-   public static void initBlocksInSparseMatrix(
-      FemModel3d model, FemNode3d[] edgeDelegates, SparseNumberedBlockMatrix S   
-   ) {
-      for (int n = 0; n < model.numNodes (); n++) {
-         FemNode3d node = model.getNode(n);
-         for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
-            nbr.addSolveBlocks (S, node);
-         }
-         for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
-            nbr.addSolveBlocks (S, node);
-         }        
-      }
-      
-      for (int e = 0; e < edgeDelegates.length; e++) {
-         FemNode3d edgeDelegate = edgeDelegates[e];
-         for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
-            nbr.addSolveBlocks (S, edgeDelegate);
-         }
-         for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
-            nbr.addSolveBlocks (S, edgeDelegate);
-         }        
-      }
-   }
+//   /**
+//    * Populate the given sparse matrix with the FemNodeNeighbor blocks.
+//    * 
+//    * @param model
+//    * @param edgeDelegates
+//    * @param S
+//    */
+//   public static void initBlocksInSparseMatrix(
+//      FemModel3d model, FemNode3d[] edgeDelegates, SparseNumberedBlockMatrix S   
+//   ) {
+//      for (int n = 0; n < model.numNodes (); n++) {
+//         FemNode3d node = model.getNode(n);
+//         for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
+//            nbr.addSolveBlocks (S, node);
+//         }
+//         for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
+//            nbr.addSolveBlocks (S, node);
+//         }        
+//      }
+//      
+//      for (int e = 0; e < edgeDelegates.length; e++) {
+//         FemNode3d edgeDelegate = edgeDelegates[e];
+//         for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
+//            nbr.addSolveBlocks (S, edgeDelegate);
+//         }
+//         for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
+//            nbr.addSolveBlocks (S, edgeDelegate);
+//         }        
+//      }
+//   }
    
    //////////////////////////////////////
    // Row Max
    //////////////////////////////////////
    
    protected static void _updateRowMaxsByBlock(
-      VectorNd maxs, int bi, int bj, MatrixBlock B
+      VectorNd maxs, int rowOffset, int colOffset, MatrixBlock B
    ) {
       double[] maxs_ = maxs.getBuffer ();
       
-      for (int r = 0; r < 3; r++) {
-         for (int c = 0; c < 3; c++) {
-            maxs_[3*bi + r] = max(maxs_[3*bi + r], abs(B.get (r, c)));
+      for (int r = 0; r < B.rowSize (); r++) {
+         for (int c = 0; c < B.colSize (); c++) {
+            maxs_[rowOffset + r] = max(maxs_[rowOffset + r], abs(B.get (r, c)));
          }
       }
    }
@@ -115,11 +119,11 @@ public class StiffnessMatrixUtil {
          FemNode3d node = model.getNode(n);
          for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _updateRowMaxsByBlock(rvMaxs, n, nb, S.getBlock (n, nb));
+            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (n), S.getBlockColOffset (nb), S.getBlock (n, nb));
          }
          for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _updateRowMaxsByBlock(rvMaxs, n, nb, S.getBlock (n, nb));
+            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (n), S.getBlockColOffset (nb), S.getBlock (n, nb));
          }        
       }
 
@@ -128,11 +132,11 @@ public class StiffnessMatrixUtil {
          int ed = edgeDelegate.getSolveIndex();
          for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _updateRowMaxsByBlock(rvMaxs, ed, nb, S.getBlock (ed, nb));
+            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (ed), S.getBlockColOffset (nb), S.getBlock (ed, nb));
          }
          for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _updateRowMaxsByBlock(rvMaxs, ed, nb, S.getBlock (ed, nb));
+            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (ed), S.getBlockColOffset (nb), S.getBlock (ed, nb));
          }        
       }
    }
@@ -152,14 +156,14 @@ public class StiffnessMatrixUtil {
     * @param isDiagLeftSide
     */
    protected static void _mulDiagByBlock(
-      int bi, int bj, MatrixBlock B, double[] D, boolean isDiagLeftSide
+      int rowOffset, int colOffset, MatrixBlock B, double[] D, boolean isDiagLeftSide
    ) {
-      for (int r = 0; r < 3; r++) {
-         for (int c = 0; c < 3; c++) {
+      for (int r = 0; r < B.rowSize (); r++) {
+         for (int c = 0; c < B.colSize (); c++) {
             if (isDiagLeftSide) {
-               B.set (r, c, B.get (r, c) * D[3*bi+r]);
+               B.set (r, c, B.get (r, c) * D[rowOffset+r]);
             } else {
-               B.set (r, c, B.get (r, c) * D[3*bj+c]);
+               B.set (r, c, B.get (r, c) * D[colOffset+c]);
             }
          }
       }
@@ -186,11 +190,11 @@ public class StiffnessMatrixUtil {
          FemNode3d node = model.getNode(n);
          for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _mulDiagByBlock(n, nb, S.getBlock (n, nb), D_, isDiagLeftSide);
+            _mulDiagByBlock(S.getBlockRowOffset (n), S.getBlockColOffset (nb), S.getBlock (n, nb), D_, isDiagLeftSide);
          }
          for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _mulDiagByBlock(n, nb, S.getBlock (n, nb), D_, isDiagLeftSide);
+            _mulDiagByBlock(S.getBlockRowOffset (n), S.getBlockColOffset (nb), S.getBlock (n, nb), D_, isDiagLeftSide);
          }        
       }
 
@@ -199,11 +203,11 @@ public class StiffnessMatrixUtil {
          int ed = edgeDelegate.getSolveIndex();
          for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _mulDiagByBlock(ed, nb, S.getBlock (ed, nb), D_, isDiagLeftSide);
+            _mulDiagByBlock(S.getBlockRowOffset (ed), S.getBlockColOffset (nb), S.getBlock (ed, nb), D_, isDiagLeftSide);
          }
          for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _mulDiagByBlock(ed, nb, S.getBlock (ed, nb), D_, isDiagLeftSide);
+            _mulDiagByBlock(S.getBlockRowOffset (ed), S.getBlockColOffset (nb), S.getBlock (ed, nb), D_, isDiagLeftSide);
          }        
       }
    }
@@ -212,11 +216,31 @@ public class StiffnessMatrixUtil {
    // Convenience methods
    //////////////////////////////////////
    
-   public static Matrix3d getIndirectNeighborK00(FemNode3d nodeA, FemNode3d nodeB) {
+   public static Matrix3x3Block getDirectNeighborBlock(FemNode3d nodeA, FemNode3d nodeB, SparseNumberedBlockMatrix S) {
+      FemNodeNeighbor neigh = nodeA.getNodeNeighbor (nodeB);
+      int blockNum = neigh.getBlockNumber ();
+      
+      if (S.getBlockByNumber(blockNum) == null) {
+         neigh.addSolveBlocks (S, nodeA);
+      }
+      return (Matrix3x3Block) S.getBlockByNumber (blockNum);
+   }
+   
+   public static Matrix3x3Block getIndirectNeighborBlock(FemNode3d nodeA, FemNode3d nodeB, SparseNumberedBlockMatrix S) {
       FemNodeNeighbor neigh = nodeA.getIndirectNeighbor (nodeB);
       if (neigh == null) {
          neigh = nodeA.addIndirectNeighbor (nodeB);
+         neigh.addSolveBlocks (S, nodeA);
       }
-      return neigh.getK00 ();
+      return (Matrix3x3Block) S.getBlockByNumber (neigh.getBlockNumber ());
+   }
+   
+   public static MatrixBlock getIndirectEdgeNeighborBlock(FemNode3d nodeA, FemNode3d nodeB, FemEdgeNeighborType neighType, SparseNumberedBlockMatrix S) {
+      FemNodeNeighbor neigh = nodeA.getIndirectNeighbor (nodeB);
+      if (neigh == null) {
+         neigh = ((GrowNode3d)nodeA).addIndirectEdgeNeighbor (nodeB, neighType);
+         neigh.addSolveBlocks (S, nodeA);
+      }
+      return S.getBlockByNumber (neigh.getBlockNumber ());
    }
 }

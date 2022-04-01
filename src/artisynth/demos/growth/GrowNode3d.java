@@ -1,11 +1,15 @@
 package artisynth.demos.growth;
 
+import java.util.LinkedList;
+
 import artisynth.core.femmodels.BackNode3d;
 import artisynth.core.femmodels.FemElement;
-import artisynth.core.femmodels.FemElement.ElementClass;
 import artisynth.core.femmodels.FemNode3d;
+import artisynth.core.femmodels.FemNodeNeighbor;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.ShellTriElement;
+import artisynth.demos.growth.models.ts.evouga.FemEdgeNeighbor;
+import artisynth.demos.growth.models.ts.evouga.FemEdgeNeighborType;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
 import maspack.matrix.VectorNd;
@@ -171,4 +175,16 @@ public class GrowNode3d extends FemNode3d {
       
       return BA.angle (CA);
    }
+   
+   // Discrete Shell
+   
+   public FemNodeNeighbor addIndirectEdgeNeighbor (FemNode3d nbrNode, FemEdgeNeighborType neighType) {
+      FemNodeNeighbor nbr = new FemEdgeNeighbor (nbrNode, neighType);
+      if (myIndirectNeighbors == null) {
+         myIndirectNeighbors = new LinkedList<FemNodeNeighbor>();
+      }
+      myIndirectNeighbors.add (nbr);
+      return nbr;
+   }
+
 }
