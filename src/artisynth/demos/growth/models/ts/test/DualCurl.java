@@ -92,7 +92,7 @@ public class DualCurl extends Basic_Base {
     
       int meshDiv = 50;
       
-    mMinEnergyBeforePausing = 1e-6;
+      mMinEnergyBeforePausing = 1e-6;
 //    mMinEnergyBeforePausing = -1;
       mPauseEveryInterval = 999;
       

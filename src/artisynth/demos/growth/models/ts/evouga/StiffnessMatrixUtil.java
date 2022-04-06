@@ -92,7 +92,7 @@ public class StiffnessMatrixUtil {
    //////////////////////////////////////
    
    protected static void _updateRowMaxsByBlock(
-      VectorNd maxs, int rowOffset, int colOffset, MatrixBlock B
+      VectorNd maxs, int rowOffset, MatrixBlock B
    ) {
       double[] maxs_ = maxs.getBuffer ();
       
@@ -119,11 +119,11 @@ public class StiffnessMatrixUtil {
          FemNode3d node = model.getNode(n);
          for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (n), S.getBlockColOffset (nb), S.getBlock (n, nb));
+            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (n), S.getBlock (n, nb));
          }
          for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (n), S.getBlockColOffset (nb), S.getBlock (n, nb));
+            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (n), S.getBlock (n, nb));
          }        
       }
 
@@ -132,11 +132,11 @@ public class StiffnessMatrixUtil {
          int ed = edgeDelegate.getSolveIndex();
          for (FemNodeNeighbor nbr : edgeDelegate.getNodeNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (ed), S.getBlockColOffset (nb), S.getBlock (ed, nb));
+            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (ed), S.getBlock (ed, nb));
          }
          for (FemNodeNeighbor nbr : edgeDelegate.getIndirectNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
-            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (ed), S.getBlockColOffset (nb), S.getBlock (ed, nb));
+            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (ed), S.getBlock (ed, nb));
          }        
       }
    }
@@ -216,22 +216,25 @@ public class StiffnessMatrixUtil {
    // Convenience methods
    //////////////////////////////////////
    
-   public static Matrix3x3Block getDirectNeighborBlock(FemNode3d nodeA, FemNode3d nodeB, SparseNumberedBlockMatrix S) {
+   public static Matrix3x3Block getDirectNeighborBlock(FemNode3d nodeA, FemNode3d nodeB, SparseNumberedBlockMatrix S, boolean isFirstStep) {
       FemNodeNeighbor neigh = nodeA.getNodeNeighbor (nodeB);
-      int blockNum = neigh.getBlockNumber ();
-      
-      if (S.getBlockByNumber(blockNum) == null) {
+      if (isFirstStep) {
          neigh.addSolveBlocks (S, nodeA);
       }
-      return (Matrix3x3Block) S.getBlockByNumber (blockNum);
+      return (Matrix3x3Block) S.getBlockByNumber (neigh.getBlockNumber ());
    }
    
    public static Matrix3x3Block getIndirectNeighborBlock(FemNode3d nodeA, FemNode3d nodeB, SparseNumberedBlockMatrix S) {
+      if (nodeA.getNodeNeighbor (nodeB) != null) {
+         return getDirectNeighborBlock(nodeA, nodeB, S, false);
+      }
+      
       FemNodeNeighbor neigh = nodeA.getIndirectNeighbor (nodeB);
       if (neigh == null) {
          neigh = nodeA.addIndirectNeighbor (nodeB);
          neigh.addSolveBlocks (S, nodeA);
       }
+     
       return (Matrix3x3Block) S.getBlockByNumber (neigh.getBlockNumber ());
    }
    

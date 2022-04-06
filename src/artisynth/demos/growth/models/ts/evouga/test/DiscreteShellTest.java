@@ -43,6 +43,13 @@ public class DiscreteShellTest extends GrowDemo {
       m_shellThickness = 1e-2;
       m_youngsModulus = 1e1;
       mReg = 0.25;
+      
+      // 
+      
+      mReg = 1e-6;
+      m_youngsModulus = 1;
+      m_shellThickness = 1e-1;
+      m_poissonsRatio = 0.5;
    }
    
    protected void build_modelSkeleton() {
@@ -54,13 +61,14 @@ public class DiscreteShellTest extends GrowDemo {
             mMesh[m].read (new File("C:\\Users\\dan\\pj\\libshell\\example\\bunny.obj"));
             mMesh[m] = MeshFactory.createPlane (1,1,25,25);
 //            mMesh[m] = MeshUtil.createCylinderFromPlane_YAxisCurved(1,1,25,25,5);
+            mMesh[m] = MeshFactory.createBox (1, 1, 1);
             
 //            RotationMatrix3d R = new RotationMatrix3d();
 //            R.setRotZ (Math.PI / 2);
 //            RigidTransform3d X = new RigidTransform3d ();
 //            X.setRotation (R);
 //            mMesh[m].transform (X);
-//            mMesh[0].write (new File("C:\\Users\\dan\\pj\\libshell\\example\\plane.obj"));
+            mMesh[0].write (new File("C:\\Users\\dan\\pj\\libshell\\example\\plane.obj"));
          }
          catch (IOException e) {
             e.printStackTrace();
@@ -74,7 +82,7 @@ public class DiscreteShellTest extends GrowDemo {
       mDS = ((DiscreteShell)mFemModel[0].myThinShellAux.getThinShellBase ());
 //      mDS.saveState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
       
-      mDS.loadRestState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
+//      mDS.loadRestState ("C:\\Users\\dan\\pj\\libshell\\example\\cylinder.rest");
       
       mDS.mReg = mReg;
    }
@@ -84,18 +92,17 @@ public class DiscreteShellTest extends GrowDemo {
       super.advanceCustom (t0, t1, flags);
    }
    
-   public static void main(String[] args) {
-      Matrix3x3Block block3x3 = new Matrix3x3Block();
-      block3x3.setIdentity ();
-      
-      MatrixNdBlock blockNd = new MatrixNdBlock(6, 6);
-      blockNd.setIdentity ();
-      
-      SparseBlockMatrix M = new SparseBlockMatrix();
-      M.addBlock (0, 0, block3x3);
-      M.addBlock (1, 1, blockNd);
-      
-      System.out.println (M.toString ("%.2f"));
-      
-   }
+//   public static void main(String[] args) {
+//      Matrix3x3Block block3x3 = new Matrix3x3Block();
+//      block3x3.setIdentity ();
+//      
+//      MatrixNdBlock blockNd = new MatrixNdBlock(6, 6);
+//      blockNd.setIdentity ();
+//      
+//      SparseBlockMatrix M = new SparseBlockMatrix();
+//      M.addBlock (0, 0, block3x3);
+//      M.addBlock (1, 1, blockNd);
+//      
+//      System.out.println (M.toString ("%.2f"));
+//   }
 }

@@ -221,6 +221,7 @@ public class DiscreteShell extends ThinShellBase {
 //      if (mIsFirstStep) {
 //         StiffnessMatrixUtil.initBlocksInSparseMatrix(mModel, mEdgeDelegates, mS);
 //      }
+//      System.out.println (mS.toString ("%.6f"));
       
       VectorNd force = new VectorNd(derivative);
       force.negate ();
@@ -264,24 +265,30 @@ public class DiscreteShell extends ThinShellBase {
 //      
 //      SparseMatrixNd D = MatrixCell.BuildSparseMatrixNd (freeDOFs, freeDOFs, Dcoeffs);
       StiffnessMatrixUtil.getRowMaxs(mModel, mEdgeDelegates, mS, mD);
+      
       double[] mD_ = mD.getBuffer ();
-      for (int i = 0; i < nNodesEdges; i++) {
-         mD_[i] = (mD_[i] == 0.0 ? 1.0 : 1.0 / sqrt(mD_[i]));
+      for (int i = 0; i < mD.size(); i++) {
+         mD_[i] = (mD_[i] == 0.0) ? 1.0 : 1.0 / sqrt(mD_[i]);
       }
       
 //      SparseMatrixNd DHDT = new SparseMatrixNd(freeDOFs, freeDOFs);
 //      DHDT.set(D);
 //      DHDT.mul (H);
 //      DHDT.mulTranspose (D);
-      StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, true);
-      StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, false);
+//      System.out.println (mS.toString ("%.6f"));
       
+      StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, true);
+      
+//      System.out.println (mS.toString ("%.6f"));
+      
+      StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, false);
+            
       VectorNd rhs = new VectorNd(force.size ());
 //      rhs.mul (D, force);
       MathUtil.mulDiagVecByVec (mD, force, rhs);
       
-      VectorNd x = new VectorNd(rhs.size ());
       
+      VectorNd x = new VectorNd(rhs.size ());
       PardisoSolver solver = new PardisoSolver();
 //      solver.analyze (DHDT, freeDOFs, Matrix.POSITIVE_DEFINITE);
       solver.analyze (mS, mFreeDOFs, Matrix.POSITIVE_DEFINITE);
@@ -302,6 +309,9 @@ public class DiscreteShell extends ThinShellBase {
          newPos.add (node.getPosition ());
          
          node.setPosition (newPos);
+
+         // Update surface mesh
+         mModel.getSurfaceVertex (node).setPosition (newPos);
       }
       
       // Update edge DoFs.
@@ -418,8 +428,7 @@ public class DiscreteShell extends ThinShellBase {
                    FemNode3d nodek = mModel.getNode (mMC.F[f][k]);
                    
                    hess.getSubMatrix (3*j, 3*k, hess_block);
-//                   nodej.getNodeNeighbor (nodek).getK00 ().add (hess_block);
-                   StiffnessMatrixUtil.getDirectNeighborBlock (nodej, nodek, mS).add (hess_block);
+                   StiffnessMatrixUtil.getDirectNeighborBlock (nodej, nodek, mS, true).add (hess_block);
                    
 //                    for (int l = 0; l < 3; l++) {
 //                        for (int m = 0; m < 3; m++) {
@@ -434,7 +443,7 @@ public class DiscreteShell extends ThinShellBase {
             }
          }
       }
-      
+            
       // Bending terms      
       
       int nedgedofs = this.mNumExtraDOFs;
@@ -500,12 +509,11 @@ public class DiscreteShell extends ThinShellBase {
                   FemNode3d nodek = mModel.getNode (mMC.F[f][k]);
                   FemNode3d nodekopp = (oppidxk != -1) ? mModel.getNode (oppidxk) : null; 
                   
-                  hess.getSubMatrix (3*j, 3*k, hess_block_3x3);
                   
                   // Node-Node stiffness
-                  
-//                  nodej.getNodeNeighbor (nodek).getK00 ().add (hess_block_3x3);
-                  StiffnessMatrixUtil.getDirectNeighborBlock (nodej, nodek, mS).add (hess_block_3x3);
+
+                  hess.getSubMatrix (3*j, 3*k, hess_block_3x3);
+                  StiffnessMatrixUtil.getDirectNeighborBlock (nodej, nodek, mS, true).add (hess_block_3x3);
                   
                   
                   if (oppidxk != -1) {
@@ -566,6 +574,9 @@ public class DiscreteShell extends ThinShellBase {
                   Matrix1x1 sb1x1 = (Matrix1x1Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
                      edgeDelegate_j, edgeDelegate_k, FemEdgeNeighborType.EDGE_EDGE, mS);
                   sb1x1.m00 += hess_ele;
+                  
+//                  System.out.println (mS.toString ("%.6f"));
+//                  System.out.println ("here");
                   
 //                  for (int l = 0; l < 3; l++) {
 //                     for (int m = 0; m < 3; m++) { 
