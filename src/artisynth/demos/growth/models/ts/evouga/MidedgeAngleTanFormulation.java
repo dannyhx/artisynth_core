@@ -9,8 +9,11 @@ import maspack.matrix.Matrix2d;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Vector3d;
 import maspack.matrix.VectorNd;
+import maspack.util.FunctionTimer;
 
 public class MidedgeAngleTanFormulation {
+   
+   protected static FunctionTimer mTimerII = new FunctionTimer();
    
    /**
     * Measures the tangent plane at a given face.
@@ -213,7 +216,6 @@ public class MidedgeAngleTanFormulation {
    }
    
    /**
-    * 
     * Verified.
     * 
     * @param model
@@ -233,6 +235,8 @@ public class MidedgeAngleTanFormulation {
       MatrixNd derivative,    
       MatrixNd[] hessian      
    ) {
+      mTimerII.restart ();
+      
       if (derivative != null) {
          if (derivative.rowSize () != 4 || derivative.colSize () != 21) {
             throw new RuntimeException("Unexpected size");
@@ -298,6 +302,8 @@ public class MidedgeAngleTanFormulation {
          hessian[3].add(IIhess[2]);
       }
       
+      mTimerII.stop ();
+      
       return result;
    }
    
@@ -328,7 +334,7 @@ public class MidedgeAngleTanFormulation {
       if (hessian != null) {
          hessian.setZero ();
       }
-      
+            
       int v0 = MC.EV[edge][0];
       int v1 = MC.EV[edge][1];
       int v2 = MC.EOpp[edge][0];

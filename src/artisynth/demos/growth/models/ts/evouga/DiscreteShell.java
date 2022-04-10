@@ -33,6 +33,7 @@ import maspack.matrix.Vector2d;
 import maspack.matrix.Vector3d;
 import maspack.matrix.VectorNd;
 import maspack.solvers.PardisoSolver;
+import maspack.util.FunctionTimer;
 
 /**
  * Implementation of Discrete Shells where DoFs are expressed in terms of
@@ -46,31 +47,40 @@ public class DiscreteShell extends ThinShellBase {
    protected MonolayerRestState mRestState;
    protected DiscreteShellMaterial mMat;
    
-   protected VectorNd mEdgeDOFs; // len = numEdges. All zero initially.
+   /** Container for the edge DoFs. Size = NumEdges * mNumExtraDOFs. Initialized to zero.*/
+   protected VectorNd mEdgeDOFs;
    
-   // MidedgeAngleTanFormulation.h
+   /** Number of degrees of freedom per edge. MidedgeAngleTanFormulation.h */ 
    protected final int mNumExtraDOFs = 1;
    
+   /** Mesh Topology. */
    protected MeshConnectivity mMC = null;
    
-   public double mReg = 0.025; //1e-6
+   /** Treated as an inverse time step. Default: 1e-6. */
+   public double mReg = 0.025; 
    
    /** Previous node positions. Used to calculate instantaneous velocity. */
    protected double[] mPrevMeshDOFs; 
    
-   /** Nodes that represent the edges of the mesh. Used to store the stiffness of the edges. 
-    *  Each node accounts for 3 edges. For example, node#0 accounts for edges #0,1,2. */
+   /** Nodes that represent the edges of the mesh. */
    protected FemNode3d[] mEdgeDelegates;
    
-   /** Stiffness matrix (i.e. hessian). */
+   /** Global stiffness matrix (i.e. hessian). */
    protected SparseNumberedBlockMatrix mS;
    
    /** Diagonal vector that can operate on mS. */
    protected VectorNd mD;
    
+   /** Is the first frame being computed? */
    protected boolean mIsFirstStep = true;
    
-   protected int mFreeDOFs = -1;
+   protected FunctionTimer mTimer = new FunctionTimer();
+   
+   protected FunctionTimer mTimerPostAssembly = new FunctionTimer();
+   
+   /** If false, then only populate the upper-triangular half of mS. 
+    *  Leave as true until fix SparseBlockMatrix.doGetBlockCRSIndices() */
+   protected boolean mIsEntireHessian = true;
    
    public DiscreteShell(FemModel3d model, PolygonalMesh mesh) {
      super(model, mesh);
@@ -119,8 +129,7 @@ public class DiscreteShell extends ThinShellBase {
      }
      
      // MidedgeAngleTanForumulation.cpp::initializeExtraDOFs
-     mEdgeDOFs = new VectorNd(mMC.EF.length);
-     mFreeDOFs = mModel.numNodes () * 3 + mEdgeDOFs.size();
+     mEdgeDOFs = new VectorNd(mMC.numEdges() * mNumExtraDOFs);
      
      for (int n = 0; n < mModel.numNodes (); n++) {
         FemNode3d node = mModel.getNode (n);
@@ -135,18 +144,18 @@ public class DiscreteShell extends ThinShellBase {
         edgeDelegate.setFlag (StiffnessMatrixUtil.EDGE_DELEGATE_FLAG);
      }
 
-     int numBlockDofs = mModel.numNodes () + mEdgeDelegates.length;
+     int numBlockDofs = numNodesAndEdges();
      int[] rowSz = new int[numBlockDofs];
      int[] colSz = new int[numBlockDofs];
      for (int i = 0; i < numBlockDofs; i++) {
-        int dof = (i < mModel.numNodes ()) ? 3 : 1; 
+        int dof = (i < mModel.numNodes ()) ? 3 : mNumExtraDOFs; 
         
         rowSz[i] = dof;
         colSz[i] = dof;
      }
      
      mS = new SparseNumberedBlockMatrix (rowSz, colSz);
-     mD = new VectorNd(mModel.numNodes () * 3 + mEdgeDelegates.length);
+     mD = new VectorNd(numFreeDoFs());
    }
    
    //////////////////////////////////////
@@ -203,6 +212,9 @@ public class DiscreteShell extends ThinShellBase {
 
    @Override
    public void advance() {
+      mTimer.reset ();
+      mTimer.start();
+      
       if (!mIsFirstStep) {
          StiffnessMatrixUtil.clearStiffness(mModel, mEdgeDelegates, mS);
          mD.setZero ();
@@ -217,24 +229,25 @@ public class DiscreteShell extends ThinShellBase {
       
       double energy = this.elasticEnergy (derivative, hessian);
       
-//      SparseMatrixNd H = MatrixCell.BuildSparseMatrixNd(freeDOFs, freeDOFs, hessian);
-//      if (mIsFirstStep) {
-//         StiffnessMatrixUtil.initBlocksInSparseMatrix(mModel, mEdgeDelegates, mS);
-//      }
-//      System.out.println (mS.toString ("%.6f"));
+      System.out.println ("I: " + GeometryDerivative.mTimerI.result (1));
+      GeometryDerivative.mTimerI.reset ();
       
+      System.out.println ("II: " + MidedgeAngleTanFormulation.mTimerII.result (1));
+      MidedgeAngleTanFormulation.mTimerII.reset ();
+      
+      System.out.println ("Stretch " + StVKMaterial.mTimerStretch.result (1));
+      StVKMaterial.mTimerStretch.reset ();
+      
+      System.out.println ("Bending " + StVKMaterial.mTimerBending.result (1));
+      StVKMaterial.mTimerBending.reset ();
+            
       VectorNd force = new VectorNd(derivative);
       force.negate ();
       
-//      SparseMatrixNd sI = new SparseMatrixNd(freeDOFs, freeDOFs);
-//      sI.setIdentity ();
-//      sI.scale (mReg);
-//      H.add (sI);
       Matrix3d sI = new Matrix3d();
       sI.setIdentity ();
       sI.scale (mReg);
-      int nNodesEdges = mModel.numNodes () + mEdgeDelegates.length; 
-      for (int i = 0; i < nNodesEdges; i++) {
+      for (int i = 0; i < numNodesAndEdges(); i++) {
          if (i < mModel.numNodes ()) {
             mS.getBlock (i, i).add (sI);
          } else {
@@ -242,28 +255,6 @@ public class DiscreteShell extends ThinShellBase {
          }
       }
       
-//      VectorNd maxvals = new VectorNd(freeDOFs);
-//      maxvals.setZero ();
-//      // For each row
-//      for (int r = 0; r < freeDOFs; r++) {
-//         SparseMatrixCell row = H.getRow (r);
-//         if (row == null) {
-//            continue;
-//         }
-//         
-//         // For each column of row.
-//         for (SparseMatrixCell cell = row; cell != null; cell = cell.next) {
-//            maxvals.set (r, max(maxvals.get (r), abs(cell.value)));
-//         }
-//      }
-//      
-//      ArrayList<MatrixCell> Dcoeffs = new ArrayList<MatrixCell>();
-//      for (int i = 0; i < freeDOFs; i++) {
-//         double val = (maxvals.get (i) == 0.0 ? 1.0 : 1.0 / sqrt(maxvals.get (i)));
-//         Dcoeffs.add (new MatrixCell(i, i, val));
-//      }
-//      
-//      SparseMatrixNd D = MatrixCell.BuildSparseMatrixNd (freeDOFs, freeDOFs, Dcoeffs);
       StiffnessMatrixUtil.getRowMaxs(mModel, mEdgeDelegates, mS, mD);
       
       double[] mD_ = mD.getBuffer ();
@@ -271,33 +262,37 @@ public class DiscreteShell extends ThinShellBase {
          mD_[i] = (mD_[i] == 0.0) ? 1.0 : 1.0 / sqrt(mD_[i]);
       }
       
-//      SparseMatrixNd DHDT = new SparseMatrixNd(freeDOFs, freeDOFs);
-//      DHDT.set(D);
-//      DHDT.mul (H);
-//      DHDT.mulTranspose (D);
-//      System.out.println (mS.toString ("%.6f"));
+      mTimerPostAssembly.start ();
       
       StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, true);
-      
-//      System.out.println (mS.toString ("%.6f"));
-      
       StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, false);
             
       VectorNd rhs = new VectorNd(force.size ());
-//      rhs.mul (D, force);
       MathUtil.mulDiagVecByVec (mD, force, rhs);
       
+      mTimerPostAssembly.stop (); 
+      System.out.println ("Post Assembly: " + mTimerPostAssembly.result (1));
+      
+      mTimer.stop ();
+      System.out.println ("Force and Stiffness Assembly: " + mTimer.result (1));
+      
+      mTimer.reset ();
       
       VectorNd x = new VectorNd(rhs.size ());
       PardisoSolver solver = new PardisoSolver();
-//      solver.analyze (DHDT, freeDOFs, Matrix.POSITIVE_DEFINITE);
-      solver.analyze (mS, mFreeDOFs, Matrix.POSITIVE_DEFINITE);
-      solver.factor ();
+      solver.analyze (mS, numFreeDoFs(), Matrix.SPD);
+      
+      mTimer.start ();
+      
+      solver.factor ();      
       solver.solve(x, rhs);
+      
+      mTimer.stop ();
+      System.out.println ("Solve: " + mTimer.result (1));
+      
       solver.dispose ();
       
       VectorNd descentDir = new VectorNd(x.size ());
-//      descentDir.mul (D, x);
       MathUtil.mulDiagVecByVec (mD, x, descentDir);
 
       // Update node positions.
@@ -380,10 +375,8 @@ public class DiscreteShell extends ThinShellBase {
       ArrayList<MatrixCell> hessian 
    ) {
       int nNodes = this.mModel.numNodes ();
-      int nEdges = this.mEdgeDOFs.size ();
       
       if (derivative != null) {
-//         derivative.adjustSize(3 * nNodes + this.mNumExtraDOFs * nEdges);
          derivative.setZero ();
       }
       
@@ -394,6 +387,8 @@ public class DiscreteShell extends ThinShellBase {
       double result = 0;
       
       // Stretching
+      
+//      mTimerSB.start ();
       
       for (int f = 0; f < mMesh.numFaces (); f++) {
          VectorNd deriv = new VectorNd(9);
@@ -419,7 +414,7 @@ public class DiscreteShell extends ThinShellBase {
             }
          }
          
-         if (hessian != null) {
+         if (hessian != null) {            
             Matrix3d hess_block = new Matrix3d();
             
             for (int j = 0; j < 3; j++) {
@@ -427,18 +422,10 @@ public class DiscreteShell extends ThinShellBase {
                 for (int k = 0; k < 3; k++) {
                    FemNode3d nodek = mModel.getNode (mMC.F[f][k]);
                    
-                   hess.getSubMatrix (3*j, 3*k, hess_block);
-                   StiffnessMatrixUtil.getDirectNeighborBlock (nodej, nodek, mS, true).add (hess_block);
-                   
-//                    for (int l = 0; l < 3; l++) {
-//                        for (int m = 0; m < 3; m++) {
-//                           hessian.add (new MatrixCell (
-//                              3*mMC.F[f][j] + l, 
-//                              3*mMC.F[f][k] + m,
-//                              hess.get (3*j+l, 3*k+m)
-//                           ));
-//                        }
-//                    }
+                   if (mIsEntireHessian || nodej.getSolveIndex () <= nodek.getSolveIndex ()) {
+                      hess.getSubMatrix (3*j, 3*k, hess_block);
+                      StiffnessMatrixUtil.getDirectNeighborBlock (nodej, nodek, mS, true).add (hess_block);
+                   }
                 }
             }
          }
@@ -509,135 +496,102 @@ public class DiscreteShell extends ThinShellBase {
                   FemNode3d nodek = mModel.getNode (mMC.F[f][k]);
                   FemNode3d nodekopp = (oppidxk != -1) ? mModel.getNode (oppidxk) : null; 
                   
-                  
                   // Node-Node stiffness
 
-                  hess.getSubMatrix (3*j, 3*k, hess_block_3x3);
-                  StiffnessMatrixUtil.getDirectNeighborBlock (nodej, nodek, mS, true).add (hess_block_3x3);
+                  if (mIsEntireHessian || nodej.getSolveIndex () <= nodek.getSolveIndex ()) {
+                     hess.getSubMatrix (3*j, 3*k, hess_block_3x3);
+                     StiffnessMatrixUtil.getDirectNeighborBlock (nodej, nodek, mS, true).add (hess_block_3x3);
+                  }
                   
-                  
-                  if (oppidxk != -1) {
+                  if (oppidxk != -1 && (mIsEntireHessian || nodej.getSolveIndex () <= nodekopp.getSolveIndex ())) {
                      hess.getSubMatrix (3*j, 9+3*k, hess_block_3x3);
                      StiffnessMatrixUtil.getIndirectNeighborBlock (nodej, nodekopp, mS).add (hess_block_3x3);
                   }
                   
-                  if (oppidxj != -1) {
+                  if (oppidxj != -1 && (mIsEntireHessian || nodejopp.getSolveIndex () <= nodek.getSolveIndex ())) {
                      hess.getSubMatrix (9+3*j, 3*k, hess_block_3x3);
                      StiffnessMatrixUtil.getIndirectNeighborBlock (nodejopp, nodek, mS).add (hess_block_3x3);
                   }
                   
-                  if (oppidxj != -1 && oppidxk != -1) {
+                  if (oppidxj != -1 && oppidxk != -1 && (mIsEntireHessian || nodejopp.getSolveIndex () <= nodekopp.getSolveIndex ())) {
                      hess.getSubMatrix (9+3*j, 9+3*k, hess_block_3x3);
                      StiffnessMatrixUtil.getIndirectNeighborBlock (nodejopp, nodekopp, mS).add (hess_block_3x3);
-                     
                   }
                   
                   // Node-Edge stiffness
                   
                   FemNode3d edgeDelegate_k = mEdgeDelegates[mMC.FE[f][k]];
 
-                  hess.getSubMatrix (3*j, 18+nedgedofs*k, hess_block_3x1);  // 3x1
-                  Matrix3x1 sb3x1 = (Matrix3x1Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
-                     nodej, edgeDelegate_k, FemEdgeNeighborType.NODE_EDGE, mS);
-                  sb3x1.m00 += hess_block_3x1.m00;
-                  sb3x1.m10 += hess_block_3x1.m10;
-                  sb3x1.m20 += hess_block_3x1.m20;
-                  
-                  hess.getSubMatrix (18+nedgedofs*k, 3*j, hess_block_1x3);  // 1x3
-                  Matrix1x3 sb1x3 = (Matrix1x3Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
-                     edgeDelegate_k, nodej, FemEdgeNeighborType.EDGE_NODE, mS);
-                  sb1x3.m00 += hess_block_1x3.m00;
-                  sb1x3.m01 += hess_block_1x3.m01;
-                  sb1x3.m02 += hess_block_1x3.m02;
-                  
-                  if (oppidxj != -1) {
-                     hess.getSubMatrix (9+3*j, 18+nedgedofs*k, hess_block_3x1);   // 3x1
-                     sb3x1 = (Matrix3x1Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
-                        nodejopp, edgeDelegate_k, FemEdgeNeighborType.NODE_EDGE, mS);
+                  if (mIsEntireHessian || nodej.getSolveIndex () <= edgeDelegate_k.getSolveIndex ()) {
+                     hess.getSubMatrix (3*j, 18+nedgedofs*k, hess_block_3x1);  // 3x1
+                     Matrix3x1 sb3x1 = (Matrix3x1Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
+                        nodej, edgeDelegate_k, FemEdgeNeighborType.NODE_EDGE, mS);
                      sb3x1.m00 += hess_block_3x1.m00;
                      sb3x1.m10 += hess_block_3x1.m10;
                      sb3x1.m20 += hess_block_3x1.m20;
-                     
-                     hess.getSubMatrix (18+nedgedofs*k, 9+3*j, hess_block_1x3);   // 1x3
-                     sb1x3 = (Matrix1x3Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
-                        edgeDelegate_k, nodejopp, FemEdgeNeighborType.EDGE_NODE, mS);
+                  }
+                  
+                  if (mIsEntireHessian || edgeDelegate_k.getSolveIndex () <= nodej.getSolveIndex ()) {
+                     hess.getSubMatrix (18+nedgedofs*k, 3*j, hess_block_1x3);  // 1x3
+                     Matrix1x3 sb1x3 = (Matrix1x3Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
+                        edgeDelegate_k, nodej, FemEdgeNeighborType.EDGE_NODE, mS);
                      sb1x3.m00 += hess_block_1x3.m00;
                      sb1x3.m01 += hess_block_1x3.m01;
                      sb1x3.m02 += hess_block_1x3.m02;
+                  }
+
+                  if (oppidxj != -1) {
+                     if (mIsEntireHessian || nodejopp.getSolveIndex () <= edgeDelegate_k.getSolveIndex ()) {
+                        hess.getSubMatrix (9+3*j, 18+nedgedofs*k, hess_block_3x1);   // 3x1
+                        Matrix3x1 sb3x1 = (Matrix3x1Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
+                           nodejopp, edgeDelegate_k, FemEdgeNeighborType.NODE_EDGE, mS);
+                        sb3x1.m00 += hess_block_3x1.m00;
+                        sb3x1.m10 += hess_block_3x1.m10;
+                        sb3x1.m20 += hess_block_3x1.m20;
+                     }
+                     
+                     if (mIsEntireHessian || edgeDelegate_k.getSolveIndex () <= nodejopp.getSolveIndex ()) {
+                        hess.getSubMatrix (18+nedgedofs*k, 9+3*j, hess_block_1x3);   // 1x3
+                        Matrix1x3 sb1x3 = (Matrix1x3Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
+                           edgeDelegate_k, nodejopp, FemEdgeNeighborType.EDGE_NODE, mS);
+                        sb1x3.m00 += hess_block_1x3.m00;
+                        sb1x3.m01 += hess_block_1x3.m01;
+                        sb1x3.m02 += hess_block_1x3.m02;
+                     }
                   }
                      
                   // Edge-Edge stiffness
                   
                   FemNode3d edgeDelegate_j = mEdgeDelegates[mMC.FE[f][j]];
 
-                  hess_ele = hess.get (18+nedgedofs*j, 18+nedgedofs*k);  // 1x1
-                  Matrix1x1 sb1x1 = (Matrix1x1Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
-                     edgeDelegate_j, edgeDelegate_k, FemEdgeNeighborType.EDGE_EDGE, mS);
-                  sb1x1.m00 += hess_ele;
-                  
-//                  System.out.println (mS.toString ("%.6f"));
-//                  System.out.println ("here");
-                  
-//                  for (int l = 0; l < 3; l++) {
-//                     for (int m = 0; m < 3; m++) { 
-//                        
-//                        hessian.add (new MatrixCell (
-//                           3*mMC.F[f][j]+l, 3*mMC.F[f][k]+m, hess.get(3*j+l, 3*k+m)));
-//                        
-//                        if (oppidxk != -1) {
-//                           hessian.add (new MatrixCell (
-//                              3*mMC.F[f][j]+l, 3*oppidxk+m, hess.get (3*j+l,9+3*k+m)));
-//                        }
-//                                                
-//                        if (oppidxj != -1) {
-//                           hessian.add (new MatrixCell (
-//                              3*oppidxj+l, 3*mMC.F[f][k]+m, hess.get (9+3*j+l,3*k+m)));
-//                        }
-//                        
-//                        if (oppidxj != -1 && oppidxk != -1) {
-//                           hessian.add (new MatrixCell (
-//                              3*oppidxj+l, 3*oppidxk+m, hess.get (9+3*j+l, 9+3*k+m)));
-//                        }
-//                     }
-//                     
-//                     for (int m = 0; m < nedgedofs; m++) {
-//                        hessian.add (new MatrixCell (
-//                           3*mMC.F[f][j]+l, 3*nNodes+nedgedofs * mMC.FE[f][k] + m, 
-//                           hess.get (3*j+l, 18+nedgedofs*k+m)
-//                        ));
-//                        
-//                        hessian.add (new MatrixCell (
-//                           3*nNodes+nedgedofs*mMC.FE[f][k]+m, 3*mMC.F[f][j]+l, 
-//                           hess.get (18+nedgedofs*k+m, 3*j+l)
-//                        ));
-//                        
-//                        if (oppidxj != -1) {
-//                           hessian.add (new MatrixCell (
-//                              3*oppidxj+l,3*nNodes+nedgedofs*mMC.FE[f][k]+m, 
-//                              hess.get(9+3*j+l, 18+nedgedofs*k+m)
-//                           ));
-//                           
-//                           hessian.add (new MatrixCell (
-//                              3*nNodes+nedgedofs*mMC.FE[f][k]+m, 3*oppidxj+l,
-//                              hess.get(18+nedgedofs*k+m, 9+3*j+l)
-//                           ));
-//                        }
-//
-//                  for (int m = 0; m < nedgedofs; m++) {
-//                     for (int ni = 0; ni < nedgedofs; ni++) {
-//                        hessian.add (new MatrixCell (
-//                           3*nNodes+nedgedofs*mMC.FE[f][j]+m, 3*nNodes+nedgedofs*mMC.FE[f][k]+ni, 
-//                           hess.get (18 + nedgedofs * j + m, 18 + nedgedofs * k + ni)
-//                        ));
-//                     }
-//                  }
+                  if (mIsEntireHessian || edgeDelegate_j.getSolveIndex () <= edgeDelegate_k.getSolveIndex ()) {
+                     hess_ele = hess.get (18+nedgedofs*j, 18+nedgedofs*k);  // 1x1
+                     Matrix1x1 sb1x1 = (Matrix1x1Block)StiffnessMatrixUtil.getIndirectEdgeNeighborBlock (
+                        edgeDelegate_j, edgeDelegate_k, FemEdgeNeighborType.EDGE_EDGE, mS);
+                     sb1x1.m00 += hess_ele;
+                  }
                }
-              
             }
          }
       }
       
+//      mTimerSB.stop ();
+//      System.out.println (mTimerSB.result (1));
+//      mTimerSB.reset ();
+      
       return result;
+   }
+   
+   //////////////////////////////////////
+   // Accessors
+   //////////////////////////////////////
+   
+   protected int numNodesAndEdges() {
+      return this.mModel.numNodes () + mMC.numEdges ();
+   }
+   
+   protected int numFreeDoFs() {
+      return 3 * this.mModel.numNodes () + mNumExtraDOFs * mMC.numEdges (); 
    }
    
    //////////////////////////////////////

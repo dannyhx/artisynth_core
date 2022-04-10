@@ -7,13 +7,16 @@ import artisynth.core.femmodels.FemModel3d;
 import maspack.geometry.Face;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.MatrixNd;
-import maspack.matrix.Vector2d;
 import maspack.matrix.VectorNd;
+import maspack.util.FunctionTimer;
 
 public class StVKMaterial extends DiscreteShellMaterial {
    
    public double lameAlpha_;
    public double lameBeta_;
+   
+   protected static FunctionTimer mTimerStretch = new FunctionTimer();
+   protected static FunctionTimer mTimerBending = new FunctionTimer();
    
    public StVKMaterial(double young, double poissons) {
       // main.cpp::lameParameters
@@ -40,6 +43,8 @@ public class StVKMaterial extends DiscreteShellMaterial {
       VectorNd derivative, // 1x9
       MatrixNd hessian     // 9x9
    ) {
+      mTimerStretch.restart ();
+      
       MonolayerRestState biRs = (MonolayerRestState)rs;
       
       double coeff = biRs.thicknesses.get (f) / 4.0;
@@ -175,6 +180,8 @@ public class StVKMaterial extends DiscreteShellMaterial {
          hessian.scale (coeff * dA);
       }
 
+      mTimerStretch.stop ();
+      
       return result;
    }
    
@@ -197,6 +204,8 @@ public class StVKMaterial extends DiscreteShellMaterial {
       VectorNd derivative,   
       MatrixNd hessian        
    ) {
+      mTimerBending.restart ();
+      
       MonolayerRestState mrs = (MonolayerRestState) rs;
       
       double coeff = pow(mrs.thicknesses.get (f), 3) / 12;
@@ -308,6 +317,8 @@ public class StVKMaterial extends DiscreteShellMaterial {
       }
       
 //      System.out.println (hessian.toString ("%.5f"));
+      
+      mTimerBending.stop ();
       
       return result;
    }

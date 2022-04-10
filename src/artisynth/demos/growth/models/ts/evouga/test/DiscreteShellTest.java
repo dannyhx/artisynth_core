@@ -59,7 +59,7 @@ public class DiscreteShellTest extends GrowDemo {
          
          try {
             mMesh[m].read (new File("C:\\Users\\dan\\pj\\libshell\\example\\bunny.obj"));
-            mMesh[m] = MeshFactory.createPlane (1,1,25,25);
+//            mMesh[m] = MeshFactory.createPlane (1,1,25,25);
 //            mMesh[m] = MeshUtil.createCylinderFromPlane_YAxisCurved(1,1,25,25,5);
             mMesh[m] = MeshFactory.createBox (1, 1, 1);
             
@@ -68,7 +68,7 @@ public class DiscreteShellTest extends GrowDemo {
 //            RigidTransform3d X = new RigidTransform3d ();
 //            X.setRotation (R);
 //            mMesh[m].transform (X);
-            mMesh[0].write (new File("C:\\Users\\dan\\pj\\libshell\\example\\plane.obj"));
+//            mMesh[0].write (new File("C:\\Users\\dan\\pj\\libshell\\example\\plane.obj"));
          }
          catch (IOException e) {
             e.printStackTrace();

@@ -1,19 +1,20 @@
 package artisynth.demos.growth.models.ts.evouga;
 
 import artisynth.core.femmodels.FemModel3d;
-import artisynth.core.femmodels.FemNode3d;
-import artisynth.core.femmodels.ShellElement3d;
 import maspack.geometry.Face;
 import maspack.matrix.Matrix2d;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
+import maspack.util.FunctionTimer;
 
 /**
  * GeometryDerivatives.cpp 
  */
 public class GeometryDerivative {
+   
+   protected static FunctionTimer mTimerI = new FunctionTimer();
    
    /**
     * Calculate the first fundamental form for the given face.
@@ -31,12 +32,14 @@ public class GeometryDerivative {
       MatrixNd derivative, 
       MatrixNd[] hessian
    ) {
+      mTimerI.restart ();
+      
       // Nodal positions.
       Vector3d[] q = new Vector3d[3];
       for (int i = 0; i < 3; i++) {
          q[i] = model.getNode (MC.F[f][i]).getPosition ();
       }
-      
+            
       Vector3d q1_q0 = new Vector3d().sub (q[1], q[0]);
       Vector3d q2_q0 = new Vector3d().sub (q[2], q[0]);
       
@@ -102,6 +105,8 @@ public class GeometryDerivative {
          hessian[3].addSubMatrix (0, 6, negI2);
          hessian[3].addSubMatrix (6, 0, negI2);
       }
+      
+      mTimerI.stop ();
       
       return result;
    }

@@ -119,12 +119,17 @@ public class StiffnessMatrixUtil {
          FemNode3d node = model.getNode(n);
          for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
+            if (S.getBlock (n, nb) == null) {
+               continue;
+            }
             _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (n), S.getBlock (n, nb));
          }
-         for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (n), S.getBlock (n, nb));
-         }        
+         if (node.getIndirectNeighbors() != null) {
+            for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
+               int nb = nbr.getNode ().getSolveIndex ();
+               _updateRowMaxsByBlock(rvMaxs, S.getBlockRowOffset (n), S.getBlock (n, nb));
+            }        
+         }
       }
 
       for (int e = 0; e < edgeDelegates.length; e++) {
@@ -190,12 +195,17 @@ public class StiffnessMatrixUtil {
          FemNode3d node = model.getNode(n);
          for (FemNodeNeighbor nbr : node.getNodeNeighbors()) {
             int nb = nbr.getNode ().getSolveIndex ();
+            if (S.getBlock (n, nb) == null) {
+               continue;
+            }
             _mulDiagByBlock(S.getBlockRowOffset (n), S.getBlockColOffset (nb), S.getBlock (n, nb), D_, isDiagLeftSide);
          }
-         for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
-            int nb = nbr.getNode ().getSolveIndex ();
-            _mulDiagByBlock(S.getBlockRowOffset (n), S.getBlockColOffset (nb), S.getBlock (n, nb), D_, isDiagLeftSide);
-         }        
+         if (node.getIndirectNeighbors() != null) {
+            for (FemNodeNeighbor nbr : node.getIndirectNeighbors()) {
+               int nb = nbr.getNode ().getSolveIndex ();
+               _mulDiagByBlock(S.getBlockRowOffset (n), S.getBlockColOffset (nb), S.getBlock (n, nb), D_, isDiagLeftSide);
+            }        
+         }
       }
 
       for (int e = 0; e < edgeDelegates.length; e++) {
