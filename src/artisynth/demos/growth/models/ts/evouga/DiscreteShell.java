@@ -76,8 +76,6 @@ public class DiscreteShell extends ThinShellBase {
    
    protected FunctionTimer mTimer = new FunctionTimer();
    
-   protected FunctionTimer mTimerPostAssembly = new FunctionTimer();
-   
    /** If false, then only populate the upper-triangular half of mS. 
     *  Leave as true until fix SparseBlockMatrix.doGetBlockCRSIndices() */
    protected boolean mIsEntireHessian = true;
@@ -212,8 +210,6 @@ public class DiscreteShell extends ThinShellBase {
 
    @Override
    public void advance() {
-      mTimer.reset ();
-      mTimer.start();
       
       if (!mIsFirstStep) {
          StiffnessMatrixUtil.clearStiffness(mModel, mEdgeDelegates, mS);
@@ -227,7 +223,14 @@ public class DiscreteShell extends ThinShellBase {
       VectorNd derivative = new VectorNd(mD.size ());
       ArrayList<MatrixCell> hessian = new ArrayList<MatrixCell>();
       
+      mTimer.reset ();
+      mTimer.start();
+      
       double energy = this.elasticEnergy (derivative, hessian);
+      
+      mTimer.stop ();
+      System.out.println ("Elastic Energy: " + mTimer.result (1));
+      mTimer.reset();
       
       System.out.println ("I: " + GeometryDerivative.mTimerI.result (1));
       GeometryDerivative.mTimerI.reset ();
@@ -262,21 +265,11 @@ public class DiscreteShell extends ThinShellBase {
          mD_[i] = (mD_[i] == 0.0) ? 1.0 : 1.0 / sqrt(mD_[i]);
       }
       
-      mTimerPostAssembly.start ();
-      
       StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, true);
       StiffnessMatrixUtil.mulDiagBySparse (mD, mModel, mEdgeDelegates, mS, false);
             
       VectorNd rhs = new VectorNd(force.size ());
       MathUtil.mulDiagVecByVec (mD, force, rhs);
-      
-      mTimerPostAssembly.stop (); 
-      System.out.println ("Post Assembly: " + mTimerPostAssembly.result (1));
-      
-      mTimer.stop ();
-      System.out.println ("Force and Stiffness Assembly: " + mTimer.result (1));
-      
-      mTimer.reset ();
       
       VectorNd x = new VectorNd(rhs.size ());
       PardisoSolver solver = new PardisoSolver();

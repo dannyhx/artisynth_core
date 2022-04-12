@@ -22,8 +22,10 @@ import maspack.matrix.RigidTransform3d;
 import maspack.matrix.RotationMatrix3d;
 import maspack.matrix.Vector3d;
 
-// -model artisynth.demos.growth.models.ts.test.DualCurl
-// -playFor 20.00
+//-model artisynth.demos.growth.models.ts.test.DualCurl
+//-noTimeline     
+//-disableHybridSolves
+//-playFor 3
 
 /**
  * Simulation to make a square patch curl into a cylinder.
@@ -90,10 +92,11 @@ public class DualCurl extends Basic_Base {
 //      this.mTsType = ThinShellType.NARAIN;
       this.mTsType = ThinShellType.EVOUGA;
     
-      int meshDiv = 50;
+      int meshDiv = 25;
       
-      mMinEnergyBeforePausing = 1e-6;
+//      mMinEnergyBeforePausing = 1e-6;
 //    mMinEnergyBeforePausing = -1;
+      mMinEnergyBeforePausing = 1e-5;
       mPauseEveryInterval = 999;
       
       // --- Setup --- //
