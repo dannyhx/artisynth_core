@@ -29,7 +29,7 @@ public class GrowColorer {
    
    /** Value range in the residual plastic strain color bar. */
    protected final double mMinResidualPlasticStrainColorBarRange = 0;
-   public double mMaxResidualPlasticStrainColorBarRange = 0.0539;
+   public double mMaxResidualPlasticStrainColorBarRange = 0.0310;
    
    /** Lowest value in the morphogen color bar. */
    protected final double mMinMorphogenColorBarRange = 0;
@@ -84,6 +84,7 @@ public class GrowColorer {
       RenderProps.setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT);
       mSurfaceMesh = mFemModel.getSurfaceMesh ();  // Latest surface mesh
       mSurfaceMesh.setVertexColoringEnabled ();
+      mFemModel.getRenderProps ().setLineWidth (1); 
       mColorBar.updateLabels (mMinPlasticStrainColorBarRange, mMaxPlasticStrainColorBarRange);
       
       Matrix3d[] nodalFps = mFemModel.getNodalPlasticDeformationGradient ();
@@ -108,12 +109,13 @@ public class GrowColorer {
       // front and back faces.
       boolean isShellEle = this.mFemModel.numShellElements () > 0;
       if (isShellEle) {
-         RenderProps.setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT);
+         RenderProps.setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
       } else {
          RenderProps.setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
       }
       mSurfaceMesh = mFemModel.getSurfaceMesh ();  // Latest surface mesh
       mSurfaceMesh.setVertexColoringEnabled ();
+      mFemModel.getRenderProps ().setLineWidth (0); 
       mColorBar.updateLabels (mMinResidualPlasticStrainColorBarRange, mMaxResidualPlasticStrainColorBarRange);
       
       double[] nodalRS = mFemModel.getNodalResidualPlasticBendingStrain ();
@@ -127,21 +129,28 @@ public class GrowColorer {
          FemNode3d node = mFemModel.getNode (n);
          sum += nodalRS[n];
          
+         double scalar = -1;
+         double alpha = -1;
+         
          if (!isShellEle && !ShellUtil.isVolBackNode(node)) {
             // Use its back node's color.
             int numNodes = mFemModel.numNodes ();
             int b = n + (numNodes/2);
-            
-            double scalar = nodalRS[b];
-            mColorBar.getColor (scalar, rgb);
-            mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (node).getIndex (), rgb[0], rgb[1], rgb[2], 0);
-            continue;
+            scalar = nodalRS[b];
+            alpha = 0;
+         } else {
+            scalar = nodalRS[n];
+            alpha = 1;
          }
-
-         double scalar = nodalRS[n];
+         
+         // Workaround. Colorbar is very coarse such that stress below 10% of maximum will appear as the same
+         // color corresponding to 0% stress. Give a color boost if stress 11% or lower.
+         if (scalar <= 0.11) {
+            scalar *= 2;
+         }
+         
          mColorBar.getColor (scalar, rgb);
-         mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (node).getIndex (), 
-            rgb[0], rgb[1], rgb[2], 1);
+         mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (node).getIndex (), rgb[0], rgb[1], rgb[2], alpha);
          
          if (n == 0 || scalar > max) {
             max = scalar;
@@ -194,7 +203,7 @@ public class GrowColorer {
       mFemModel.getRenderProps ().setLineColor (Color.WHITE);
       mSurfaceMesh.getRenderProps ().setFaceStyle (FaceStyle.FRONT_AND_BACK);
       mSurfaceMesh.getRenderProps ().setBackColor (Color.CYAN);
-      
+      mFemModel.getRenderProps ().setLineWidth (1); 
    }
    
    /**
@@ -221,6 +230,7 @@ public class GrowColorer {
          mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
       mSurfaceMesh = mFemModel.getSurfaceMesh ();
       mSurfaceMesh.clearColors ();
+      mFemModel.getRenderProps ().setLineWidth (1);     
    }
    
    /** Get an interpolated RGB value between two given RGB values. */

@@ -328,7 +328,7 @@ public class Morphogen2GrowthTensor {
                else if (isBendingMorphogenHack) {
                   // Negate strain to bottom-surface to simulate bending.
                   if (zeroStrainAtBottom)
-                     strainMtx.setZero ();  
+                     strainMtx.setZero ();
                   else
                      strainMtx.negate ();
                }

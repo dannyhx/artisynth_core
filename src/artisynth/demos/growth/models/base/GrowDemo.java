@@ -258,6 +258,8 @@ public class GrowDemo extends ShellPatch {
    protected static boolean mCutSelectedNodes = false;
    
    protected static boolean mCustom = false;
+   protected static boolean mResetCamera = false;
+   protected static double mCustomDouble = 0;
    
    /* --- Camera --- */
    
@@ -433,6 +435,9 @@ public class GrowDemo extends ShellPatch {
       
       mPanel.addWidget (this, "cutSelectedNodes");
       mPanel.addWidget (this, "custom");
+      
+      mPanel.addWidget (this, "resetCamera");
+      mPanel.addWidget (this, "customDouble");
    }
    
    protected void build_post() {
@@ -504,6 +509,9 @@ public class GrowDemo extends ShellPatch {
       
       myProps.add("cutSelectedNodes", "", mCutSelectedNodes);
       myProps.add("custom", "", mCustom);
+      
+      myProps.add("resetCamera", "", mResetCamera);
+      myProps.add("customDouble", "", mCustomDouble);
    }
    
    @Override
@@ -569,7 +577,23 @@ public class GrowDemo extends ShellPatch {
    }
    public boolean getCustom() { return mCustom; }
    public void setCustom(boolean val) { mCustom = val; }
-  
+   public boolean getResetCamera() { return false; }
+   public void setResetCamera(boolean val) { 
+      if (mCameraEye != null) {
+         Main.getMain ().getViewer ().setEye (mCameraEye);
+         Main.getMain ().getViewer ().setCenter (mCameraCenter);
+      }
+      
+      if (Main.getMain ().getViewer () != null) {
+         Main.getMain ().getViewer ().setBackgroundColor (mRendCfg.mBackgroundColor);
+      }
+      
+      if (mAxisAlignedRotation != null) {
+         Main.getMain ().getViewer ().setAxialView (mAxisAlignedRotation);
+      }
+   }
+   public double getCustomDouble () { return this.mGrowColorer.mMaxResidualPlasticStrainColorBarRange; }
+   public void   setCustomDouble (double val) { this.mGrowColorer.mMaxResidualPlasticStrainColorBarRange = val; }
 
    
    /* --- Time Step Logic --- */
@@ -588,18 +612,7 @@ public class GrowDemo extends ShellPatch {
    
    public void advanceCustom(double t0, double t1, int flags) {
       if (t0 < 0.01) {
-         if (mCameraEye != null) {
-            Main.getMain ().getViewer ().setEye (mCameraEye);
-            Main.getMain ().getViewer ().setCenter (mCameraCenter);
-         }
-         
-         if (Main.getMain ().getViewer () != null) {
-            Main.getMain ().getViewer ().setBackgroundColor (mRendCfg.mBackgroundColor);
-         }
-         
-         if (mAxisAlignedRotation != null) {
-            Main.getMain ().getViewer ().setAxialView (mAxisAlignedRotation);
-         }
+         setResetCamera(true);
       }
       
       // Pause the simulation if so.

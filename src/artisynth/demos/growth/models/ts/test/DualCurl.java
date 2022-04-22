@@ -1,6 +1,8 @@
 package artisynth.demos.growth.models.ts.test;
 
 import static java.lang.Math.PI;
+import static java.lang.Math.sqrt;
+import static java.lang.Math.tan;
 
 import java.awt.Color;
 import java.nio.file.Files;
@@ -53,10 +55,20 @@ import maspack.matrix.Vector3d;
  *     meshDiv = 25 (1250 Elements) | 
  *               50 (5000 Elements) | 
  *               100 (20,000 Elements)
+ *           
+ *     Use mMinEnergyBeforePausing = 1e-4 for single cylinder.
+ *     Use mMinEnergyBeforePausing = 1e-3 for tight cylinder.
+ *     
+ *     Use mReg = 2e-2 for single cylinder. Speeds up simulation.
+ *     Use mReg = 0.3 for tight cylinder.
+ *               
+ * Notes:
+ *    For single cylinder, use 
  */
 public class DualCurl extends Basic_Base {
 
-   protected final double AMPLIFIED_STRESS_MULTIPLIER = 5.0; // 7.5
+   /** Cylinder diameter shrink factor. Example: 2.0 for 2x smaller cylinder size. */
+   protected final double AMPLIFIED_STRESS_MULTIPLIER = 1; // 10.0
    
    /** Thickness option to simulate */
    protected int t;
@@ -65,6 +77,10 @@ public class DualCurl extends Basic_Base {
    protected Matrix3d mFixedBendingStrainMtx = null;
    
    static {
+//      for (int i = 0; i < 6; i++) {
+//         ShellTriElement.INTEGRATION_COORDS_GAUSS_6[i*4 + 2] /= 1/Math.sqrt(3); 
+//      }
+      
       ShellTriElement.myDefaultIntegrationCoords = ShellTriElement.INTEGRATION_COORDS_GAUSS_6;
    }
 
@@ -74,12 +90,48 @@ public class DualCurl extends Basic_Base {
    protected boolean mIsBuildingRestState = false;
    
    /** 
-    * Inverse timestep size. 
+    * Mass of each DoF for Discrete Shell.
     */
-   protected double mReg = 0.20;
+   protected double mReg = 2e-2;  // 0.20
 
+   protected double getBottomSurfaceStretchNeededForCurl(
+      double stressMultiplier,
+      double thickness, 
+      double meshX, 
+      double meshXDiv
+   ) {
+      double eleWd = meshX / (float) meshXDiv;
+      
+      meshXDiv /= stressMultiplier;
+      
+      // Interior angle between each element of cylinder.
+      double theta = ((meshXDiv-2) * PI) / meshXDiv;
+      
+      double slopeTheta = theta / 2.0;
+      
+      //
+      
+//      double adj = thickness / tan(slopeTheta);    // q=default. too much
+//    double adj = thickness / tan(slopeTheta);    // w/ q=1. almost
+      
+//      double adj = thickness * (1/sqrt(3)) / tan(slopeTheta);  // partial
+      
+//      double adj = thickness * (0.5 + 0.5*(1/sqrt(3))) / tan(slopeTheta);   // a little too much
+      double adj = thickness / tan(slopeTheta) * (1/sqrt(3));   // Most accurate. Requires 0.1x mesh size and high res.
+      
+      double g = (eleWd + 2*adj) / eleWd - 1.0;
+      return g;
+   }
+   
    protected void build_pre() {
       super.build_pre();
+      
+      m_particleDamping = 1;
+      m_stiffnessDamping = 5e-2;
+      
+      m_particleDamping = 1;
+      m_stiffnessDamping = 5e-2;
+      
             
       // --- Adjustable parameters --- //
       
@@ -92,11 +144,10 @@ public class DualCurl extends Basic_Base {
 //      this.mTsType = ThinShellType.NARAIN;
       this.mTsType = ThinShellType.EVOUGA;
     
-      int meshDiv = 25;
+      int meshDiv = 100;
       
-//      mMinEnergyBeforePausing = 1e-6;
-//    mMinEnergyBeforePausing = -1;
-      mMinEnergyBeforePausing = 1e-5;
+      mMinEnergyBeforePausing = 1e-4;
+//    mMinEnergyBeforePausing = 1e-3;
       mPauseEveryInterval = 999;
       
       // --- Setup --- //
@@ -131,14 +182,8 @@ public class DualCurl extends Basic_Base {
       
       double[] thicknesses = new double[] {1e-3, 1e-2, 1e-1, 1e-2};
       double[] youngModuluses = new double[] {1e4, 1e4, 1e4, 1e4};
-      double angScale = (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1;   // 15 : 1
-      double width = (mMeshX/(float)mMeshXDiv);  
-      double a = thicknesses[t];
-      double theta = angScale*2*PI / mMeshXDiv;  // Rotationa angle.
-      double o = a * Math.tan (theta);           // Top-layer stretched length for given side, absolute units.
-      o *= 2;                                    // NEW: 2x to account for both sides.
-      double strain = (o/width);                 // Length relative to unstretched length.
-      System.out.printf ("Strain: %.2f \n", strain);
+      double strain = getBottomSurfaceStretchNeededForCurl(
+         AMPLIFIED_STRESS_MULTIPLIER, thicknesses[t], mMeshX, mMeshXDiv);
       double[] sidedStrains_vol = new double[] {strain, strain, strain, strain}; 
       double[] sidedStrains_shell = new double[] {strain, strain, strain, strain};
       double[] pauses_vol = new double[] {999, 999, 999, 3};
@@ -164,10 +209,6 @@ public class DualCurl extends Basic_Base {
       } else if (mEleClass == ElementClass.MEMBRANE && mTsType == ThinShellType.EVOUGA) {
          m_shellThickness = thicknesses_ts[t];  
          m_youngsModulus = youngModuluses_ts[t]; 
-//         m_poissonsRatio = 0.5;
-//         m_youngsModulus = 0.5;
-//         m_youngsModulus = 0.25;
-//         m_youngsModulus = 0.1;
       } else if (mEleClass == ElementClass.SHELL) {
          m_shellThickness = thicknesses[t];
          m_youngsModulus = youngModuluses[t];
@@ -228,12 +269,12 @@ public class DualCurl extends Basic_Base {
                Files.createDirectory (discreteShellCacheDirPath);
             }
             
-            // Use rest state mesh if doesn't exists.
-            if (!Files.exists (getRestStatePath())) {
-               mIsBuildingRestState = true;
-               mMesh[0] =  MeshUtil.createCylinderFromPlane_YAxisCurved (
-                  mMeshX, mMeshY, mMeshXDiv, mMeshYDiv, (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
-            }
+            // Create rest state mesh if doesn't exists.
+//            if (!Files.exists (getRestStatePath())) {
+            mIsBuildingRestState = true;
+            mMesh[0] =  MeshUtil.createCylinderFromPlane_YAxisCurved (
+               mMeshX, mMeshY, mMeshXDiv, mMeshYDiv, (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
+//            }
          }
       } catch (Exception ex) {
          throw new RuntimeException(ex);
@@ -281,7 +322,7 @@ public class DualCurl extends Basic_Base {
       super.build_renderConfig ();
       
       mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
-      mRendCfg.mNodeRadius = 0.0005;
+      mRendCfg.mNodeRadius = 0;
       
       mRendCfg.mDirectorLen = 0; 
       mRendCfg.mFrontMeshColor = Color.LIGHT_GRAY; 

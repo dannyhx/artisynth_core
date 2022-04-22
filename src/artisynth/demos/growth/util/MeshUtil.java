@@ -847,7 +847,7 @@ public class MeshUtil {
    /**
     * Create a plane and bend it into a cylinder. 
     * 
-    * The plane's "x-axis" will be curved.
+    * The plane's "y-axis" will be curved.
     * 
     * @param wx
     * @param wy
@@ -855,57 +855,20 @@ public class MeshUtil {
     * @param ydiv
     * @return
     */
-   public static PolygonalMesh createCylinderFromPlane(
-      double wx, double wy, int xdiv, int ydiv, double overlapMultiplier
-   ) {
-      PolygonalMesh mesh = MeshFactory.createPlane (wx, wy, xdiv, ydiv);
-      
-      // Within the plane, the vertices are x-major (i.e. vertices 0,1,2,3... 
-      // move along the first x-axis first.
-      // y-bin index = vtx.idx % (xdiv + 1)
-      
-      // To get all the vertices for a y-bin (Y):
-      //   vtx.idx = Y + (xdiv+1)*n
-      
-      // Group vertices by x coordinate.
-      
-      double dx = wx/xdiv;
-      double interiorAng = ((xdiv-2) * PI) / xdiv * overlapMultiplier;  // Angle between 2 polygon sides. 
-      
-      // Rotation angle.
-      double thetaDiv = 2*PI/xdiv * overlapMultiplier;
-
-      double radius = (dx/2) / cos(interiorAng/2);
-      
-      for (Vertex3d vtx : mesh.getVertices ()) {
-         int v = vtx.getIndex ();
-         
-         int yBin = v % (xdiv+1);
-         double binTheta = yBin* thetaDiv; 
-         
-         vtx.pnt.x = cos(binTheta - PI/2) * radius;
-         vtx.pnt.z = sin(binTheta - PI/2) * radius;
-      }
-      
-      return mesh;
-   }
-   
-   /**
-    * Same as createCylinderFromPlane(), but the plane is curved along its
-    * "y-axis".
-    */
    public static PolygonalMesh createCylinderFromPlane_YAxisCurved(
       double wx, double wy, int xdiv, int ydiv, double overlapMultiplier
    ) {
       PolygonalMesh mesh = MeshFactory.createPlane (wx, wy, xdiv, ydiv);
 
       double dy = wy/ydiv;
-      double interiorAng = ((ydiv-2) * PI) / ydiv * overlapMultiplier;  // Angle between 2 polygon sides. 
       
       // Rotation angle.
-      double thetaDiv = 2*PI/ydiv * overlapMultiplier;
+      double thetaDiv = 2*PI/ydiv;
 
-      double radius = (dy/2) / cos(interiorAng/2);
+      double radius = (dy/2) / sin(PI/ydiv);
+      
+      thetaDiv *= overlapMultiplier;
+      radius /= overlapMultiplier;
       
       for (Vertex3d vtx : mesh.getVertices ()) {
          int v = vtx.getIndex ();

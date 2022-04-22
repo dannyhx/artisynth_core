@@ -8,6 +8,7 @@ import artisynth.core.femmodels.FemNodeNeighbor;
 import artisynth.core.femmodels.IntegrationPoint3d;
 import artisynth.core.femmodels.ShellElement3d;
 import artisynth.core.femmodels.WedgeElement;
+import artisynth.demos.growth.models.ts.ThinShellType;
 import artisynth.demos.growth.models.ts.evouga.StiffnessMatrixUtil;
 import artisynth.demos.growth.util.ShellUtil;
 import maspack.matrix.Matrix3d;
@@ -59,8 +60,17 @@ public class GrowModel3d extends FemModel3d {
          nodalFgs[n] = new Matrix3d();
       }
       
+      ThinShellType tsType = 
+         (this.myThinShellAux == null) ? null : this.myThinShellAux.mType;
+      
       for (ShellElement3d ele : getShellElements ()) {
          GrowTriElement gEle = (GrowTriElement)ele; 
+         
+         if (tsType == ThinShellType.NARAIN) {
+            continue;
+         } else if (tsType == ThinShellType.EVOUGA) {
+            continue;
+         }
          
          IntegrationPoint3d[] ipnts = gEle.getIntegrationPoints();
          GrowIntegrationData3d[] idata = gEle.getIntegrationData();

@@ -56,7 +56,7 @@ public class DiscreteShell extends ThinShellBase {
    /** Mesh Topology. */
    protected MeshConnectivity mMC = null;
    
-   /** Treated as an inverse time step. Default: 1e-6. */
+   /** Scalar of identity matrix that gets added with stiffness matrix. Default: 1e-6. */
    public double mReg = 0.025; 
    
    /** Previous node positions. Used to calculate instantaneous velocity. */

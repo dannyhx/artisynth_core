@@ -50,30 +50,31 @@ public class DiscreteShellTest extends GrowDemo {
       m_youngsModulus = 1;
       m_shellThickness = 1e-1;
       m_poissonsRatio = 0.5;
+      
+      //      
    }
    
    protected void build_modelSkeleton() {
       mMesh = new PolygonalMesh[M];
       for (int m=0; m<M; m++) { 
-         mMesh[m] = new PolygonalMesh();
+//         try {
+//            mMesh[m].read (new File("C:\\Users\\dan\\pj\\libshell\\example\\bunny.obj"));
+//         }
+//         catch (IOException e) {
+//            e.printStackTrace();
+//         }
          
-         try {
-            mMesh[m].read (new File("C:\\Users\\dan\\pj\\libshell\\example\\bunny.obj"));
-//            mMesh[m] = MeshFactory.createPlane (1,1,25,25);
-//            mMesh[m] = MeshUtil.createCylinderFromPlane_YAxisCurved(1,1,25,25,5);
-            mMesh[m] = MeshFactory.createBox (1, 1, 1);
-            
-//            RotationMatrix3d R = new RotationMatrix3d();
-//            R.setRotZ (Math.PI / 2);
-//            RigidTransform3d X = new RigidTransform3d ();
-//            X.setRotation (R);
-//            mMesh[m].transform (X);
-//            mMesh[0].write (new File("C:\\Users\\dan\\pj\\libshell\\example\\plane.obj"));
-         }
-         catch (IOException e) {
-            e.printStackTrace();
-         }
+//       mMesh[m] = MeshFactory.createPlane (1,1,25,25);
+//       mMesh[m] = MeshFactory.createBox (1, 1, 1);
+         mMesh[m] = MeshUtil.createCylinderFromPlane_YAxisCurved(1,1,25,25,2);
       }
+   }
+   
+   protected void build_renderConfig() {
+      super.build_renderConfig ();
+      
+      mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
+      mRendCfg.mNodeRadius = 0.0005;
    }
    
    protected void build_post() {
