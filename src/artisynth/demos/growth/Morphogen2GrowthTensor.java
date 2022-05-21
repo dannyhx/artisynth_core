@@ -319,29 +319,29 @@ public class Morphogen2GrowthTensor {
 
             if (ele.getElementClass () == ElementClass.SHELL) {
                if (isBendingMorphogenHack && k < 3) {
-                  // Apply strain as usual to top-surface.
+                  // Apply strain as usual to back-surface.
                } 
                else if (isBendingMorphogenHack && k < 6) {
                   // Do not apply strain to mid-surface.
                   strainMtx.setZero ();
                } 
                else if (isBendingMorphogenHack) {
-                  // Negate strain to bottom-surface to simulate bending.
+                  // Leave the top-surface untouched.
                   if (zeroStrainAtBottom)
                      strainMtx.setZero ();
                   else
-                     strainMtx.negate ();
+                     strainMtx.negate ();   // Don't use.
                }
-            } else {
+            } else { // Element case.
                if (isBendingMorphogenHack && k < 3) {
-                  // Apply strain as usual to top-surface.
+                  // Apply strain as usual to bottom-surface.
                } 
                else if (isBendingMorphogenHack && k < 6) {
-                  // Negate strain to bottom-surface to simulate bending.
+               // Leave the top-surface untouched.
                   if (zeroStrainAtBottom)
                      strainMtx.setZero ();  
                   else
-                     strainMtx.negate ();
+                     strainMtx.negate ();    // Don't use.
                } 
             }
             
