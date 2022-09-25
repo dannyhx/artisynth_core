@@ -112,10 +112,13 @@ custom growth experiments.
 
 Documentation on ArtiSynth itself can be found at https://www.artisynth.org/Software/Documentation.
 
-## Miscellaneous
+## Coding Settings
 
-If coding within Eclipse, I recommend this using plugin which allows you to cut/copy/paste lines of code
+I recommend using plugin which allows you to cut/copy/paste lines of code
 much like in Visual Studio Code.
 [https://code.google.com/archive/p/copycutcurrentline/](https://code.google.com/archive/p/copycutcurrentline/)
 
 The CTRL+SHIFT+R shortcut is also very handy, which allows you quick search for a specific filename.
+
+You can enable automatic formatting and automatic import organization:
+`Window > Preferences > Java > Editor > Save Actions`
