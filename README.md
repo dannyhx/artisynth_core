@@ -52,14 +52,12 @@ unzip eclipseSettings.zip
 
 # Import the Artisynth git repository.
 File (located in top taskbar) > Import > Git > Projects from Git > Next >
+Existing local repository > Next > Add... 
 
-Existing local repository > Next >
-
-Add... > Set the Directory to your eclipse workspace. The
-`artisynth_core` repository should automatically appear
-in the search results afterwards; tick its checkbox > Finish >
-
-Next > Next (Import existing Eclipse projects) > Finish
+# Set the Directory to your eclipse workspace. The
+# `artisynth_core` repository should automatically appear
+# in the search results afterwards
+Tick its checkbox > Finish > Next > Next (Import existing Eclipse projects) > Finish
 
 # The Package Explorer (left sidebar) should appear now, 
 # with artisynth_core visible.
@@ -68,13 +66,13 @@ Next > Next (Import existing Eclipse projects) > Finish
 Run (located in top taskbar) > Run Configurations ... > Java Application > 
 ArtiSynth > Arguments tab > Set the Program arguments to
 
--model artisynth.demos.growth.models.paper.Intricate_Wrinkles   
--noTimeline     
--play                   
--disableHybridSolves    
--numSolverThreads 1  
+    -model artisynth.demos.growth.models.paper.Intricate_Wrinkles   
+    -noTimeline     
+    -play                   
+    -disableHybridSolves    
+    -numSolverThreads 1  
 
-> Set the VM arguments to 
+Set the VM arguments to 
 -Xmx10g                 
 
 > Apply > Close
