@@ -30,13 +30,17 @@ cd eclipse-workspace
 git clone https://github.com/dannyhx/artisynth_core.git
 cd artisynth_core
 
-# Switch to the shell_growth branch.
-git checkout shell_growth
+# Switch to the growth branch.
+git checkout growth
 
 # Download the libraries required for ArtiSynth.
 cd bin
 ./updateArtisynthLibs     # Linux/Mac
 ./updateArtisynthLibs.bat # Windows
+
+# Unzip the eclipse settings.
+# If using a GUI zip program, accept any overwrite if prompted.
+unzip eclipseSettings.zip
 
 # Open Eclipse.
 # When prompted for the workspace directory, specify the workspace
@@ -109,3 +113,11 @@ created in the `growth.models.paper` package. The paper package itself provides 
 custom growth experiments.
 
 Documentation on ArtiSynth itself can be found at https://www.artisynth.org/Software/Documentation.
+
+## Miscellaneous
+
+If coding within Eclipse, I recommend this using plugin which allows you to cut/copy/paste lines of code
+much like in Visual Studio Code.
+[https://code.google.com/archive/p/copycutcurrentline/](https://code.google.com/archive/p/copycutcurrentline/)
+
+The CTRL+SHIFT+R shortcut is also very handy, which allows you quick search for a specific filename.
