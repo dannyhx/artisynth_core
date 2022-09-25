@@ -14,39 +14,39 @@ import maspack.render.Renderer.ColorInterpolation;
 import maspack.render.Renderer.ColorMixing;
 import maspack.render.Renderer.FaceStyle;
 
-/** 
- *  Handles coloring the surface of the growth model.
- *  
- *  The color can correspond to the amount of plastic strain or morphogen
- *  concentration present.
+/**
+ * Handles coloring the surface of the growth model.
+ * 
+ * The color can correspond to the amount of plastic strain or morphogen
+ * concentration present.
  */
 public class GrowColorer {
    /** Lowest value in the plastic strain color bar. */
    protected final double mMinPlasticStrainColorBarRange = 1;
-   
-   /** Highest value in the plastic strain color bar.*/
+
+   /** Highest value in the plastic strain color bar. */
    public double mMaxPlasticStrainColorBarRange = 1.10;
-   
+
    /** Value range in the residual plastic strain color bar. */
    protected final double mMinResidualPlasticStrainColorBarRange = 0;
    public double mMaxResidualPlasticStrainColorBarRange = 0.0310;
-   
+
    /** Lowest value in the morphogen color bar. */
    protected final double mMinMorphogenColorBarRange = 0;
-   
-   /** Highest value in the morphogen color bar.*/
+
+   /** Highest value in the morphogen color bar. */
    protected final double mMaxMorphogenColorBarRange = 1;
-   
+
    /** RGB color for areas with lowest morphogen value. */
-   public Vector3d zeroMorphogenRGB = new Vector3d(0,1,0);
-   
+   public Vector3d zeroMorphogenRGB = new Vector3d (0, 1, 0);
+
    /** RGB color for areas with highest morphogen value. */
-   public Vector3d maxMorphogenRGB = new Vector3d(1,0,1);
-   
+   public Vector3d maxMorphogenRGB = new Vector3d (1, 0, 1);
+
    protected GrowModel3d mFemModel;
    protected RootModel mRootModel;
    protected PolygonalMesh mSurfaceMesh;
-   
+
    protected ColorBar mColorBar;
 
    /**
@@ -56,51 +56,58 @@ public class GrowColorer {
     * @param root
     * Root model that contains the FE model. It will hold the color map chart.
     */
-   public GrowColorer (
-   RootModel root, GrowModel3d femModel, boolean showColorBar) {
-      setTarget(femModel);
+   public GrowColorer (RootModel root, GrowModel3d femModel,
+   boolean showColorBar) {
+      setTarget (femModel);
 
       mColorBar = new ColorBar ();
       mColorBar.setNumberFormat ("%.5f"); // 5 decimal places.
-      mColorBar.populateLabels (
-         mMinPlasticStrainColorBarRange, mMaxPlasticStrainColorBarRange, 10 /*ticks*/);
+      mColorBar
+         .populateLabels (
+            mMinPlasticStrainColorBarRange, mMaxPlasticStrainColorBarRange,
+            10 /* ticks */);
       mColorBar.setColorMap (mFemModel.getColorMap ());
       mColorBar.setLocation (-80, 0.05, 20, 0.9);
       if (showColorBar)
          root.addRenderable (mColorBar);
       mColorBar.setColorMap (mFemModel.getColorMap ());
    }
-   
-   public void setTarget(GrowModel3d femModel) {
+
+   public void setTarget (GrowModel3d femModel) {
       mFemModel = femModel;
    }
-   
+
    /**
     * Update the colors, corresponding to the amount of plastic strain.
     */
    public void computePlasticStrainColors () {
       // When coloring vtx-by-vtx, cannot give different colors for
       // front and back faces.
-      RenderProps.setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT);
-      mSurfaceMesh = mFemModel.getSurfaceMesh ();  // Latest surface mesh
+      RenderProps
+         .setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT);
+      mSurfaceMesh = mFemModel.getSurfaceMesh (); // Latest surface mesh
       mSurfaceMesh.setVertexColoringEnabled ();
-      mFemModel.getRenderProps ().setLineWidth (1); 
-      mColorBar.updateLabels (mMinPlasticStrainColorBarRange, mMaxPlasticStrainColorBarRange);
-      
+      mFemModel.getRenderProps ().setLineWidth (1);
+      mColorBar
+         .updateLabels (
+            mMinPlasticStrainColorBarRange, mMaxPlasticStrainColorBarRange);
+
       Matrix3d[] nodalFps = mFemModel.getNodalPlasticDeformationGradient ();
-      double[] rgb = new double[3];  
+      double[] rgb = new double[3];
       for (int n = 0; n < mFemModel.numNodes (); n++) {
          FemNode3d node = mFemModel.getNode (n);
-         
+
          // Convert the plastic deformation gradient into a scalar.
          double scalar = fpToScalar (nodalFps[n]);
-         
+
          mColorBar.getColor (scalar, rgb);
-         mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (node).getIndex (), 
-            rgb[0], rgb[1], rgb[2], 1);
-      }  
+         mSurfaceMesh
+            .setColor (
+               mFemModel.getSurfaceVertex (node).getIndex (), rgb[0], rgb[1],
+               rgb[2], 1);
+      }
    }
-   
+
    /**
     * Update the colors, corresponding to the amount of residual plastic strain.
     */
@@ -109,137 +116,157 @@ public class GrowColorer {
       // front and back faces.
       boolean isShellEle = this.mFemModel.numShellElements () > 0;
       if (isShellEle) {
-         RenderProps.setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
-      } else {
-         RenderProps.setFaceStyle (mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
+         RenderProps
+            .setFaceStyle (
+               mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
       }
-      mSurfaceMesh = mFemModel.getSurfaceMesh ();  // Latest surface mesh
+      else {
+         RenderProps
+            .setFaceStyle (
+               mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
+      }
+      mSurfaceMesh = mFemModel.getSurfaceMesh (); // Latest surface mesh
       mSurfaceMesh.setVertexColoringEnabled ();
-      mFemModel.getRenderProps ().setLineWidth (0); 
-      mColorBar.updateLabels (mMinResidualPlasticStrainColorBarRange, mMaxResidualPlasticStrainColorBarRange);
-      
+      mFemModel.getRenderProps ().setLineWidth (0);
+      mColorBar
+         .updateLabels (
+            mMinResidualPlasticStrainColorBarRange,
+            mMaxResidualPlasticStrainColorBarRange);
+
       double[] nodalRS = mFemModel.getNodalResidualPlasticBendingStrain ();
       double[] rgb = new double[3];
-      
+
       double max = 0;
       double min = 0;
       double sum = 0;
-      
+
       for (int n = 0; n < mFemModel.numNodes (); n++) {
          FemNode3d node = mFemModel.getNode (n);
          sum += nodalRS[n];
-         
+
          double scalar = -1;
          double alpha = -1;
-         
-         if (!isShellEle && !ShellUtil.isVolBackNode(node)) {
+
+         if (!isShellEle && !ShellUtil.isVolBackNode (node)) {
             // Use its back node's color.
             int numNodes = mFemModel.numNodes ();
-            int b = n + (numNodes/2);
+            int b = n + (numNodes / 2);
             scalar = nodalRS[b];
             alpha = 0;
-         } else {
+         }
+         else {
             scalar = nodalRS[n];
             alpha = 1;
          }
-         
-         // Workaround. Colorbar is very coarse such that stress below 10% of maximum will appear as the same
-         // color corresponding to 0% stress. Give a color boost if stress 11% or lower.
+
+         // Workaround. Colorbar is very coarse such that stress below 10% of
+         // maximum will appear as the same
+         // color corresponding to 0% stress. Give a color boost if stress 11%
+         // or lower.
          if (scalar <= 0.11) {
             scalar *= 2;
          }
-         
+
          mColorBar.getColor (scalar, rgb);
-         mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (node).getIndex (), rgb[0], rgb[1], rgb[2], alpha);
-         
+         mSurfaceMesh
+            .setColor (
+               mFemModel.getSurfaceVertex (node).getIndex (), rgb[0], rgb[1],
+               rgb[2], alpha);
+
          if (n == 0 || scalar > max) {
             max = scalar;
          }
-         
+
          if (n == 0 || scalar < min) {
             min = scalar;
          }
-         
-//         FemNode3d nodeB = mFemModel.getNode (n+3);
-//         mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (nodeB).getIndex (), 
-//            rgb[0], rgb[1], rgb[2], 1);
-      }  
-      
-      System.out.printf ("Stress: [%.4f, %.4f]. Total: [%.4f]\n", min, max, sum);
+
+         // FemNode3d nodeB = mFemModel.getNode (n+3);
+         // mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (nodeB).getIndex
+         // (),
+         // rgb[0], rgb[1], rgb[2], 1);
+      }
+
+      System.out
+         .printf ("Stress: [%.4f, %.4f]. Total: [%.4f]\n", min, max, sum);
    }
-   
+
    /**
     * Update the colors, corresponding to the amount of morphogen.
     */
    public void computeMorphogenColors () {
-      // When coloring vtx-by-vtx, cannot give different colors for 
+      // When coloring vtx-by-vtx, cannot give different colors for
       // front and back faces.
-      mSurfaceMesh = mFemModel.getSurfaceMesh ();  // Latest surface mesh
+      mSurfaceMesh = mFemModel.getSurfaceMesh (); // Latest surface mesh
 
       mSurfaceMesh.setVertexColoringEnabled ();
       mSurfaceMesh.setColorInterpolation (ColorInterpolation.RGB);
       mSurfaceMesh.setVertexColorMixing (ColorMixing.REPLACE);
       mSurfaceMesh.setColorsFixed (false);
-      
-      mColorBar.updateLabels (
-         mMinMorphogenColorBarRange, mMaxMorphogenColorBarRange);
-      
+
+      mColorBar
+         .updateLabels (mMinMorphogenColorBarRange, mMaxMorphogenColorBarRange);
+
       double maxMorph = 0;
       for (FemNode3d node : mFemModel.getNodes ()) {
-         maxMorph = Math.max ( ((GrowNode3d)node).getChem3 (), maxMorph);
+         maxMorph = Math.max (((GrowNode3d)node).getChem3 (), maxMorph);
       }
-      
+
       for (FemNode3d node : mFemModel.getNodes ()) {
          GrowNode3d gNode = (GrowNode3d)node;
          double nodeMorph = gNode.getChem3 ();
-         
-         Vector3d nodeMorphogenRGB = interpolateRGB (
-            zeroMorphogenRGB, maxMorphogenRGB, nodeMorph/maxMorph);
-         
-         mSurfaceMesh.setColor (mFemModel.getSurfaceVertex (node).getIndex (),
-            nodeMorphogenRGB.x, nodeMorphogenRGB.y, nodeMorphogenRGB.z, 1);
+
+         Vector3d nodeMorphogenRGB =
+            interpolateRGB (
+               zeroMorphogenRGB, maxMorphogenRGB, nodeMorph / maxMorph);
+
+         mSurfaceMesh
+            .setColor (
+               mFemModel.getSurfaceVertex (node).getIndex (),
+               nodeMorphogenRGB.x, nodeMorphogenRGB.y, nodeMorphogenRGB.z, 1);
       }
-      
+
       mFemModel.getRenderProps ().setLineColor (Color.WHITE);
       mSurfaceMesh.getRenderProps ().setFaceStyle (FaceStyle.FRONT_AND_BACK);
       mSurfaceMesh.getRenderProps ().setBackColor (Color.CYAN);
-      mFemModel.getRenderProps ().setLineWidth (1); 
+      mFemModel.getRenderProps ().setLineWidth (1);
    }
-   
+
    /**
     * Convert a plastic deformation gradient into a scalar value that's within
     * the color bar range.
     */
-   protected double fpToScalar(Matrix3d Fp) {
+   protected double fpToScalar (Matrix3d Fp) {
       return Fp.determinant ();
    }
-   
+
    /**
-    * Convert a morphogen concentration into a scalar value that's within the 
+    * Convert a morphogen concentration into a scalar value that's within the
     * color bar range.
     */
-   protected double morphogenToScalar(double morphogen) {
-      return Math.min(1.5, morphogen);
+   protected double morphogenToScalar (double morphogen) {
+      return Math.min (1.5, morphogen);
    }
-   
+
    /**
     * Turn off any surface coloring.
     */
-   public void toggleOff() {
-      RenderProps.setFaceStyle (
-         mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
+   public void toggleOff () {
+      RenderProps
+         .setFaceStyle (
+            mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
       mSurfaceMesh = mFemModel.getSurfaceMesh ();
       mSurfaceMesh.clearColors ();
-      mFemModel.getRenderProps ().setLineWidth (1);     
+      mFemModel.getRenderProps ().setLineWidth (1);
    }
-   
+
    /** Get an interpolated RGB value between two given RGB values. */
-   public Vector3d interpolateRGB(Vector3d A, Vector3d B, double pctB) {
-      Vector3d C = new Vector3d();
-      
-      C.scaledAdd (1-pctB, A);
-      C.scaledAdd (pctB   ,B);
-      
+   public Vector3d interpolateRGB (Vector3d A, Vector3d B, double pctB) {
+      Vector3d C = new Vector3d ();
+
+      C.scaledAdd (1 - pctB, A);
+      C.scaledAdd (pctB, B);
+
       return C;
    }
 }

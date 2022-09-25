@@ -1,6 +1,5 @@
 package artisynth.demos.growth.models.ts;
 
 public enum ThinShellType {
-   NARAIN, 
-   EVOUGA, 
+   NARAIN, EVOUGA,
 }

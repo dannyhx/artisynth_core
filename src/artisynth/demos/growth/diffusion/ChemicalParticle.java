@@ -7,40 +7,40 @@ import maspack.properties.PropertyList;
 
 /** A particle that has its own chemicals. */
 public class ChemicalParticle extends Particle {
-   
+
    /** Chemical concentration for each chemical. */
    protected VectorNd mChems;
-   
-   public ChemicalParticle(double mass, Point3d pt, int numChems) {
-      super(mass, pt);
-      mChems = new VectorNd(numChems);
+
+   public ChemicalParticle (double mass, Point3d pt, int numChems) {
+      super (mass, pt);
+      mChems = new VectorNd (numChems);
    }
-   
-   public void setChems(VectorNd chems) {
+
+   public void setChems (VectorNd chems) {
       mChems = chems;
    }
-   
-   public double getChem0() {
+
+   public double getChem0 () {
       return mChems.get (0);
    }
-   
-   public void setChem0(double amt) {
+
+   public void setChem0 (double amt) {
       mChems.set (0, amt);
    }
-   
-   public double getChem1() {
-      if (mChems.size() < 2) {
+
+   public double getChem1 () {
+      if (mChems.size () < 2) {
          return 0;
       }
-      
+
       return mChems.get (1);
    }
-   
-   public void setChem1(double amt) {
+
+   public void setChem1 (double amt) {
       mChems.set (1, amt);
    }
-   
-   public double getChem(int chemIdx) {
+
+   public double getChem (int chemIdx) {
       return mChems.get (chemIdx);
    }
 
@@ -59,5 +59,5 @@ public class ChemicalParticle extends Particle {
    public PropertyList getAllPropertyInfo () {
       return myProps;
    }
-   
+
 }

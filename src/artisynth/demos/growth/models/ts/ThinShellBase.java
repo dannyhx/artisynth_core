@@ -8,43 +8,50 @@ import maspack.geometry.PolygonalMesh;
 import maspack.matrix.Matrix3d;
 
 public abstract class ThinShellBase {
-   
+
    protected FemModel3d mModel;
-   protected PolygonalMesh mMesh; 
-   
-   public ThinShellBase(FemModel3d model, PolygonalMesh mesh) {
+   protected PolygonalMesh mMesh;
+
+   public ThinShellBase (FemModel3d model, PolygonalMesh mesh) {
       this.mModel = model;
       this.mMesh = mesh;
    }
-   
-   public abstract void setMaterialProperties(
+
+   public abstract void setMaterialProperties (
       double youngsModulus, double poissonsRatio, double thickness);
-   
-   public abstract void addForceAndStiffness();
-   
+
+   public abstract void addForceAndStiffness ();
+
    // Useful if shell implementation has its own advance strategy.
-   public void advance() {
-      
+   public void advance () {
+
    }
-   
+
    /** Remeshing **/
-   
-   public void remeshPreOp() {}
-   public void remeshPostOp(boolean isEleModified) {}
-   
+
+   public void remeshPreOp () {
+   }
+
+   public void remeshPostOp (boolean isEleModified) {
+   }
+
    /** Remeshing Operations **/
-   
-   public void remeshRemoveFacePreOp(Face face, OpRv opRv) {}
-   
+
+   public void remeshRemoveFacePreOp (Face face, OpRv opRv) {
+   }
+
    /* --- Morphogen2Growth --- */
-   
-   public void applyGrowthTensorToEle(
-      FemElement3dBase ele, boolean isBendingMorphogenHack, 
-      Matrix3d fixedBendingStrain) {};
-      
-   public void unapplyGrowthTensors() {};
-   
+
+   public void applyGrowthTensorToEle (
+      FemElement3dBase ele, boolean isBendingMorphogenHack,
+      Matrix3d fixedBendingStrain) {
+   };
+
+   public void unapplyGrowthTensors () {
+   };
+
    /* --- Plasticity --- */
-   
-   public void useResidualPlasticStrain() {};
+
+   public void useResidualPlasticStrain () {
+   };
 }

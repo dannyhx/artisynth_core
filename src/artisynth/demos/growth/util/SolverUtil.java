@@ -6,7 +6,7 @@ import maspack.matrix.Vector;
 import maspack.matrix.VectorNd;
 
 /*
-Copyright ©2013 The Regents of the University of California
+Copyright ï¿½2013 The Regents of the University of California
 (Regents). All Rights Reserved. Permission to use, copy, modify, and
 distribute this software and its documentation for educational,
 research, and not-for-profit purposes, without fee and without a
@@ -39,40 +39,40 @@ public class SolverUtil {
     * @param b
     * @return
     */
-   public static VectorNd solve_llsq(DenseMatrixBase A, VectorNd b) {
+   public static VectorNd solve_llsq (DenseMatrixBase A, VectorNd b) {
       int m = A.rowSize ();
       int n = A.colSize ();
-      
+
       if (b.size () != m) {
-         throw new RuntimeException("b vector does not match row size of A.");
+         throw new RuntimeException ("b vector does not match row size of A.");
       }
-      
-      MatrixNd M = new MatrixNd(n, n);
-      VectorNd y = new VectorNd(n);
-      
+
+      MatrixNd M = new MatrixNd (n, n);
+      VectorNd y = new VectorNd (n);
+
       for (int i = 0; i < n; i++) {
-         VectorNd iCol = new VectorNd(m);
+         VectorNd iCol = new VectorNd (m);
          A.getColumn (i, iCol);
          y.set (i, b.dot (iCol));
-         
+
          for (int j = 0; j < n; j++) {
-            VectorNd jCol = new VectorNd(m);
+            VectorNd jCol = new VectorNd (m);
             A.getColumn (j, jCol);
             M.set (i, j, iCol.dot (jCol));
          }
       }
-      
+
       if (M.frobeniusNorm () == 0) {
-         throw new RuntimeException("Detected zero frobenius norm matrix.");
+         throw new RuntimeException ("Detected zero frobenius norm matrix.");
       }
-      
+
       if (n == 3) {
-         return solve_symmetric_3x3(M, y);
+         return solve_symmetric_3x3 (M, y);
       }
-      
-      throw new RuntimeException("Unsupported matrix size for linear solver.");
+
+      throw new RuntimeException ("Unsupported matrix size for linear solver.");
    }
-   
+
    /**
     * vectors.cpp::solve_symmetric
     * 
@@ -80,41 +80,41 @@ public class SolverUtil {
     * @param y
     * @return
     */
-   protected static VectorNd solve_symmetric_3x3(DenseMatrixBase A, Vector b) {
+   protected static VectorNd solve_symmetric_3x3 (DenseMatrixBase A, Vector b) {
       if (A.rowSize () != 3 || A.colSize () != 3) {
-         throw new RuntimeException("Expected 3x3 matrix.");
+         throw new RuntimeException ("Expected 3x3 matrix.");
       }
-      
-      double t13 = A.get(1,2)*A.get(1,2);
-      double t14 = A.get(0,2)*A.get(0,2);
-      double t15 = A.get(0,0)*t13;
-      double t16 = A.get(1,1)*t14;
-      double t17 = A.get(0,1)*A.get(0,1);
-      double t18 = A.get(2,2)*t17;
-      double t21 = A.get(0,1)*A.get(0,2)*A.get(1,2)*2.0;
-      double t22 = A.get(0,0)*A.get(1,1)*A.get(2,2);
-      double t19 = t15+t16+t18-t21-t22;
-      
+
+      double t13 = A.get (1, 2) * A.get (1, 2);
+      double t14 = A.get (0, 2) * A.get (0, 2);
+      double t15 = A.get (0, 0) * t13;
+      double t16 = A.get (1, 1) * t14;
+      double t17 = A.get (0, 1) * A.get (0, 1);
+      double t18 = A.get (2, 2) * t17;
+      double t21 = A.get (0, 1) * A.get (0, 2) * A.get (1, 2) * 2.0;
+      double t22 = A.get (0, 0) * A.get (1, 1) * A.get (2, 2);
+      double t19 = t15 + t16 + t18 - t21 - t22;
+
       if (Math.abs (t19) == 0) {
-         throw new RuntimeException("Detected singular matrix.");
+         throw new RuntimeException ("Detected singular matrix.");
       }
-      
-      double t20 = 1/t19;
-      
-      return new VectorNd(
-         t20*(t13*b.get(0)+A.get(0,2)*
-            (A.get(1,1)*b.get(2)-A.get(1,2)*b.get(1))-A.get(0,1)*
-            (A.get(1,2)*b.get(2)-A.get(2,2)*b.get(1))-A.get(1,1)*
-            A.get(2,2)*b.get(0)),
-         
-         t20*(t14*b.get(1)+A.get(1,2)*
-         (A.get(0,0)*b.get(2)-A.get(0,2)*b.get(0))
-         -A.get(0,1)*(A.get(0,2)*b.get(2)-A.get(2,2)*
-         b.get(0))-A.get(0,0)*A.get(2,2)*b.get(1)),
-         
-         t20*(t17*b.get(2)+A.get(1,2)*(A.get(0,0)*b.get(1)-A.get(0,1)*b.get(0))
-         -A.get(0,2)*(A.get(0,1)*b.get(1)-A.get(1,1)*b.get(0))
-         -A.get(0,0)*A.get(1,1)*b.get(2))
-      );
+
+      double t20 = 1 / t19;
+
+      return new VectorNd (
+         t20 * (t13 * b.get (0)
+         + A.get (0, 2) * (A.get (1, 1) * b.get (2) - A.get (1, 2) * b.get (1))
+         - A.get (0, 1) * (A.get (1, 2) * b.get (2) - A.get (2, 2) * b.get (1))
+         - A.get (1, 1) * A.get (2, 2) * b.get (0)),
+
+         t20 * (t14 * b.get (1)
+         + A.get (1, 2) * (A.get (0, 0) * b.get (2) - A.get (0, 2) * b.get (0))
+         - A.get (0, 1) * (A.get (0, 2) * b.get (2) - A.get (2, 2) * b.get (0))
+         - A.get (0, 0) * A.get (2, 2) * b.get (1)),
+
+         t20 * (t17 * b.get (2)
+         + A.get (1, 2) * (A.get (0, 0) * b.get (1) - A.get (0, 1) * b.get (0))
+         - A.get (0, 2) * (A.get (0, 1) * b.get (1) - A.get (1, 1) * b.get (0))
+         - A.get (0, 0) * A.get (1, 1) * b.get (2)));
    }
 }

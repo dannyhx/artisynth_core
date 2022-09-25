@@ -529,11 +529,11 @@ public class MathUtil {
       return p;
    }
 
-   public static Vector3d triangleGradient (Point3d[] vtxs, double[] xs) {
+   public static Vector3d triangleGradient (Point3d[] pnts, double[] xs) {
       // GrowthToolbox :: trianglegradient()
 
-      Vector3d v10 = new Vector3d ().sub (vtxs[1], vtxs[0]);
-      Vector3d v20 = new Vector3d ().sub (vtxs[2], vtxs[0]);
+      Vector3d v10 = new Vector3d ().sub (pnts[1], pnts[0]);
+      Vector3d v20 = new Vector3d ().sub (pnts[2], pnts[0]);
 
       double d11 = v10.dot (v10);
       double d12 = v10.dot (v20);
@@ -781,12 +781,12 @@ public class MathUtil {
    }
 
    public static void main (String[] args) {
-      Vector3d[] vtxs =
-         new Vector3d[] { new Vector3d (0, 0, 0), new Vector3d (1, 0, 0),
-                          new Vector3d (0, 1, 0), };
+      Point3d[] pts =
+         new Point3d[] { new Point3d (0, 0, 0), new Point3d (1, 0, 0),
+                         new Point3d (0, 1, 0), };
       double[] xs = new double[] { 1, 0, 0 };
 
-      Vector3d g = triangleGradient (vtxs, xs);
+      Vector3d g = triangleGradient (pts, xs);
 
       System.out.println (g);
    }
