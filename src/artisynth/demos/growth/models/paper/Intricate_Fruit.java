@@ -15,7 +15,7 @@ import maspack.matrix.RigidTransform3d;
       mCameraEye = new Point3d(0, -4.9771, 0);
       mCameraCenter = new Point3d(0,0,0);
  */
-// artisynth.models.plants.growth.paperdemos.Intricate_Fruit
+// -model artisynth.demos.growth.models.paper.Intricate_Fruit
 public class Intricate_Fruit extends GrowDemo {
 
    protected void build_modelSkeleton() {

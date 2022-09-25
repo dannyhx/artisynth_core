@@ -173,6 +173,8 @@ public class GrowDemo extends ShellPatch {
    protected Morphogen2GrowthTensor mMorphogen2GrowthTensor;
    protected PlasticEmbedder mPlasticEmbedder;
    
+   protected boolean mIsEnableMorphogen2GrowthTensor = true;
+   
    /* --- Collision --- */
    
    /** Collision settings between each pair of models, including self 
@@ -331,6 +333,10 @@ public class GrowDemo extends ShellPatch {
          mRefRB[m].getRenderProps().setEdgeColor(Color.BLACK);
          mRefRB[m].getRenderProps().setDrawEdges(true);
          mRefRB[m].getRenderProps().setAlpha (1.0);
+         
+         if (this.mIsShowRefMesh) {
+            mMechModel.add (mRefRB[m]);
+         }
       }          
    }
    
@@ -712,6 +718,10 @@ public class GrowDemo extends ShellPatch {
          for (int m=0; m<M; m++) {
             if (! mFemModel[m].getDynamicsEnabled ()) 
                continue;
+            
+            if (! mIsEnableMorphogen2GrowthTensor) {
+               continue;
+            }
             
             mMorphogen2GrowthTensor.setTarget (mFemModel[m]);
             

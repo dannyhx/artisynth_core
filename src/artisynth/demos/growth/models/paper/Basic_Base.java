@@ -29,6 +29,8 @@ public class Basic_Base extends GrowDemo {
       mRenderMode = RenderMode.MORPHOLOGY;
       mSurfaceColor = SurfaceColor.MORPHOGEN;
       mPauseEveryInterval = 4.97;
+      
+      mEnableCollisionHandling = false;
    }
    
    protected void build_renderConfig() {

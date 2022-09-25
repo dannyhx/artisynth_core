@@ -30,7 +30,7 @@ import maspack.matrix.Point3d;
       mCameraEye = new Point3d(0.119382, -0.985104, 0.098211);
       mCameraCenter = new Point3d(-0.138341, -0.747875, 0.038583);
  */
-// artisynth.models.plants.growth.paperdemos.Intricate_RippleCascade
+// -model artisynth.demos.growth.models.paper.Intricate_RippleCascade
 public class Intricate_RippleCascade extends GrowDemo {
    
    protected double morphogenSrcDuration = 999;

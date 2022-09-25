@@ -71,7 +71,7 @@ public class ShellPatch extends RootModel {
    /* --- FEM physical properties --- */
    
    /** Element type */
-   protected ElementClass mEleClass = ElementClass.VOLUMETRIC;
+   protected ElementClass mEleClass = ElementClass.SHELL;
    
    /** If using membrane element type, what thin-shell behavior to use? */
    protected ThinShellType mTsType = ThinShellType.NARAIN;

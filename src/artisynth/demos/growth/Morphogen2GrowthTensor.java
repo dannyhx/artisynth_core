@@ -44,7 +44,6 @@ public class Morphogen2GrowthTensor {
    protected FemModel3d mFemModel;
    protected PolygonalMesh mMesh; 
    
-   
    public Morphogen2GrowthTensor(FemModel3d femModel, PolygonalMesh mesh) {
       setTarget(femModel, mesh);
    }
@@ -132,16 +131,24 @@ public class Morphogen2GrowthTensor {
       for (FemElement3dBase ele : ShellUtil.getAllElements(mFemModel)) {
          GrowElementBase gEle = (GrowElementBase)ele;
          
+         Matrix3d curFrame = gEle.getFrame ();
+         
          // First, generate the principle axes of this element.
          //     j0 == parallel to normal
          //     j1 == parallel to polDir
          //     j2 == perpendicular to j0 and j1 (i.e. cross(j0,j1) )
          
-         Vector3d polDir = new Vector3d(gEle.getPolDir ());
+         Vector3d nrm = ShellUtil.getNormal (ele, true);
          
-         Vector3d j0 = ShellUtil.getNormal (ele, false);
-         Vector3d j1 = new Vector3d( polDir ).normalize ();
-         Vector3d j2 = new Vector3d().cross (j0, j1).normalize ();
+         // Project POL onto plane of element
+         // Vector3d par = MathUtil.projVec3ToPlane (gEle.getPolDir (), nrm);
+         // if (par.normSquared () < MathUtil.ELIPSON) {
+         //    par = MathUtil.projVec3ToPlane (nrm, gEle.getPolDirAlt());
+         // }
+         // par.normalize ();
+        Vector3d par = gEle.getPolDir ();
+
+         Vector3d per = new Vector3d().cross (nrm, par).normalize ();
          
          // Now, aggregate principle axes as 3x3 orthogonal matrix where 
          //    col0 == polDir 
@@ -149,10 +156,10 @@ public class Morphogen2GrowthTensor {
          //    col2 == normal 
          
          Matrix3d frame = new Matrix3d();
-         frame.setColumn (0, j1);
-         frame.setColumn (1, j2);
-         frame.setColumn (2, j0);
-         
+         frame.setColumn (0, par);
+         frame.setColumn (1, per);
+         frame.setColumn (2, nrm);
+
          gEle.setFrame(frame);
       }
    }
@@ -276,7 +283,7 @@ public class Morphogen2GrowthTensor {
    }
    
    /** Convenient method to calculate integration growth tensors. */
-   public void computeGrowthTensors() {
+   public void computeGrowthTensors() {   
       createFrames();
       createElementGrowthTensors();
       rotateElementGrowthTensors();
@@ -304,6 +311,26 @@ public class Morphogen2GrowthTensor {
                ele, isBendingMorphogenHack, fixedBendingStrain);
             continue; 
          }
+         
+         // Matrix3d prevF = gEle.getFramePrev ();
+         // Matrix3d prevFT = new Matrix3d(prevF); 
+         // prevFT.transpose ();
+         
+         // Matrix3d invPrevF = new Matrix3d(prevF);
+         // boolean isOk = invPrevF.invert ();
+         // if (!isOk) {
+         //    throw new RuntimeException("Failed to invert");
+         // }
+         
+         // Matrix3d invPrevFT = new Matrix3d(prevFT);
+         // isOk = invPrevFT.invert ();
+         // if (!isOk) {
+         //    throw new RuntimeException("Failed to invert");
+         // }
+         
+         // Matrix3d F = new Matrix3d(gEle.getFrame ());
+         // Matrix3d FT = new Matrix3d(F);
+         // FT.transpose();
          
          GrowIntegrationData3d[] idata = gEle.getIntegrationData ();
          for (int k = 0; k < idata.length; k++) {
@@ -346,6 +373,17 @@ public class Morphogen2GrowthTensor {
             }
             
             if (this.fixedBendingStrain == null ) {
+               // Before incrementing Fp, take the existing Fp, undo its rotation
+               // and apply current rotation.
+//               Matrix3d curFp = idata[k].getFp ();
+//               curFp.sub (Matrix3d.IDENTITY);
+//               curFp.mul (invPrevFT);
+//               curFp.mul (invPrevF, curFp); 
+//               // Undo done. Apply current.
+//               curFp.mul (F, curFp);
+//               curFp.mul (FT);
+//               curFp.add (Matrix3d.IDENTITY);
+               
                idata[k].addFp (strainMtx);
             } else {
                strainMtx.add (Matrix3d.IDENTITY);

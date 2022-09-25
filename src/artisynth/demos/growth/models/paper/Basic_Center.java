@@ -5,6 +5,12 @@ import java.awt.Color;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
 
+/* Top-Camera:
+
+mCameraEye = new Point3d(0, -4.9771, 0);
+mCameraCenter = new Point3d(0,0,0);
+*/
+//-model artisynth.demos.growth.models.paper.Basic_Center
 public class Basic_Center extends Basic_Base {
 
    protected void build_pre() {

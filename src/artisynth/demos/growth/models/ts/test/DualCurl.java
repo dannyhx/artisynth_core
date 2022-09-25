@@ -1,8 +1,6 @@
 package artisynth.demos.growth.models.ts.test;
 
 import static java.lang.Math.PI;
-import static java.lang.Math.sqrt;
-import static java.lang.Math.tan;
 
 import java.awt.Color;
 import java.nio.file.Files;
@@ -10,18 +8,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import artisynth.core.femmodels.FemElement.ElementClass;
+import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.femmodels.ShellTriElement;
 import artisynth.core.materials.FemMaterial;
 import artisynth.core.materials.LinearMaterial;
 import artisynth.demos.growth.models.paper.Basic_Base;
 import artisynth.demos.growth.models.ts.ThinShellType;
 import artisynth.demos.growth.models.ts.evouga.DiscreteShell;
+import artisynth.demos.growth.util.FemUtil;
 import artisynth.demos.growth.util.MeshUtil;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.Point3d;
-import maspack.matrix.RigidTransform3d;
-import maspack.matrix.RotationMatrix3d;
 import maspack.matrix.Vector3d;
 
 //-model artisynth.demos.growth.models.ts.test.DualCurl
@@ -65,6 +63,13 @@ import maspack.matrix.Vector3d;
  * Notes:
  *    For single cylinder, use 
  */
+
+/* MODS  
+ *
+ * meshDiv
+ * mMinEnergyBeforePausing
+ * mIsEnableMorphogen2GrowthTensor = false
+ */
 public class DualCurl extends Basic_Base {
 
    /** Cylinder diameter shrink factor. Example: 2.0 for 2x smaller cylinder size. */
@@ -93,35 +98,10 @@ public class DualCurl extends Basic_Base {
     * Mass of each DoF for Discrete Shell.
     */
    protected double mReg = 2e-2;  // 0.20
+   
+   protected boolean mIsSolidCylinderRef = false;
 
-   protected double getBottomSurfaceStretchNeededForCurl(
-      double stressMultiplier,
-      double thickness, 
-      double meshX, 
-      double meshXDiv
-   ) {
-      double eleWd = meshX / (float) meshXDiv;
-      
-      meshXDiv /= stressMultiplier;
-      
-      // Interior angle between each element of cylinder.
-      double theta = ((meshXDiv-2) * PI) / meshXDiv;
-      
-      double slopeTheta = theta / 2.0;
-      
-      //
-      
-//      double adj = thickness / tan(slopeTheta);    // q=default. too much
-//    double adj = thickness / tan(slopeTheta);    // w/ q=1. almost
-      
-//      double adj = thickness * (1/sqrt(3)) / tan(slopeTheta);  // partial
-      
-//      double adj = thickness * (0.5 + 0.5*(1/sqrt(3))) / tan(slopeTheta);   // a little too much
-      double adj = thickness / tan(slopeTheta) * (1/sqrt(3));   // Most accurate. Requires 0.1x mesh size and high res.
-      
-      double g = (eleWd + 2*adj) / eleWd - 1.0;
-      return g;
-   }
+
    
    protected void build_pre() {
       super.build_pre();
@@ -138,16 +118,16 @@ public class DualCurl extends Basic_Base {
       t = 3;
       
 //      mEleClass = ElementClass.VOLUMETRIC;
-//      mEleClass = ElementClass.SHELL;
-      mEleClass = ElementClass.MEMBRANE;
+      mEleClass = ElementClass.SHELL;
+//      mEleClass = ElementClass.MEMBRANE;
       
 //      this.mTsType = ThinShellType.NARAIN;
-      this.mTsType = ThinShellType.EVOUGA;
+//      this.mTsType = ThinShellType.EVOUGA;
     
-      int meshDiv = 100;
+      int meshDiv = 10; // 100
       
-      mMinEnergyBeforePausing = 1e-4;
-//    mMinEnergyBeforePausing = 1e-3;
+//      mMinEnergyBeforePausing = 1e-4;  // First exp
+//    mMinEnergyBeforePausing = 1e-3;    // Second exp
       mPauseEveryInterval = 999;
       
       // --- Setup --- //
@@ -182,7 +162,7 @@ public class DualCurl extends Basic_Base {
       
       double[] thicknesses = new double[] {1e-3, 1e-2, 1e-1, 1e-2};
       double[] youngModuluses = new double[] {1e4, 1e4, 1e4, 1e4};
-      double strain = getBottomSurfaceStretchNeededForCurl(
+      double strain = FemUtil.getBottomSurfaceStretchNeededForCurl(
          AMPLIFIED_STRESS_MULTIPLIER, thicknesses[t], mMeshX, mMeshXDiv);
       double[] sidedStrains_vol = new double[] {strain, strain, strain, strain}; 
       double[] sidedStrains_shell = new double[] {strain, strain, strain, strain};
@@ -221,7 +201,12 @@ public class DualCurl extends Basic_Base {
          });
          
          mPauseEveryInterval = pauses_shell[t]; 
+         
+         m_youngsModulus = 1e12;
 
+         if (mIsSolidCylinderRef) {
+            mFixedBendingStrainMtx = null;
+         }
       } else {
          m_shellThickness = thicknesses[t];
          m_youngsModulus = youngModuluses[t];
@@ -275,6 +260,10 @@ public class DualCurl extends Basic_Base {
             mMesh[0] =  MeshUtil.createCylinderFromPlane_YAxisCurved (
                mMeshX, mMeshY, mMeshXDiv, mMeshYDiv, (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
 //            }
+         } else if (mEleClass == ElementClass.SHELL) {
+            mIsBuildingRestState = true;
+            mMesh[0] =  MeshUtil.createCylinderFromPlane_YAxisCurved (
+               mMeshX, mMeshY, mMeshXDiv, mMeshYDiv, (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
          }
       } catch (Exception ex) {
          throw new RuntimeException(ex);
@@ -302,6 +291,33 @@ public class DualCurl extends Basic_Base {
          
          // Set other DS parameters.
          ds.mReg = mReg;
+      } else if (mEleClass == ElementClass.SHELL) {
+         if (mIsBuildingRestState) {
+            super.build_modelStructure ();
+
+            // Restore original mesh.
+            super.build_modelSkeleton ();
+         } 
+         
+         // Set world to flat sheet
+         
+         boolean[] frontBack = 
+         (mEleClass == ElementClass.VOLUMETRIC) ? 
+            new boolean[] {true, false} :
+            new boolean[] {true}; 
+      
+         for (boolean isFront : frontBack) {
+            for (int v = 0; v < mMesh[0].numVertices (); v++) {
+               Vertex3d vtx = mMesh[0].getVertex (v);
+   
+               FemNode3d node = mFemModel[0].getNode (v);
+               if (isFront) {
+                  node.setPosition(vtx.getPosition ());
+               } else {
+                  node.setBackPosition ((Point3d)new Point3d(vtx.getPosition ()).add (0, 0, m_shellThickness));
+               }
+            }
+         }
       } else {
          super.build_modelStructure ();
       }
@@ -345,6 +361,7 @@ public class DualCurl extends Basic_Base {
    
    protected void build_post() {
       super.build_post ();
+            
       mMorphogen2GrowthTensor.isBendingMorphogenHack = true;
       mMorphogen2GrowthTensor.fixedBendingStrain = mFixedBendingStrainMtx;
       mMorphogen2GrowthTensor.zeroStrainAtBottom = true;
@@ -354,6 +371,22 @@ public class DualCurl extends Basic_Base {
       if (mEleClass == ElementClass.MEMBRANE && mTsType == ThinShellType.EVOUGA) {
          mMechModel.setDynamicsEnabled (false);      
       }
+      
+//      if (mEleClass == ElementClass.VOLUMETRIC || mEleClass == ElementClass.SHELL) {
+//         mIsEnableMorphogen2GrowthTensor = false;
+//         
+//         PolygonalMesh restMeshFront =  MeshUtil.createCylinderFromPlane_YAxisCurved (
+//            mMeshX, mMeshY, mMeshXDiv, mMeshYDiv, (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
+//         
+//         double c1 = mMeshY;
+//         double r1 =  c1 / (2*PI);
+//         double c2 = 2*PI * (r1 + m_shellThickness);
+//         
+//         PolygonalMesh restMeshBack =  MeshUtil.createCylinderFromPlane_YAxisCurved (
+//            mMeshX, c2, mMeshXDiv, mMeshYDiv, (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
+//         
+//         FemUtil.setFpFromRestMesh (mEleClass, mFemModel[0], restMeshFront, restMeshBack);
+//      }
    }
    
    public boolean isMorphogenSrcNode(int v) {

@@ -32,7 +32,6 @@ public class GrowWedgeElement extends WedgeElement implements GrowElementBase {
    
    
    
-   
    /* --- Constructor --- */
 
    public GrowWedgeElement (GrowNode3d p0, GrowNode3d p1,

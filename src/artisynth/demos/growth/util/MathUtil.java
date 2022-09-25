@@ -525,6 +525,12 @@ public class MathUtil {
       return Math.max(xa_xp.norm (), 1e-3*e.norm());
    }
    
+   public static Vector3d projVec3ToPlane(Vector3d v, Vector3d n) {
+      Vector3d n_v = new Vector3d().cross (n, v);
+      Vector3d p = new Vector3d().cross (n_v, n); 
+      return p;
+   }
+   
    /////////////
    // Average
    /////////////

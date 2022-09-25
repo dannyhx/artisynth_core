@@ -34,8 +34,8 @@ public class GrowTriElement extends ShellTriElement implements GrowElementBase {
    
    /** Matrix representation of the strain at each edge. */
    protected Matrix3d mBendStrain;
- 
    
+ 
    
    /* --- Constructor --- */
 
