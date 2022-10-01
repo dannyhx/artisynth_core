@@ -103,7 +103,7 @@ public class _Exp_LeafRing extends GrowDemo {
       // Slower growth rate
       mSizeMin = 0.35;
       mSizeMax = mSizeMin * 100;
-      mMorphogenSrcConc = 1.05; // 1.0 oK
+      mMorphogenSrcConc = 1.025; // 1.0 oK
       m_shellThickness = 1e-3;
       m_youngsModulus = 1e5;
       mSubDivide = 2;

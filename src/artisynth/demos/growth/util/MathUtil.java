@@ -568,7 +568,7 @@ public class MathUtil {
    public static Point3d avg (Point3d p0, Point3d p1) {
       return (Point3d)new Point3d ().add (p0, p1).scale (0.5);
    }
-v
+
    protected static Vector3d avg (Vector3d p0, Vector3d p1) {
       return new Vector3d ().add (p0, p1).scale (0.5);
    }
