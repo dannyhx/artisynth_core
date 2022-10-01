@@ -3,6 +3,7 @@ package artisynth.demos.growth.models.paper;
 import java.awt.Color;
 
 import artisynth.demos.growth.GrowNode3d;
+import artisynth.demos.growth.PolarityElementAux;
 import artisynth.demos.growth.models.base.GrowDemo;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
@@ -96,6 +97,8 @@ public class Intricate_RippleCascade extends GrowDemo {
             gNode.mIsMorphogenSrc = true;
          }
       }
+
+      PolarityElementAux.createPolGradientAgainstAxis (mFemModel[0], 1, -1);
    }
 
    public void advanceCustom (double t0, double t1, int flags) {

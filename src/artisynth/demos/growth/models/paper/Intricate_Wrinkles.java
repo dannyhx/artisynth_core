@@ -2,6 +2,7 @@ package artisynth.demos.growth.models.paper;
 
 import artisynth.core.driver.Main;
 import artisynth.demos.growth.GrowNode3d;
+import artisynth.demos.growth.PolarityElementAux;
 import artisynth.demos.growth.models.base.GrowDemo;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
@@ -13,7 +14,7 @@ import maspack.matrix.Point3d;
  * -0.261661 1.91022e-18 Latex Crop: 732 134 688 166
  * 
  */
-// artisynth.demos.growth.models.paper.Intricate_Wrinkles
+// -model artisynth.demos.growth.models.paper.Intricate_Wrinkles
 public class Intricate_Wrinkles extends GrowDemo {
 
    protected double morphogenSrcDuration = 2;
@@ -51,6 +52,7 @@ public class Intricate_Wrinkles extends GrowDemo {
 
    protected void build_post () {
       super.build_post ();
+      PolarityElementAux.createPolGradientAgainstAxis (mFemModel[0], 1, +1);
    }
 
    public void advanceCustom (double t0, double t1, int flags) {

@@ -4,10 +4,8 @@ import artisynth.core.femmodels.FemElement3dBase;
 import artisynth.core.femmodels.IntegrationData3d;
 import artisynth.core.femmodels.IntegrationPoint3d;
 import maspack.matrix.Matrix3d;
-import maspack.matrix.MatrixNd;
 import maspack.matrix.RotationMatrix3d;
 import maspack.matrix.SVDecomposition3d;
-import maspack.matrix.Vector3d;
 
 public interface GrowElementBase {
 
@@ -220,28 +218,6 @@ public interface GrowElementBase {
 
    /* --- Accessors --- */
 
-   public Vector3d getPolDir ();
+   public PolarityElementAux getPolAux ();
 
-   public void setPolDir (Vector3d mPolDir);
-
-   public Matrix3d getFrame ();
-
-   public void setFrame (Matrix3d mFrame);
-
-   public MatrixNd getElementGrowthTensor ();
-
-   public void setElementGrowthTensor (MatrixNd mElementGrowthTensor);
-
-   public MatrixNd getRotatedElementGrowthStrains ();
-
-   public void setRotatedElementGrowthStrains (
-      MatrixNd mRotatedElementGrowthStrains);
-
-   public MatrixNd getStrainAtIntegPts ();
-
-   public void setStrainAtIntegPts (MatrixNd mStrainAtIntegPts);
-
-   public Matrix3d getBendStrain ();
-
-   public void setBendStrain (Matrix3d mBendStrain);
 }

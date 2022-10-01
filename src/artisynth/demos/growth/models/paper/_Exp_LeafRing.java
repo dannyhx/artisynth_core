@@ -14,6 +14,7 @@ import artisynth.core.driver.Main;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.modelbase.ModelComponentBase;
 import artisynth.demos.growth.GrowNode3d;
+import artisynth.demos.growth.PolarityElementAux;
 import artisynth.demos.growth.models.base.GrowDemo;
 import artisynth.demos.growth.util.MeshUtil;
 import maspack.geometry.Face;
@@ -27,7 +28,7 @@ import maspack.render.RenderProps;
 import maspack.render.Renderer;
 import maspack.render.Renderer.Shading;
 
-// artisynth.models.plants.growth.paperdemos.LeafRing
+// -model artisynth.demos.growth.models.paper._Exp_LeafRing
 public class _Exp_LeafRing extends GrowDemo {
 
    /**
@@ -97,7 +98,19 @@ public class _Exp_LeafRing extends GrowDemo {
       mNumRings = 1;
       mRemeshFreq = 0.25;
       mPenetrationTol = -8e-2;
-      mPauseEveryInterval = 40; // 43
+      mPauseEveryInterval = 40; // 43 // 37.666 out of memory
+
+      // Slower growth rate
+      mSizeMin = 0.35;
+      mSizeMax = mSizeMin * 100;
+      mMorphogenSrcConc = 1.05; // 1.0 oK
+      m_shellThickness = 1e-3;
+      m_youngsModulus = 1e5;
+      mSubDivide = 2;
+      mNumRings = 1;
+      mRemeshFreq = 0.25;
+      mPenetrationTol = -8e-2;
+      mPauseEveryInterval = 40; // 43 // 37.666 out of memory
 
       mShowColorBar = false;
 
@@ -123,6 +136,8 @@ public class _Exp_LeafRing extends GrowDemo {
    }
 
    boolean isDome = true;
+
+   protected ArrayList<Vector3d> polGradRulers = new ArrayList<Vector3d> ();
 
    protected void build_modelSkeleton () {
       ArrayList<PolygonalMesh> meshes = new ArrayList<PolygonalMesh> ();
@@ -177,6 +192,10 @@ public class _Exp_LeafRing extends GrowDemo {
             leaf.transform (X);
 
             meshes.add (leaf);
+
+            Vector3d polGradRuler = new Vector3d (0, triVtxs[2].pnt.y, 0);
+            X.transformVec (polGradRuler, polGradRuler);
+            polGradRulers.add (polGradRuler);
          }
       }
 
@@ -347,6 +366,13 @@ public class _Exp_LeafRing extends GrowDemo {
 
       // Configure nodes
       for (int m = 0; m < M; m++) {
+         if (m < polGradRulers.size ()) {
+            PolarityElementAux
+               .createPolGradientAgainstParallelVector (
+                  mFemModel[m], mFemModel[m].getNode (0).getPosition (),
+                  polGradRulers.get (m));
+         }
+
          // TODO NEW
          mFemModel[m].setAbortOnInvertedElements (true);
 
@@ -375,8 +401,6 @@ public class _Exp_LeafRing extends GrowDemo {
          }
          mFemModel[M - 1].setDynamicsEnabled (false);
       }
-
-      mPolDir.set (0, 1, 0);
 
       mRenderMode = RenderMode.MORPHOLOGY;
    }
@@ -426,5 +450,20 @@ public class _Exp_LeafRing extends GrowDemo {
          }
       }
    }
+
+   // public void render (Renderer renderer, int flags) {
+   // renderer.setShading (Shading.NONE); // turn off lighting
+   // renderer.setLineWidth (3);
+   // renderer.setColor (Color.BLUE);
+   //
+   // for (int m = 0; m < M - 1; m++) {
+   // Point3d s = mFemModel[m].getNode (0).getPosition ();
+   // Vector3d v = polGradRulers.get (m);
+   //
+   // Point3d e = (Point3d)new Point3d (s).add (v);
+   //
+   // renderer.drawLine (s, e);
+   // }
+   // }
 
 }

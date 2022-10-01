@@ -1,6 +1,7 @@
 package artisynth.demos.growth.models.paper;
 
 import artisynth.demos.growth.GrowNode3d;
+import artisynth.demos.growth.PolarityElementAux;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
@@ -8,7 +9,9 @@ import maspack.matrix.Vector3d;
 /*
 1.25093 -1.1616 1.03499
 0.0225034 -0.0624607 -0.0503307
- */
+
+-model artisynth.demos.growth.models.paper.Basic_Curl
+*/
 
 public class Basic_Curl extends Basic_Base {
    protected void build_pre () {
@@ -69,6 +72,8 @@ public class Basic_Curl extends Basic_Base {
             gNode.setDynamic (false);
          }
       }
+
+      PolarityElementAux.createPolGradientAgainstAxis (mFemModel[0], 1, +1);
    }
 
    public void advanceCustom (double t0, double t1, int flags) {

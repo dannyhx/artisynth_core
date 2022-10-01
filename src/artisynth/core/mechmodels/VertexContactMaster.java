@@ -6,78 +6,79 @@
  */
 package artisynth.core.mechmodels;
 
-import java.util.HashSet;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 
-import maspack.matrix.*;
-import maspack.geometry.*;
+import maspack.geometry.Vertex3d;
+import maspack.matrix.SparseBlockMatrix;
+import maspack.matrix.Vector3d;
 
 /**
- * Implements a ContactMaster that combines the weighted contact
- * masters for a single vertex-based contact
+ * Implements a ContactMaster that combines the weighted contact masters for a
+ * single vertex-based contact
  */
 public class VertexContactMaster implements ContactMaster {
-   
+
    // DAN21: public
    public ArrayList<ContactMaster>[] myMasterLists;
    // DAN21: public
    public double[] myWgts;
 
-   public VertexContactMaster (
-      CollidableBody collidable, Vertex3d[] vtxs, double[] wgts, String ctx) {
-      
+   public VertexContactMaster (CollidableBody collidable, Vertex3d[] vtxs,
+   double[] wgts, String ctx) {
+
       myWgts = Arrays.copyOf (wgts, wgts.length);
       myMasterLists = new ArrayList[vtxs.length];
-      for (int i=0; i<vtxs.length; i++) {
-         myMasterLists[i] = new ArrayList<>();
-         collidable.collectVertexMasters (
-            myMasterLists[i], vtxs[i], ctx);
+      for (int i = 0; i < vtxs.length; i++) {
+         myMasterLists[i] = new ArrayList<> ();
+         collidable.collectVertexMasters (myMasterLists[i], vtxs[i], ctx);
       }
    }
-   
-   // DAN21 
-   public VertexContactMaster() {
-      
+
+   // DAN21
+   public VertexContactMaster () {
+
    }
 
    public void add1DConstraintBlocks (
-      SparseBlockMatrix GT, int bj, double scale, 
-      ContactPoint cpnt, Vector3d dir) {
+      SparseBlockMatrix GT, int bj, double scale, ContactPoint cpnt,
+      Vector3d dir) {
 
-      for (int i=0; i<myMasterLists.length; i++) {
+      for (int i = 0; i < myMasterLists.length; i++) {
          for (ContactMaster cm : myMasterLists[i]) {
-            cm.add1DConstraintBlocks (GT, bj, scale*myWgts[i], cpnt, dir);
+            cm.add1DConstraintBlocks (GT, bj, scale * myWgts[i], cpnt, dir);
          }
       }
    }
 
    public void add2DConstraintBlocks (
-      SparseBlockMatrix GT, int bj, double scale,
-      ContactPoint cpnt, Vector3d dir0, Vector3d dir1) {
+      SparseBlockMatrix GT, int bj, double scale, ContactPoint cpnt,
+      Vector3d dir0, Vector3d dir1) {
 
-      for (int i=0; i<myMasterLists.length; i++) {
+      for (int i = 0; i < myMasterLists.length; i++) {
          for (ContactMaster cm : myMasterLists[i]) {
-            cm.add2DConstraintBlocks (
-               GT, bj, scale*myWgts[i], cpnt, dir0, dir1);
+            cm
+               .add2DConstraintBlocks (
+                  GT, bj, scale * myWgts[i], cpnt, dir0, dir1);
          }
       }
    }
-   
+
    public void addRelativeVelocity (
       Vector3d vel, double scale, ContactPoint cpnt) {
 
-      for (int i=0; i<myMasterLists.length; i++) {
+      for (int i = 0; i < myMasterLists.length; i++) {
          for (ContactMaster cm : myMasterLists[i]) {
-            cm.addRelativeVelocity (vel, scale*myWgts[i], cpnt);
+            cm.addRelativeVelocity (vel, scale * myWgts[i], cpnt);
          }
       }
    }
 
    public boolean isControllable () {
-      for (int i=0; i<myMasterLists.length; i++) {
+      for (int i = 0; i < myMasterLists.length; i++) {
          for (ContactMaster cm : myMasterLists[i]) {
-            if (cm.isControllable()) {
+            if (cm.isControllable ()) {
                return true;
             }
          }
@@ -89,9 +90,9 @@ public class VertexContactMaster implements ContactMaster {
       HashSet<DynamicComponent> masters, boolean activeOnly) {
 
       int num = 0;
-      for (int i=0; i<myMasterLists.length; i++) {
+      for (int i = 0; i < myMasterLists.length; i++) {
          for (ContactMaster cm : myMasterLists[i]) {
-            num += cm.collectMasterComponents(masters, activeOnly);
+            num += cm.collectMasterComponents (masters, activeOnly);
          }
       }
       return num;

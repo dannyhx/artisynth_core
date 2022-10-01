@@ -156,13 +156,8 @@ public class GrowDemo extends ShellPatch {
    /** Should NOR morphogen be generated whenever morphogen DF is converted? */
    protected boolean mIsActivateNOR = false;
 
-   /* --- Growth --- */
-
-   /**
-    * Growth direction of PAR morphogen. PER morphogen growth direction is the
-    * cross-product of the element's normal and mPolDir.
-    */
-   protected static Vector3d mPolDir = new Vector3d (0, 1, 0);
+   protected Vector3d mFixedParDir = null;
+   protected Vector3d mFixedPerDir = null;
 
    /* --- Reference-space mesh (for display only) --- */
 
@@ -179,7 +174,7 @@ public class GrowDemo extends ShellPatch {
    protected Vector3d mRefMeshOffset = new Vector3d (0, 0, -1);
 
    /** Should the reference mesh be displayed? */
-   protected boolean mIsShowRefMesh = true;
+   protected boolean mIsShowRefMesh = false;
 
    /* --- Morphogen-to-Plastic-Strain and Plastic Embedding --- */
 
@@ -473,8 +468,6 @@ public class GrowDemo extends ShellPatch {
       mPanel.addWidget (this, "SF_sizeMax");
       mPanel.addWidget (this, "SF_aspectMin");
 
-      mPanel.addWidget (this, "polDir");
-
       mPanel.addWidget (this, "maxPlasticStrainColorBarRange");
 
       mPanel.addWidget (this, "cutSelectedNodes");
@@ -543,8 +536,6 @@ public class GrowDemo extends ShellPatch {
       myProps.add ("SF_sizeMin", "", mSizeMin);
       myProps.add ("SF_sizeMax", "", mSizeMax);
       myProps.add ("SF_aspectMin", "", mAspectMin);
-
-      myProps.add ("polDir", "", mPolDir);
 
       myProps
          .add (
@@ -699,14 +690,6 @@ public class GrowDemo extends ShellPatch {
 
    public void setSF_aspectMin (double val) {
       mAspectMin = val;
-   }
-
-   public Vector3d getPolDir () {
-      return mPolDir;
-   }
-
-   public void setPolDir (Vector3d val) {
-      mPolDir.set (val);
    }
 
    public double getMaxPlasticStrainColorBarRange () {
@@ -893,11 +876,12 @@ public class GrowDemo extends ShellPatch {
             }
 
             mMorphogen2GrowthTensor.setTarget (mFemModel[m]);
+            mMorphogen2GrowthTensor.setFixDirs (mFixedParDir, mFixedPerDir);
 
             if (!mMaintainResidualStrain)
                mMorphogen2GrowthTensor.unapplyGrowthTensors ();
 
-            mMorphogen2GrowthTensor.updatePolarityDirection (mPolDir);
+            mMorphogen2GrowthTensor.updatePolarityDirection ();
             mMorphogen2GrowthTensor
                .activateFractionOfMorphogen (
                   mChemCvtRate, mIsActivatePAR, mIsActivatePER, mIsActivateNOR);

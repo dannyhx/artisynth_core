@@ -1008,7 +1008,7 @@ public class NarainShell extends ThinShellBase {
          avgStrain = new Matrix3d ();
          double[] S = new double[GrowthTensorUtil.numStrainComp ()];
          for (int n = 0; n < ele.numNodes (); n++) {
-            gEle.getRotatedElementGrowthStrains ().getRow (n, S);
+            gEle.getPolAux ().mRotatedElementGrowthStrains.getRow (n, S);
             Matrix3d nodeStrain = GrowthTensorUtil.vecToMtx3d (S);
             avgStrain.add (nodeStrain);
          }

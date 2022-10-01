@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.util.ArrayList;
 
 import artisynth.demos.growth.GrowNode3d;
+import artisynth.demos.growth.PolarityElementAux;
 import artisynth.demos.growth.collision.CollisionDetector;
 import artisynth.demos.growth.collision.ContinuousRenderable;
 import artisynth.demos.growth.models.base.GrowDemo;
@@ -18,7 +19,7 @@ import maspack.matrix.Vector3d;
 import maspack.render.RenderProps;
 import maspack.render.Renderer;
 
-// artisynth.models.plants.growth.paperdemos.Intricate_RippleBouquet
+// -model artisynth.demos.growth.models.paper.Intricate_RippleBouquet
 public class Intricate_RippleBouquet extends GrowDemo {
 
    /**
@@ -40,6 +41,7 @@ public class Intricate_RippleBouquet extends GrowDemo {
     * 
     * Top-Down (no edge exp): mCameraEye = new Point3d(0.0322226 0.00913619
     * 10.2464); mCameraCenter = new Point3d(0.0316826 0.0176713 -0.49313);
+    * 
     */
 
    protected double mMorphogenSrcConc = 0.5;
@@ -62,8 +64,7 @@ public class Intricate_RippleBouquet extends GrowDemo {
       mPauseEveryInterval = 8.33;
 
       // Collision partitioning test
-      mEnableCollisionHandling = false;
-      mEnableContinuousDetection = false;
+      mEnableCollisionHandling = true;
 
       // -disableHybridSolves
 
@@ -187,7 +188,7 @@ public class Intricate_RippleBouquet extends GrowDemo {
 
       mRendCfg = mRendCfgPresets.get (RenderMode.MORPHOLOGY);
       mRendCfg.mDrawEdges = false;
-      mRendCfg.mNodeRadius = 0;
+      mRendCfg.mNodeRadius = 0.01;
    }
 
    protected void build_femRendering () {
@@ -211,6 +212,8 @@ public class Intricate_RippleBouquet extends GrowDemo {
 
    protected void build_post () {
       for (int m = 0; m < M; m++) {
+         PolarityElementAux.createPolGradientAgainstAxis (mFemModel[m], 2, +1);
+
          for (int v = 0; v < mMesh[m].numVertices (); v++) {
             if (isMorphogenSrcNode (m, v)) {
                GrowNode3d gNode = (GrowNode3d)mFemModel[m].getNode (v);

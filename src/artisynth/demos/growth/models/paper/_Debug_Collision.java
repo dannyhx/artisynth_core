@@ -17,7 +17,7 @@ import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector3d;
 
-// artisynth.models.plants.growth.paperdemos._GrowDemoCollisionTest
+// -model artisynth.demos.growth.models.paper._Debug_Collision
 public class _Debug_Collision extends GrowDemo {
 
    protected void build_pre () {
@@ -42,10 +42,10 @@ public class _Debug_Collision extends GrowDemo {
       mEnableSelfCollision = true;
 
       // DEBUG
-      mEnableRemesh = true;
-      mSizeMin = 0.15;
+      mEnableRemesh = false;
+      mSizeMin = 0.25;
       mSizeMax = mSizeMin * 100;
-      mRemeshFreq = 0.25;
+      mRemeshFreq = 0.10;
       mEnablePlasticEmbedding = true;
 
       // Bilateral test
@@ -57,6 +57,12 @@ public class _Debug_Collision extends GrowDemo {
       mEnableProximityDetection = true;
       mEnableContinuousDetection = false;
       mEnableImpactZoneDetection = true;
+
+      // Interpolate test
+      mEnableRemesh = true;
+      mSizeMin = 0.15;
+      mRemeshFreq = 0.45;
+      mEnableContinuousDetection = true;
 
       mMaxContinuousIters = 5;
       CollisionDetector.myImpactZonePenetrationTol = -0.001;
@@ -142,7 +148,7 @@ public class _Debug_Collision extends GrowDemo {
 
       RigidTransform3d X = new RigidTransform3d ();
       X.mulRotY (Math.toRadians (-90));
-      X.addTranslation (new Vector3d (0, 0, 5));
+      X.addTranslation (new Vector3d (0, 0, 3.5));
 
       M = 2;
       mMesh = new PolygonalMesh[M];

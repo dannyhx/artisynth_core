@@ -28,8 +28,19 @@ public class MathUtilTest {
       System.out.println (ang * (180 / Math.PI));
    }
 
+   protected void test_triangleGradient () {
+      Point3d[] pts =
+         new Point3d[] { new Point3d (0, 0, 0), new Point3d (1, 0, 0),
+                         new Point3d (0.5, Math.sqrt (1 - 1 / 4), 0), };
+      double[] xs = new double[] { 1, 0, 0.5 };
+
+      Vector3d g = MathUtil.triangleGradient (pts, xs);
+
+      System.out.println (g);
+   }
+
    public static void main (String[] args) {
       MathUtilTest t = new MathUtilTest ();
-      t.test_vectorAnglePair ();
+      t.test_triangleGradient ();
    }
 }

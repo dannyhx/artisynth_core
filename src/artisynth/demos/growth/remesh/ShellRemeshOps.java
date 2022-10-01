@@ -458,88 +458,112 @@ public class ShellRemeshOps extends RemeshOps {
    protected void disableContactMasters (Vertex3d vtx) {
       FemNode3d node = mFemModel.getNode (vtx.getIndex ());
 
-      // CSNCMT
-      for (CollisionHandler colHdlr : mCCAgg.myColHdlrs) {
-         for (ContactConstraint cc : colHdlr.myUnilaterals) {
-            // Scan through ContactConstraint's ContactMasters, searching for
-            // ones involving the given node. If found such ContactMaster,
-            // delete it.
-            for (int m = 0; m < 2; m++) {
-               ArrayList<ContactMaster> masters =
-                  (m == 0) ? cc.myMasters0 : cc.myMasters1;
-               for (ContactMaster cm : masters) {
-                  if (cm instanceof VertexContactMaster) {
-                     VertexContactMaster vcm = (VertexContactMaster)cm;
+      for (boolean isBackNode : new boolean[] { false, true }) {
+         // CSNCMT
+         for (CollisionHandler colHdlr : mCCAgg.myColHdlrs) {
+            for (ContactConstraint cc : colHdlr.myUnilaterals) {
+               // Scan through ContactConstraint's ContactMasters, searching for
+               // ones involving the given node. If found such ContactMaster,
+               // delete it.
+               for (int m = 0; m < 2; m++) {
+                  ArrayList<ContactMaster> masters =
+                     (m == 0) ? cc.myMasters0 : cc.myMasters1;
+                  for (ContactMaster _vcm : masters) {
+                     if (_vcm instanceof VertexContactMaster) {
+                        VertexContactMaster vcm = (VertexContactMaster)_vcm;
 
-                     ContactMaster ppaToDelete = null;
-                     int ppaIdxToDelete = -1;
+                        // For each list of PPA
+                        for (ArrayList<ContactMaster> masterList : vcm.myMasterLists) {
+                           LinkedList<ContactMaster> ppa_toDel =
+                              new LinkedList<ContactMaster> ();
 
-                     for (ArrayList<ContactMaster> vcm_cms : vcm.myMasterLists) {
+                           // For each PointParticleAttachment list in the
+                           // VertexContactMaster
+                           for (ContactMaster _ppa : masterList) {
+                              if (_ppa instanceof PointParticleAttachment) {
+                                 PointParticleAttachment ppa =
+                                    (PointParticleAttachment)_ppa;
+                                 Particle particle = ppa.myParticle;
 
-                        // For each ContactMaster list in the
-                        // VertexContactMaster
-                        int ppaIdx = 0;
-                        for (ContactMaster vcm_cm : vcm_cms) {
-                           if (vcm_cm instanceof PointParticleAttachment) {
-                              PointParticleAttachment ppa =
-                                 (PointParticleAttachment)vcm_cm;
-                              Particle particle = ppa.myParticle;
-
-                              if (particle == node) {
-                                 ppaToDelete = vcm_cm;
-                                 ppaIdxToDelete = ppaIdx;
-                                 break;
+                                 if (particle == node
+                                 || particle == node.getBackNode ()) {
+                                    //
+                                    ppa_toDel.add (ppa);
+                                 }
+                              }
+                              else {
+                                 throw new AssertionError (
+                                    "Unexpected ContactMaster type.");
                               }
                            }
-                           else {
-                              throw new AssertionError (
-                                 "Unexpected ContactMaster type.");
-                           }
 
-                           ppaIdx++;
-                        }
-
-                        if (ppaToDelete != null) {
-                           // Delete PPA.
-                           vcm_cms.remove (ppaToDelete);
-                           break;
-                        }
-                     }
-
-                     if (ppaToDelete != null) {
-                        // Delete PPA's weight.
-                        int new_wgt_idx = 0;
-                        double[] new_wgts = new double[vcm.myWgts.length - 1];
-
-                        for (int i = 0; i < vcm.myWgts.length; i++) {
-                           if (i != ppaIdxToDelete) {
-                              new_wgts[new_wgt_idx] = vcm.myWgts[i];
-                              new_wgt_idx++;
+                           // Delete PointParticleAttachments
+                           boolean isChanged = masterList.removeAll (ppa_toDel);
+                           if (!isChanged && ppa_toDel.size () > 0) {
+                              System.out.println ("unexpected");
                            }
                         }
+
+                        // For each list of PPA, if empty, delete it and
+                        // its weight.
+
+                        // Count number of empty PPA lists.
+                        int numEmpty = 0;
+                        for (int i = 0; i < vcm.myMasterLists.length; i++) {
+                           if (vcm.myMasterLists[i].isEmpty ()) {
+                              numEmpty++;
+                           }
+                        }
+
+                        if (numEmpty > 0) {
+                           int newMasterListsSz =
+                              vcm.myMasterLists.length - numEmpty;
+                           ArrayList<ContactMaster>[] newMasterLists =
+                              new ArrayList[newMasterListsSz];
+                           double[] newWgts = new double[newMasterListsSz];
+
+                           // Copy to new arrays, excluding the empty ones.
+
+                           int newCurIdx = 0;
+
+                           for (int i = 0; i < vcm.myMasterLists.length; i++) {
+                              if (vcm.myMasterLists[i].size () > 0) {
+                                 // Non-empty, so add it.
+                                 newMasterLists[newCurIdx] =
+                                    vcm.myMasterLists[i];
+                                 newWgts[newCurIdx] = vcm.myWgts[i];
+
+                                 newCurIdx++;
+                              }
+                           }
+
+                           vcm.myMasterLists = newMasterLists;
+                           vcm.myWgts = newWgts;
+                        }
                      }
-                  }
-                  else {
-                     throw new AssertionError (
-                        "Unexpected ContactMaster type.");
+                     else {
+                        throw new AssertionError (
+                           "Unexpected ContactMaster type.");
+                     }
+                  } // for each master in masters0, masters1
+
+                  // If VertexContactMaster is actually empty, then remove it
+                  // from ContactConstraint's list of masters (0 or 1).
+
+                  ArrayList<ContactMaster> masters_copy =
+                     (ArrayList<ContactMaster>)masters.clone ();
+
+                  for (ContactMaster _vcm : masters_copy) {
+                     VertexContactMaster curVcm = (VertexContactMaster)_vcm;
+
+                     if (curVcm.myWgts.length == 0) {
+                        masters.remove (curVcm);
+                     }
                   }
                }
 
-               // If VertexContactMaster is actually empty, then remove it
-               // from ContactConstraint's list of masters (0 or 1).
-
-               ArrayList<ContactMaster> masters_copy =
-                  (ArrayList<ContactMaster>)masters.clone ();
-               for (ContactMaster curMaster : masters_copy) {
-                  VertexContactMaster curVcm = (VertexContactMaster)curMaster;
-
-                  if (curVcm.myWgts.length == 0) {
-                     masters.remove (curVcm);
-                  }
-               }
+               // TODO. Need to remove vtx from the vertices of cm.cpnt?
             }
-
-            // TODO. Need to remove vtx from the vertices of cm.cpnt?
          }
       }
 

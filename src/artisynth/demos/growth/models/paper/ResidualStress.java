@@ -9,6 +9,7 @@ import maspack.geometry.PolygonalMesh;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
+import maspack.matrix.Vector3d;
 
 // artisynth.models.plants.growth.paperdemos.ResidualStress
 public class ResidualStress extends GrowDemo {
@@ -71,6 +72,9 @@ public class ResidualStress extends GrowDemo {
       mFemModel[0].setDirectorRenderLen (0);
 
       super.build_post ();
+
+      this.mFixedParDir = new Vector3d (0, 1, 0);
+      this.mFixedParDir = null;
    }
 
    public void advanceCustom (double t0, double t1, int flags) {

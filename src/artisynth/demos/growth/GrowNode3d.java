@@ -44,6 +44,12 @@ public class GrowNode3d extends FemNode3d {
    /** If true, morphogen is always zeroed at this node. */
    public boolean mIsNoMorphogenZone = false;
 
+   /**
+    * Polarity concentration at the node. Gradient is used to determine PAR
+    * growth direction. See PolarityElementAux.
+    */
+   public double mPolConc = 0;
+
    public GrowNode3d (boolean isShell) {
       super ();
 
@@ -71,6 +77,7 @@ public class GrowNode3d extends FemNode3d {
       myProps.add ("chem3 * *", "Concentration of 4th chemical", 0);
       myProps.add ("isMorphogenSrc * *", "", false);
       myProps.add ("isNoMorphogenZone * *", "", false);
+      myProps.add ("polConc * *", "Polarity concentration", 0);
    }
 
    public PropertyList getAllPropertyInfo () {
@@ -123,6 +130,14 @@ public class GrowNode3d extends FemNode3d {
 
    public void setIsNoMorphogenZone (boolean val) {
       mIsNoMorphogenZone = val;
+   }
+
+   public double getPolConc () {
+      return this.mPolConc;
+   }
+
+   public void setPolConc (double val) {
+      mPolConc = val;
    }
 
    /* --- Setters and Getters --- */

@@ -6,19 +6,39 @@
  */
 package artisynth.core.mechmodels;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.FileWriter;
-import java.io.BufferedWriter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
+import artisynth.core.mechmodels.MechSystemSolver.Integrator;
+import artisynth.core.mechmodels.MechSystemSolver.PosStabilization;
+import artisynth.core.modelbase.ComponentChangeEvent;
+import artisynth.core.modelbase.ComponentState;
+import artisynth.core.modelbase.ComponentUtils;
+import artisynth.core.modelbase.CompositeComponent;
+import artisynth.core.modelbase.HasNumericState;
+import artisynth.core.modelbase.Model;
+import artisynth.core.modelbase.ModelComponent;
+import artisynth.core.modelbase.NumericState;
+import artisynth.core.modelbase.RenderableModelBase;
+import artisynth.core.modelbase.StepAdjustment;
+import artisynth.core.modelbase.TransformGeometryAction;
+import artisynth.core.modelbase.TransformGeometryContext;
+import artisynth.core.modelbase.TransformableGeometry;
+import artisynth.core.util.ArtisynthIO;
+import artisynth.core.util.TimeBase;
 import maspack.geometry.GeometryTransformer;
-import maspack.matrix.AffineTransform3dBase;
-import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Matrix;
 import maspack.matrix.MatrixNd;
 import maspack.matrix.MatrixNdBlock;
-import maspack.matrix.MatrixBlock;
 import maspack.matrix.NumericalException;
 import maspack.matrix.SparseBlockMatrix;
 import maspack.matrix.SparseNumberedBlockMatrix;
@@ -30,27 +50,21 @@ import maspack.properties.PropertyUtils;
 import maspack.render.RenderableUtils;
 import maspack.solvers.SparseSolverId;
 import maspack.util.DataBuffer;
+import maspack.util.EnumRange;
 import maspack.util.IntHolder;
 import maspack.util.InternalErrorException;
 import maspack.util.NumberFormat;
-import maspack.util.FunctionTimer;
 import maspack.util.Range;
-import maspack.util.EnumRange;
-import artisynth.core.mechmodels.MechSystemSolver.PosStabilization;
-import artisynth.core.mechmodels.MechSystemSolver.Integrator;
-import artisynth.core.modelbase.*;
-import artisynth.core.util.ArtisynthIO;
-import artisynth.core.util.TimeBase;
 
 public abstract class MechSystemBase extends RenderableModelBase
-   implements MechSystemModel {
+implements MechSystemModel {
 
    public static boolean mySaveForcesAsState = true;
    public static boolean myParametricsInSystemMatrix = true;
-   //public static boolean myZeroForcesInPreadvance = true;
+   // public static boolean myZeroForcesInPreadvance = true;
 
    protected int myStructureVersion = 0;
-   // flag indicating that the state resulting from the current 
+   // flag indicating that the state resulting from the current
    // advance will be saved
    protected boolean myStateWillBeSaved = false;
 
@@ -66,7 +80,7 @@ public abstract class MechSystemBase extends RenderableModelBase
    protected ArrayList<HasNumericState> myAuxStateComponents;
    protected ArrayList<HasSlaveObjects> mySlaveObjectComponents;
 
-   protected VectorNd myInitialForces = new VectorNd();
+   protected VectorNd myInitialForces = new VectorNd ();
 
    int[] myDynamicSizes;
    int mySystemSize;
@@ -90,15 +104,15 @@ public abstract class MechSystemBase extends RenderableModelBase
    protected static boolean DEFAULT_UPDATE_FORCES_AT_STEP_END = false;
 
    private boolean myUpdateForcesAtStepEnd = DEFAULT_UPDATE_FORCES_AT_STEP_END;
-   PropertyMode myUpdateForcesAtStepEndMode = PropertyMode.Inherited;   
+   PropertyMode myUpdateForcesAtStepEndMode = PropertyMode.Inherited;
 
-   SparseBlockMatrix myMassMatrix;   
+   SparseBlockMatrix myMassMatrix;
 
    protected static PosStabilization myDefaultStabilization =
       PosStabilization.GlobalMass;
-   //protected PosStabilization myStabilization = myDefaultStabilization;
+   // protected PosStabilization myStabilization = myDefaultStabilization;
 
-   protected boolean myDynamicsEnabled = DEFAULT_DYNAMICS_ENABLED; 
+   protected boolean myDynamicsEnabled = DEFAULT_DYNAMICS_ENABLED;
    protected boolean myProfilingP = DEFAULT_PROFILING;
    protected int myProfilingCnt = 0;
 
@@ -123,14 +137,14 @@ public abstract class MechSystemBase extends RenderableModelBase
    double myLastPrintTime = 0;
 
    // objects for projecting position constraints
-   //KKTSolver myPosSolver = new KKTSolver();
-   VectorNd myRg = new VectorNd(0);
-   VectorNd myBg = new VectorNd(0);
-   VectorNd myRn = new VectorNd(0);
-   VectorNd myBn = new VectorNd(0);
+   // KKTSolver myPosSolver = new KKTSolver();
+   VectorNd myRg = new VectorNd (0);
+   VectorNd myBg = new VectorNd (0);
+   VectorNd myRn = new VectorNd (0);
+   VectorNd myBn = new VectorNd (0);
 
-   VectorNi myBilateralSizes = new VectorNi(100);
-   VectorNi myUnilateralSizes = new VectorNi(100);
+   VectorNi myBilateralSizes = new VectorNi (100);
+   VectorNi myUnilateralSizes = new VectorNi (100);
 
    private double myPenetrationLimit = -1;
 
@@ -142,18 +156,18 @@ public abstract class MechSystemBase extends RenderableModelBase
     */
    public class ConstraintForceStateSaver implements HasNumericState {
 
-      public boolean hasState() {
+      public boolean hasState () {
          return true;
       }
 
       public void getInitialState (NumericState nstate) {
          if (false) {
-            int numf = getNumBilateralForces() + getNumUnilateralForces();
+            int numf = getNumBilateralForces () + getNumUnilateralForces ();
             nstate.zput (numf);
-            int di = nstate.dsize();
-            int dsize = di+numf;
+            int di = nstate.dsize ();
+            int dsize = di + numf;
             nstate.dsetSize (dsize);
-            double[] dbuf = nstate.dbuffer();
+            double[] dbuf = nstate.dbuffer ();
             while (di < dsize) {
                dbuf[di++] = 0;
             }
@@ -162,48 +176,48 @@ public abstract class MechSystemBase extends RenderableModelBase
             // just set numf to -1, meaning that all forces will be set to 0
             nstate.zput (-1);
          }
-         if (nstate.hasDataFrames()) {
+         if (nstate.hasDataFrames ()) {
             nstate.addDataFrame (this);
          }
       }
 
       public void getState (DataBuffer data) {
-         int numf = getNumBilateralForces() + getNumUnilateralForces();
+         int numf = getNumBilateralForces () + getNumUnilateralForces ();
          data.zput (numf);
-         int di = data.dsize();
-         data.dsetSize (di+numf);
+         int di = data.dsize ();
+         data.dsetSize (di + numf);
          // create special vector to access the state ...
-         VectorNd dvec = new VectorNd();
-         dvec.setBuffer (data.dsize(), data.dbuffer());
-         for (int i=0; i<myConstrainers.size(); i++) {
-            Constrainer c = myConstrainers.get(i);
+         VectorNd dvec = new VectorNd ();
+         dvec.setBuffer (data.dsize (), data.dbuffer ());
+         for (int i = 0; i < myConstrainers.size (); i++) {
+            Constrainer c = myConstrainers.get (i);
             di = c.getBilateralForces (dvec, di);
             di = c.getUnilateralForces (dvec, di);
-         }         
+         }
       }
 
       public void setState (DataBuffer data) {
-         int chkf = getNumBilateralForces() + getNumUnilateralForces();
-         int numf = data.zget();
+         int chkf = getNumBilateralForces () + getNumUnilateralForces ();
+         int numf = data.zget ();
          if (numf != -1 && numf != chkf) {
             throw new IllegalArgumentException (
-               "number of impulse forces is "+numf+", expecting "+chkf);
+               "number of impulse forces is " + numf + ", expecting " + chkf);
          }
 
          // numf == -1 means all forces should be set to 0
-         
+
          // create special vector to access the state ...
-         VectorNd dvec = new VectorNd();
+         VectorNd dvec = new VectorNd ();
          int di = 0;
          if (numf != -1) {
-            dvec.setBuffer (data.dsize(), data.dbuffer());
-            di = data.doffset();
+            dvec.setBuffer (data.dsize (), data.dbuffer ());
+            di = data.doffset ();
          }
          else {
             dvec.setSize (chkf);
          }
-         for (int i=0; i<myConstrainers.size(); i++) {
-            Constrainer c = myConstrainers.get(i);
+         for (int i = 0; i < myConstrainers.size (); i++) {
+            Constrainer c = myConstrainers.get (i);
             di = c.setBilateralForces (dvec, 1.0, di);
             di = c.setUnilateralForces (dvec, 1.0, di);
          }
@@ -214,20 +228,24 @@ public abstract class MechSystemBase extends RenderableModelBase
    }
 
    ConstraintForceStateSaver myConstraintForceStateSaver =
-      new ConstraintForceStateSaver();
+      new ConstraintForceStateSaver ();
 
    static {
-      myProps.add (
-         "dynamicsEnabled", "enable dynamics", DEFAULT_DYNAMICS_ENABLED);
-      myProps.add (
-         "penetrationLimit", 
-         "collision penetration limit for step reduction", -1);
-      myProps.addInheritable (
-         "updateForcesAtStepEnd",
-         "update forces values at the end of each step", 
-         DEFAULT_UPDATE_FORCES_AT_STEP_END);
-      myProps.add (
-         "profiling", "print step time and computation time", DEFAULT_PROFILING);
+      myProps
+         .add ("dynamicsEnabled", "enable dynamics", DEFAULT_DYNAMICS_ENABLED);
+      myProps
+         .add (
+            "penetrationLimit",
+            "collision penetration limit for step reduction", -1);
+      myProps
+         .addInheritable (
+            "updateForcesAtStepEnd",
+            "update forces values at the end of each step",
+            DEFAULT_UPDATE_FORCES_AT_STEP_END);
+      myProps
+         .add (
+            "profiling", "print step time and computation time",
+            DEFAULT_PROFILING);
       myProps.add ("integrator", "integration method", DEFAULT_INTEGRATOR);
       myProps.add ("matrixSolver", "matrix solver", DEFAULT_MATRIX_SOLVER);
 
@@ -239,18 +257,18 @@ public abstract class MechSystemBase extends RenderableModelBase
       }
    }
 
-   public double getPenetrationLimit() {
+   public double getPenetrationLimit () {
       if (myPenetrationLimit == -1) {
          double radius = RenderableUtils.getRadius (this);
          if (radius != 0) {
-            myPenetrationLimit = 0.05*radius;
+            myPenetrationLimit = 0.05 * radius;
          }
       }
       return myPenetrationLimit;
    }
 
-   protected void setDefaultValues() {
-      super.setDefaultValues();
+   protected void setDefaultValues () {
+      super.setDefaultValues ();
       setDynamicsEnabled (DEFAULT_DYNAMICS_ENABLED);
       setPenetrationLimit (-1);
       setProfiling (DEFAULT_PROFILING);
@@ -265,7 +283,7 @@ public abstract class MechSystemBase extends RenderableModelBase
       setIntegrator (DEFAULT_INTEGRATOR);
    }
 
-   public boolean getDynamicsEnabled() {
+   public boolean getDynamicsEnabled () {
       return myDynamicsEnabled;
    }
 
@@ -279,28 +297,29 @@ public abstract class MechSystemBase extends RenderableModelBase
       }
       else {
          mySolver = new MechSystemSolver (this);
-         mySolver.setStabilization (getStabilization());
-         mySolver.setUpdateForcesAtStepEnd (getUpdateForcesAtStepEnd());
-         mySolver.setIntegrator (getIntegrator());
-         mySolver.setMatrixSolver (getMatrixSolver());
+         mySolver.setStabilization (getStabilization ());
+         mySolver.setUpdateForcesAtStepEnd (getUpdateForcesAtStepEnd ());
+         mySolver.setIntegrator (getIntegrator ());
+         mySolver.setMatrixSolver (getMatrixSolver ());
       }
    }
 
    public MechSystemBase (String name) {
       super (name);
       setMatrixSolver (myDefaultMatrixSolver);
-      setIntegrator (DEFAULT_INTEGRATOR);     
-      allocateSolver (/*oldSolver=*/null);
-      myAttachmentWorker = new DynamicAttachmentWorker();
-      //setStabilization (myDefaultStabilization);
-      //setUpdateForcesAtStepEnd (DEFAULT_UPDATE_FORCES_AT_STEP_END);
+      setIntegrator (DEFAULT_INTEGRATOR);
+      allocateSolver (/* oldSolver= */null);
+      myAttachmentWorker = new DynamicAttachmentWorker ();
+      // setStabilization (myDefaultStabilization);
+      // setUpdateForcesAtStepEnd (DEFAULT_UPDATE_FORCES_AT_STEP_END);
    }
 
    /**
-    * Returns the topmost MechSystem, if any, that is associated with
-    * a specific component. 
+    * Returns the topmost MechSystem, if any, that is associated with a specific
+    * component.
     * 
-    * @param comp component to start with
+    * @param comp
+    * component to start with
     * @return topmost MechSystem on or above <code>comp</code>, or
     * <code>null</code> if there is none.
     */
@@ -308,28 +327,28 @@ public abstract class MechSystemBase extends RenderableModelBase
       MechSystem mech = null;
       while (comp != null) {
          if (comp instanceof MechSystem) {
-            mech = (MechSystem) comp;
+            mech = (MechSystem)comp;
          }
-         comp=comp.getParent();
+         comp = comp.getParent ();
       }
       return mech;
    }
-   
-   public MechSystemSolver getSolver() {
+
+   public MechSystemSolver getSolver () {
       return mySolver;
    }
 
-   public SparseBlockMatrix createVelocityJacobian() {
-      updateDynamicComponentLists();
+   public SparseBlockMatrix createVelocityJacobian () {
+      updateDynamicComponentLists ();
       return new SparseBlockMatrix (new int[0], myDynamicSizes);
    }
 
    public void reduceVelocityJacobian (SparseBlockMatrix J) {
-      updateDynamicComponentLists();
-      if (getAttachments().size() > 0 && !J.isVerticallyLinked()) {
-	 J.setVerticallyLinked(true);
+      updateDynamicComponentLists ();
+      if (getAttachments ().size () > 0 && !J.isVerticallyLinked ()) {
+         J.setVerticallyLinked (true);
       }
-      for (DynamicAttachment a : getAttachments()) {
+      for (DynamicAttachment a : getAttachments ()) {
          myAttachmentWorker.reduceRowMatrix (a, J);
       }
    }
@@ -337,45 +356,48 @@ public abstract class MechSystemBase extends RenderableModelBase
    public int getNumUnilateralForces () {
       myUnilateralSizes.setSize (0);
       getUnilateralConstraintSizes (myUnilateralSizes);
-      return myUnilateralSizes.sum();
-   }      
-
+      return myUnilateralSizes.sum ();
+   }
 
    public void getUnilateralConstraintSizes (VectorNi sizes) {
-      updateForceComponentList();
-      for (int i=0; i<myConstrainers.size(); i++) {
-         myConstrainers.get(i).getUnilateralSizes (sizes);
-      }      
+      updateForceComponentList ();
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         myConstrainers.get (i).getUnilateralSizes (sizes);
+      }
    }
 
-   public boolean hasUnilateralConstraints() {
-      updateForceComponentList();
-      
+   public boolean hasUnilateralConstraints () {
+      updateForceComponentList ();
+
       myUnilateralSizes.setSize (0);
       getUnilateralConstraintSizes (myUnilateralSizes);
-      
+
       return (myUnilateralSizes.size () != 0);
    }
-   
+
    public void getUnilateralConstraints (SparseBlockMatrix NT, VectorNd dn) {
-      if (NT.numBlockRows() != 0 || NT.numBlockCols() != 0) {
+      if (NT.numBlockRows () != 0 || NT.numBlockCols () != 0) {
          throw new IllegalArgumentException (
             "On entry, NT should be empty with zero size");
       }
-      updateForceComponentList();
+      updateForceComponentList ();
       myUnilateralSizes.setSize (0);
       getUnilateralConstraintSizes (myUnilateralSizes);
-      NT.setColCapacity (myUnilateralSizes.size());
+
+      // if (myUnilateralSizes.size () > 0) {
+      // System.out.println ("Here");
+      // }
+
+      NT.setColCapacity (myUnilateralSizes.size ());
       NT.addRows (myDynamicSizes, myDynamicSizes.length);
       if (dn != null) {
-         dn.setSize (myUnilateralSizes.sum());
+         dn.setSize (myUnilateralSizes.sum ());
       }
       int idx = 0;
-      for (int i=0; i<myConstrainers.size(); i++) {
-         idx = myConstrainers.get(i).addUnilateralConstraints (
-            NT, dn, idx);
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         idx = myConstrainers.get (i).addUnilateralConstraints (NT, dn, idx);
       }
-      for (DynamicAttachment a : getAttachments()) {
+      for (DynamicAttachment a : getAttachments ()) {
          myAttachmentWorker.reduceConstraints (a, NT, dn, false);
       }
       // need this for now - would be good to get rid of it:
@@ -385,47 +407,46 @@ public abstract class MechSystemBase extends RenderableModelBase
    public int getNumBilateralForces () {
       myBilateralSizes.setSize (0);
       getBilateralConstraintSizes (myBilateralSizes);
-      return myBilateralSizes.sum();
-   }      
+      return myBilateralSizes.sum ();
+   }
 
    public void getBilateralConstraintSizes (VectorNi sizes) {
-      updateForceComponentList();
-      for (int i=0; i<myConstrainers.size(); i++) {
-         myConstrainers.get(i).getBilateralSizes (sizes);
+      updateForceComponentList ();
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         myConstrainers.get (i).getBilateralSizes (sizes);
       }
    }
 
    /**
     * {@inheritDoc}
     */
-   public boolean isBilateralStructureConstant() {
-      // assume true - override if 
+   public boolean isBilateralStructureConstant () {
+      // assume true - override if
       return true;
    }
-   
+
    public void getBilateralConstraints (SparseBlockMatrix GT, VectorNd dg) {
 
-      if (GT.numBlockRows() != 0 || GT.numBlockCols() != 0) {
+      if (GT.numBlockRows () != 0 || GT.numBlockCols () != 0) {
          throw new IllegalArgumentException (
             "On entry, GT should be empty with zero size");
       }
-      updateForceComponentList();
-      updateDynamicComponentLists();
+      updateForceComponentList ();
+      updateDynamicComponentLists ();
       myBilateralSizes.setSize (0);
       getBilateralConstraintSizes (myBilateralSizes);
-      GT.setColCapacity (myBilateralSizes.size());
+      GT.setColCapacity (myBilateralSizes.size ());
       GT.addRows (myDynamicSizes, myDynamicSizes.length);
       if (dg != null) {
-         dg.setSize (myBilateralSizes.sum());
+         dg.setSize (myBilateralSizes.sum ());
       }
 
-      IntHolder changeCnt = new IntHolder(0);
+      IntHolder changeCnt = new IntHolder (0);
       int idx = 0;
-      for (int i=0; i<myConstrainers.size(); i++) {
-         idx = myConstrainers.get(i).addBilateralConstraints (
-            GT, dg, idx);
-      }      
-      for (DynamicAttachment a : getAttachments()) {
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         idx = myConstrainers.get (i).addBilateralConstraints (GT, dg, idx);
+      }
+      for (DynamicAttachment a : getAttachments ()) {
          myAttachmentWorker.reduceConstraints (a, GT, dg, false);
       }
       // need this for now - would be good to get rid of it:
@@ -433,75 +454,75 @@ public abstract class MechSystemBase extends RenderableModelBase
    }
 
    public void getBilateralInfo (ConstraintInfo[] ginfo) {
-      updateForceComponentList();
+      updateForceComponentList ();
       int idx = 0;
-      for (int i=0; i<myConstrainers.size(); i++) {
-         idx = myConstrainers.get(i).getBilateralInfo (ginfo, idx);
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         idx = myConstrainers.get (i).getBilateralInfo (ginfo, idx);
       }
    }
 
    public void setBilateralForces (VectorNd lam, double s) {
       setBilateralForces (lam, s, 0);
-   }         
+   }
 
    public int setBilateralForces (VectorNd lam, double s, int idx) {
-      updateForceComponentList();
-      for (int i=0; i<myConstrainers.size(); i++) {
-         idx = myConstrainers.get(i).setBilateralForces (lam, s, idx);
+      updateForceComponentList ();
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         idx = myConstrainers.get (i).setBilateralForces (lam, s, idx);
       }
       return idx;
    }
 
    public void getBilateralForces (VectorNd lam) {
-      updateForceComponentList();
+      updateForceComponentList ();
       getBilateralForces (lam, 0);
    }
-   
+
    public int getBilateralForces (VectorNd lam, int idx) {
-      for (int i=0; i<myConstrainers.size(); i++) {
-         idx = myConstrainers.get(i).getBilateralForces (lam, idx);
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         idx = myConstrainers.get (i).getBilateralForces (lam, idx);
       }
       return idx;
    }
 
    public void getUnilateralInfo (ConstraintInfo[] ninfo) {
-      updateForceComponentList();
+      updateForceComponentList ();
       int idx = 0;
-      for (int i=0; i<myConstrainers.size(); i++) {
-         idx = myConstrainers.get(i).getUnilateralInfo (ninfo, idx);
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         idx = myConstrainers.get (i).getUnilateralInfo (ninfo, idx);
       }
    }
 
    public void setUnilateralForces (VectorNd the, double s) {
       setUnilateralForces (the, s, 0);
-   }         
+   }
 
    public int setUnilateralForces (VectorNd the, double s, int idx) {
-      updateForceComponentList();
-      for (int i=0; i<myConstrainers.size(); i++) {
-         idx = myConstrainers.get(i).setUnilateralForces (the, s, idx);
+      updateForceComponentList ();
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         idx = myConstrainers.get (i).setUnilateralForces (the, s, idx);
       }
       return idx;
    }
 
    public void getUnilateralForces (VectorNd the) {
-      updateForceComponentList();
+      updateForceComponentList ();
       getUnilateralForces (the, 0);
-   }         
+   }
 
    public int getUnilateralForces (VectorNd the, int idx) {
-      for (int i=0; i<myConstrainers.size(); i++) {
-         idx = myConstrainers.get(i).getUnilateralForces (the, idx);
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         idx = myConstrainers.get (i).getUnilateralForces (the, idx);
       }
       return idx;
    }
 
    public int maxFrictionConstraintSets () {
-      updateForceComponentList();
+      updateForceComponentList ();
       int max = 0;
-      for (int i=0; i<myConstrainers.size(); i++) {
-         max += myConstrainers.get(i).maxFrictionConstraintSets();
-      }      
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         max += myConstrainers.get (i).maxFrictionConstraintSets ();
+      }
       return max;
    }
 
@@ -509,55 +530,59 @@ public abstract class MechSystemBase extends RenderableModelBase
    public void getFrictionConstraints (
       SparseBlockMatrix DT, FrictionInfo[] finfo) {
 
-      if (DT.numBlockRows() != 0 || DT.numBlockCols() != 0) {
+      if (DT.numBlockRows () != 0 || DT.numBlockCols () != 0) {
          throw new IllegalArgumentException (
             "On entry, DT should be empty with zero size");
       }
-      updateForceComponentList();
-      DT.addRows (myDynamicSizes, myDynamicSizes.length-1);
+      updateForceComponentList ();
+      DT.addRows (myDynamicSizes, myDynamicSizes.length - 1);
       int idx = 0;
-      for (int i=0; i<myConstrainers.size(); i++) {
-         idx = myConstrainers.get(i).addFrictionConstraints (DT, finfo, idx);
-      }      
-      //idxh.value = addFrictionConstraints (DT, finfo, idxh.value);
-      for (DynamicAttachment a : getAttachments()) {
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         idx = myConstrainers.get (i).addFrictionConstraints (DT, finfo, idx);
+      }
+      // idxh.value = addFrictionConstraints (DT, finfo, idxh.value);
+      for (DynamicAttachment a : getAttachments ()) {
          myAttachmentWorker.reduceConstraints (a, DT, null, false);
       }
    }
-   
+
    public boolean updateConstraints (
       double t, StepAdjustment stepAdjust, int flags) {
 
-      updateForceComponentList();
+      updateForceComponentList ();
       double maxpen = 0;
       boolean hasConstraints = false;
-      
-      for (int i=0; i<myConstrainers.size(); i++) {
-         double pen = myConstrainers.get(i).updateConstraints (t, flags);
-         // DANCOLEDIT - There's a bug where if the mesh topology is modified (e.g. new element),
-         // updateConstraints() will notify the surface mesh to be updated, which in turn,
-         // causes the cache to be updated --- clearing "myConstrainers" along with it.
+
+      for (int i = 0; i < myConstrainers.size (); i++) {
+         double pen = myConstrainers.get (i).updateConstraints (t, flags);
+         // DANCOLEDIT - There's a bug where if the mesh topology is modified
+         // (e.g. new element),
+         // updateConstraints() will notify the surface mesh to be updated,
+         // which in turn,
+         // causes the cache to be updated --- clearing "myConstrainers" along
+         // with it.
          if (myConstrainers == null) {
-            updateForceComponentList();
+            updateForceComponentList ();
          }
-         
+
          if (pen >= 0) {
             hasConstraints = true;
             if (pen > maxpen) {
                maxpen = pen;
             }
          }
-      } 
-      double penlimit = getPenetrationLimit();
+      }
+      double penlimit = getPenetrationLimit ();
       if (penlimit > 0 && maxpen > penlimit && stepAdjust != null) {
-         stepAdjust.recommendAdjustment (
-            0.5 /*penlimit/maxpen*/, "contact penetration exceeds "+penlimit);
+         stepAdjust
+            .recommendAdjustment (
+               0.5 /* penlimit/maxpen */,
+               "contact penetration exceeds " + penlimit);
       }
       return hasConstraints;
    }
-   
 
-   public int getStructureVersion() {
+   public int getStructureVersion () {
       return myStructureVersion;
    }
 
@@ -568,26 +593,25 @@ public abstract class MechSystemBase extends RenderableModelBase
     * <code>sizes</code> is less than the number of dynamic components, the
     * results are truncated.
     *
-    * @param dofs returns the number of DOFs for each dynamic component
+    * @param dofs
+    * returns the number of DOFs for each dynamic component
     */
    public void getDynamicDOFs (int[] dofs) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       int max = Math.min (dofs.length, myDynamicSizes.length);
-      for (int i=0; i<max; i++) {
+      for (int i = 0; i < max; i++) {
          dofs[i] = myDynamicSizes[i];
       }
    }
 
    public static void placeDynamicComponent (
-      List<DynamicComponent> active,
-      List<DynamicComponent> attached, 
-      List<DynamicComponent> parametric,
-      DynamicComponent d) {
+      List<DynamicComponent> active, List<DynamicComponent> attached,
+      List<DynamicComponent> parametric, DynamicComponent d) {
 
-      if (d.isActive()) {
+      if (d.isActive ()) {
          active.add (d);
       }
-      else if (d.isAttached()) {
+      else if (d.isAttached ()) {
          attached.add (d);
       }
       else {
@@ -596,25 +620,25 @@ public abstract class MechSystemBase extends RenderableModelBase
    }
 
    /**
-    * Returns a list of the dynamic components in this model. Used for
-    * debugging only. Must not be modified.
+    * Returns a list of the dynamic components in this model. Used for debugging
+    * only. Must not be modified.
     */
-   public ArrayList<DynamicComponent> getDynamicComponents() {
+   public ArrayList<DynamicComponent> getDynamicComponents () {
       return myDynamicComponents;
    }
 
-   protected void updateDynamicComponentLists() {
+   protected void updateDynamicComponentLists () {
 
       if (myDynamicComponents == null) {
-         myDynamicComponents = new ArrayList<DynamicComponent>();
+         myDynamicComponents = new ArrayList<DynamicComponent> ();
          ArrayList<DynamicComponent> active =
-            new ArrayList<DynamicComponent>();
+            new ArrayList<DynamicComponent> ();
          ArrayList<DynamicComponent> attached =
-            new ArrayList<DynamicComponent>();
+            new ArrayList<DynamicComponent> ();
          ArrayList<DynamicComponent> parametric =
-            new ArrayList<DynamicComponent>();
+            new ArrayList<DynamicComponent> ();
          if (useAllDynamicComps) {
-            myAllDynamicComponents = new ArrayList<DynamicComponent>();
+            myAllDynamicComponents = new ArrayList<DynamicComponent> ();
             getDynamicComponents (myAllDynamicComponents);
             for (DynamicComponent c : myAllDynamicComponents) {
                placeDynamicComponent (active, attached, parametric, c);
@@ -624,28 +648,29 @@ public abstract class MechSystemBase extends RenderableModelBase
             getDynamicComponents (active, attached, parametric);
          }
 
-         myNumActive = active.size();
-         myNumAttached = attached.size();
+         myNumActive = active.size ();
+         myNumAttached = attached.size ();
 
          myParametricVelStateSize = 0;
          myParametricPosStateSize = 0;
-         myParametricComponents = new ArrayList<MotionTargetComponent>();
+         myParametricComponents = new ArrayList<MotionTargetComponent> ();
          for (DynamicComponent c : parametric) {
             if (c instanceof MotionTargetComponent) {
-               myParametricPosStateSize += c.getPosStateSize();
-               myParametricVelStateSize += c.getVelStateSize();
+               myParametricPosStateSize += c.getPosStateSize ();
+               myParametricVelStateSize += c.getVelStateSize ();
                myParametricComponents.add ((MotionTargetComponent)c);
             }
          }
-         myNumParametric = myParametricComponents.size();
+         myNumParametric = myParametricComponents.size ();
 
          if (myParametricsInSystemMatrix) {
-            myDynamicSizes = new int[myNumActive+myNumAttached+myNumParametric];
+            myDynamicSizes =
+               new int[myNumActive + myNumAttached + myNumParametric];
          }
          else {
-            myDynamicSizes = new int[myNumActive+myNumAttached];
+            myDynamicSizes = new int[myNumActive + myNumAttached];
          }
-            
+
          myActiveVelStateSize = 0;
          myActivePosStateSize = 0;
          myAttachedVelStateSize = 0;
@@ -655,15 +680,15 @@ public abstract class MechSystemBase extends RenderableModelBase
          for (DynamicComponent c : active) {
             myDynamicComponents.add (c);
             c.setSolveIndex (idx);
-            myDynamicSizes[idx++] = c.getVelStateSize();
-            myActivePosStateSize += c.getPosStateSize();
-            myActiveVelStateSize += c.getVelStateSize();
+            myDynamicSizes[idx++] = c.getVelStateSize ();
+            myActivePosStateSize += c.getPosStateSize ();
+            myActiveVelStateSize += c.getVelStateSize ();
          }
          for (DynamicComponent c : myParametricComponents) {
             if (MechModel.myParametricsInSystemMatrix) {
                myDynamicComponents.add (c);
                c.setSolveIndex (idx);
-               myDynamicSizes[idx++] = c.getVelStateSize();
+               myDynamicSizes[idx++] = c.getVelStateSize ();
             }
             else {
                c.setSolveIndex (-1);
@@ -672,31 +697,31 @@ public abstract class MechSystemBase extends RenderableModelBase
          for (DynamicComponent c : attached) {
             myDynamicComponents.add (c);
             c.setSolveIndex (idx);
-            myDynamicSizes[idx++] = c.getVelStateSize();
-            myAttachedPosStateSize += c.getPosStateSize();
-            myAttachedVelStateSize += c.getVelStateSize();
+            myDynamicSizes[idx++] = c.getVelStateSize ();
+            myAttachedPosStateSize += c.getPosStateSize ();
+            myAttachedVelStateSize += c.getVelStateSize ();
          }
          mySystemSize = 0;
-         for (int i=0; i<myDynamicSizes.length; i++) {
+         for (int i = 0; i < myDynamicSizes.length; i++) {
             mySystemSize += myDynamicSizes[i];
          }
          myNumComponents = myDynamicSizes.length;
       }
    }
 
-   protected void updateForceComponentList() {
+   protected void updateForceComponentList () {
       // Build new constrainer and force effector lists if necessary.
       // Create using temporary lists just in case clearCachedData() gets
       // called while the lists are being built.
 
       ArrayList<Constrainer> newConstrainers = null;
-      ArrayList<ForceEffector> newForceEffectors = null;      
+      ArrayList<ForceEffector> newForceEffectors = null;
       if (myConstrainers == null) {
-         newConstrainers = new ArrayList<Constrainer>();
+         newConstrainers = new ArrayList<Constrainer> ();
          getConstrainers (newConstrainers, 0);
       }
       if (myForceEffectors == null) {
-         newForceEffectors = new ArrayList<ForceEffector>();
+         newForceEffectors = new ArrayList<ForceEffector> ();
          getForceEffectors (newForceEffectors, 0);
       }
       if (newConstrainers != null) {
@@ -707,14 +732,14 @@ public abstract class MechSystemBase extends RenderableModelBase
       }
    }
 
-   protected void updateAuxStateComponentList() {
+   protected void updateAuxStateComponentList () {
       if (myAuxStateComponents == null) {
          // XXX getAuxStateComponents might trigger a FEM surface build, which
          // will in turn trigger a structure change that will call
          // clearCachedData(). So, we need to make sure
          // updateAuxStateComponentList() is called before any other updates
          // are called.
-         ArrayList<HasNumericState> list = new ArrayList<HasNumericState>();
+         ArrayList<HasNumericState> list = new ArrayList<HasNumericState> ();
          getAuxStateComponents (list, 0);
          myAuxStateComponents = list;
       }
@@ -723,57 +748,60 @@ public abstract class MechSystemBase extends RenderableModelBase
    /**
     * Should be overridden in subclasses to return all the HasSlaveObjects
     * components within this model.
-    * @param comps HasSlaveObjects components should be added to this list
+    * 
+    * @param comps
+    * HasSlaveObjects components should be added to this list
     */
-   public void getSlaveObjectComponents (List<HasSlaveObjects> comps, int level) {
+   public void getSlaveObjectComponents (
+      List<HasSlaveObjects> comps, int level) {
    }
-   
-   protected void updateSlaveObjectComponentList() {
+
+   protected void updateSlaveObjectComponentList () {
       if (mySlaveObjectComponents == null) {
-         mySlaveObjectComponents = new ArrayList<HasSlaveObjects>();
+         mySlaveObjectComponents = new ArrayList<HasSlaveObjects> ();
          getSlaveObjectComponents (mySlaveObjectComponents, 0);
       }
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
    public void getActivePosState (VectorNd q) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       q.setSize (myActivePosStateSize);
       getActivePosState (q, 0);
    }
 
    protected int getActivePosState (VectorNd q, int idx) {
-      double[] buf = q.getBuffer();
-      for (int i=0; i<myNumActive; i++) {
-         idx = myDynamicComponents.get(i).getPosState (buf, idx);
+      double[] buf = q.getBuffer ();
+      for (int i = 0; i < myNumActive; i++) {
+         idx = myDynamicComponents.get (i).getPosState (buf, idx);
       }
       return idx;
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
    public void getActiveVelState (VectorNd u) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       u.setSize (myActiveVelStateSize);
       getActiveVelState (u, 0);
    }
 
    protected int getActiveVelState (VectorNd u, int idx) {
-      double[] buf = u.getBuffer();
-      for (int i=0; i<myNumActive; i++) {
-         idx = myDynamicComponents.get(i).getVelState (buf, idx);
+      double[] buf = u.getBuffer ();
+      for (int i = 0; i < myNumActive; i++) {
+         idx = myDynamicComponents.get (i).getVelState (buf, idx);
       }
       return idx;
    }
 
    public int getActiveVelState (VectorNd u, int idx, boolean bodyCoords) {
-      updateDynamicComponentLists();
-      double[] buf = u.getBuffer();
-      for (int i=0; i<myNumActive; i++) {
-         DynamicComponent c = myDynamicComponents.get(i);
+      updateDynamicComponentLists ();
+      double[] buf = u.getBuffer ();
+      for (int i = 0; i < myNumActive; i++) {
+         DynamicComponent c = myDynamicComponents.get (i);
          if (c instanceof RigidBody) {
             if (bodyCoords) {
                idx = ((RigidBody)c).getBodyVelState (buf, idx);
@@ -789,174 +817,175 @@ public abstract class MechSystemBase extends RenderableModelBase
       return idx;
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
    public void setActivePosState (VectorNd q) {
       setActivePosState (q, 0);
    }
-   
+
    protected int setActivePosState (VectorNd q, int idx) {
-      updateDynamicComponentLists();
-      double[] buf = q.getBuffer();
-      for (int i=0; i<myNumActive; i++) {
-         idx = myDynamicComponents.get(i).setPosState (buf, idx);
+      updateDynamicComponentLists ();
+      double[] buf = q.getBuffer ();
+      for (int i = 0; i < myNumActive; i++) {
+         idx = myDynamicComponents.get (i).setPosState (buf, idx);
       }
-      updateAttachmentPos (getActiveAttachments());
-      updateSlavePos();
-      updateAttachmentVel (getActiveAttachments()); // AVEL
-      updateSlaveVel(); // AVEL
+      updateAttachmentPos (getActiveAttachments ());
+      updateSlavePos ();
+      updateAttachmentVel (getActiveAttachments ()); // AVEL
+      updateSlaveVel (); // AVEL
       return idx;
    }
 
    public void addActivePosImpulse (VectorNd x, double h, VectorNd v) {
-      updateDynamicComponentLists();
-      double[] xbuf = x.getBuffer();
-      double[] vbuf = v.getBuffer();
+      updateDynamicComponentLists ();
+      double[] xbuf = x.getBuffer ();
+      double[] vbuf = v.getBuffer ();
       int xidx = 0;
       int vidx = 0;
-      for (int i=0; i<myNumActive; i++) {
-         DynamicComponent d = myDynamicComponents.get(i);
+      for (int i = 0; i < myNumActive; i++) {
+         DynamicComponent d = myDynamicComponents.get (i);
          d.addPosImpulse (xbuf, xidx, h, vbuf, vidx);
-         xidx += d.getPosStateSize();
-         vidx += d.getVelStateSize();
+         xidx += d.getPosStateSize ();
+         vidx += d.getVelStateSize ();
       }
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
    public void setActiveVelState (VectorNd u) {
       setActiveVelState (u, 0);
    }
 
-
    protected int setActiveVelState (VectorNd u, int idx) {
-      updateDynamicComponentLists();
-      double[] buf = u.getBuffer();
-      for (int i=0; i<myNumActive; i++) {
-         idx = myDynamicComponents.get(i).setVelState (buf, idx);
+      updateDynamicComponentLists ();
+      double[] buf = u.getBuffer ();
+      for (int i = 0; i < myNumActive; i++) {
+         idx = myDynamicComponents.get (i).setVelState (buf, idx);
       }
-      updateAttachmentVel (getActiveAttachments());
-      updateSlaveVel();
-      //updateVelState();
+      updateAttachmentVel (getActiveAttachments ());
+      updateSlaveVel ();
+      // updateVelState();
       return idx;
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
-   public int getActivePosStateSize() {
-      updateDynamicComponentLists();
+   public int getActivePosStateSize () {
+      updateDynamicComponentLists ();
       return myActivePosStateSize;
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
-   public int getActiveVelStateSize() {
-      updateDynamicComponentLists();
+   public int getActiveVelStateSize () {
+      updateDynamicComponentLists ();
       return myActiveVelStateSize;
    }
 
    public void getActivePosDerivative (VectorNd dxdt, double t) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       dxdt.setSize (myActivePosStateSize);
-      double[] buf = dxdt.getBuffer();
+      double[] buf = dxdt.getBuffer ();
       int idx = 0;
-      for (int i=0; i<myNumActive; i++) {
-         idx = myDynamicComponents.get(i).getPosDerivative (buf, idx);
+      for (int i = 0; i < myNumActive; i++) {
+         idx = myDynamicComponents.get (i).getPosDerivative (buf, idx);
       }
-   } 
+   }
 
    /**
-    * Returns a list of all the active dynamic components, which
-    * collectively determine the values returned by {@link #getActiveForces},
-    * {@link #getActivePosState}, etc. The returned list is a copy and
-    * may be modified.
-    *  
+    * Returns a list of all the active dynamic components, which collectively
+    * determine the values returned by {@link #getActiveForces},
+    * {@link #getActivePosState}, etc. The returned list is a copy and may be
+    * modified.
+    * 
     * @return list of all the active dynamic components.
     */
-   public ArrayList<DynamicComponent> getActiveDynamicComponents() {
-      ArrayList<DynamicComponent> comps = new ArrayList<>();
-      for (int i=0; i<myNumActive; i++) {
-         comps.add (myDynamicComponents.get(i));
-      }  
+   public ArrayList<DynamicComponent> getActiveDynamicComponents () {
+      ArrayList<DynamicComponent> comps = new ArrayList<> ();
+      for (int i = 0; i < myNumActive; i++) {
+         comps.add (myDynamicComponents.get (i));
+      }
       return comps;
    }
-   
-   /** 
+
+   /**
     * {@inheritDoc}
     */
    public void getActiveForces (VectorNd f) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       f.setSize (myActiveVelStateSize);
-      //updateForcesIfNecessary (t);
-      double[] buf = f.getBuffer();
+      // updateForcesIfNecessary (t);
+      double[] buf = f.getBuffer ();
       int idx = 0;
-      for (int i=0; i<myNumActive; i++) {
-         idx = myDynamicComponents.get(i).getForce (buf, idx);
-      }      
+      for (int i = 0; i < myNumActive; i++) {
+         idx = myDynamicComponents.get (i).getForce (buf, idx);
+      }
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
    public void setActiveForces (VectorNd f) {
-      updateDynamicComponentLists();
-      double[] buf = f.getBuffer();
+      updateDynamicComponentLists ();
+      double[] buf = f.getBuffer ();
       int idx = 0;
-      for (int i=0; i<myNumActive; i++) {
-         idx = myDynamicComponents.get(i).setForce (buf, idx);
-      }      
+      for (int i = 0; i < myNumActive; i++) {
+         idx = myDynamicComponents.get (i).setForce (buf, idx);
+      }
    }
 
    public void getForces (VectorNd f) {
-      updateDynamicComponentLists();
-      f.setSize (
-         myActiveVelStateSize+myAttachedVelStateSize+myParametricVelStateSize);
-      double[] buf = f.getBuffer();
+      updateDynamicComponentLists ();
+      f
+         .setSize (
+            myActiveVelStateSize + myAttachedVelStateSize
+            + myParametricVelStateSize);
+      double[] buf = f.getBuffer ();
       int idx = 0;
-      for (int i=0; i<myDynamicComponents.size(); i++) {
-         idx = myDynamicComponents.get(i).getForce (buf, idx);
-      }      
+      for (int i = 0; i < myDynamicComponents.size (); i++) {
+         idx = myDynamicComponents.get (i).getForce (buf, idx);
+      }
    }
 
    public void setForces (VectorNd f) {
-      updateDynamicComponentLists();
-      double[] buf = f.getBuffer();
+      updateDynamicComponentLists ();
+      double[] buf = f.getBuffer ();
       int idx = 0;
-      for (int i=0; i<myDynamicComponents.size(); i++) {
-         idx = myDynamicComponents.get(i).setForce (buf, idx);
-      }      
+      for (int i = 0; i < myDynamicComponents.size (); i++) {
+         idx = myDynamicComponents.get (i).setForce (buf, idx);
+      }
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
    public void getParametricForces (VectorNd f) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       f.setSize (myParametricVelStateSize);
-      double[] buf = f.getBuffer();
+      double[] buf = f.getBuffer ();
       int idx = 0;
-      for (int i=myNumActive; i<myNumActive+myNumParametric; i++) {
-         idx = myDynamicComponents.get(i).getForce (buf, idx);
-      }      
+      for (int i = myNumActive; i < myNumActive + myNumParametric; i++) {
+         idx = myDynamicComponents.get (i).getForce (buf, idx);
+      }
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
    public void setParametricForces (VectorNd f) {
-      updateDynamicComponentLists();
-      double[] buf = f.getBuffer();
+      updateDynamicComponentLists ();
+      double[] buf = f.getBuffer ();
       int idx = 0;
-      for (int i=myNumActive; i<myNumActive+myNumParametric; i++) {
-         idx = myDynamicComponents.get(i).setForce (buf, idx);
-      }      
+      for (int i = myNumActive; i < myNumActive + myNumParametric; i++) {
+         idx = myDynamicComponents.get (i).setForce (buf, idx);
+      }
    }
 
-   public synchronized String getPrintState() {
+   public synchronized String getPrintState () {
       return myPrintState;
    }
 
@@ -973,99 +1002,100 @@ public abstract class MechSystemBase extends RenderableModelBase
    public synchronized PrintWriter openPrintStateFile (String fileName)
       throws IOException {
       if (myPrintStateWriter != null) {
-         myPrintStateWriter.close();
+         myPrintStateWriter.close ();
       }
-      myPrintStateWriter = new PrintWriter (
-         new BufferedWriter (new FileWriter (fileName)));
+      myPrintStateWriter =
+         new PrintWriter (new BufferedWriter (new FileWriter (fileName)));
       return myPrintStateWriter;
    }
 
    public synchronized PrintWriter reopenPrintStateFile (String fileName)
       throws IOException {
       if (myPrintStateWriter != null) {
-         myPrintStateWriter.close();
+         myPrintStateWriter.close ();
       }
-      myPrintStateWriter = new PrintWriter (
-         new BufferedWriter (new FileWriter (fileName, /*append=*/true)));
+      myPrintStateWriter =
+         new PrintWriter (
+            new BufferedWriter (new FileWriter (fileName, /* append= */true)));
       return myPrintStateWriter;
    }
 
    public synchronized void closePrintStateFile () throws IOException {
       if (myPrintStateWriter != null) {
-         myPrintStateWriter.close();
+         myPrintStateWriter.close ();
       }
    }
 
    public synchronized void writePrintStateHeader (String description) {
-      
-      updateDynamicComponentLists();
+
+      updateDynamicComponentLists ();
       if (myPrintStateWriter == null) {
-         System.out.println ("TEST \""+description+"\"");
+         System.out.println ("TEST \"" + description + "\"");
          System.out.print ("comps: [");
       }
       else {
-         myPrintStateWriter.println ("TEST \""+description+"\"");
+         myPrintStateWriter.println ("TEST \"" + description + "\"");
          myPrintStateWriter.print ("comps: [");
       }
-      for (int i=0; i<myNumActive; i++) {
-         DynamicComponent c = myDynamicComponents.get(i);
+      for (int i = 0; i < myNumActive; i++) {
+         DynamicComponent c = myDynamicComponents.get (i);
          String symbol = null;
-         if (c.getPosStateSize() == 3) {
+         if (c.getPosStateSize () == 3) {
             // XXX HACK - shouldn't assume posStateSize == 3 means a point
             symbol = "P";
          }
          else if (c instanceof Frame) {
             symbol = "F";
-            if (c.getPosStateSize() > 7) {
-               symbol += " R" + (c.getPosStateSize()-7);
+            if (c.getPosStateSize () > 7) {
+               symbol += " R" + (c.getPosStateSize () - 7);
             }
          }
          else {
             throw new UnsupportedOperationException (
-               "printState not supported for " + c.getClass());
+               "printState not supported for " + c.getClass ());
          }
          if (myPrintStateWriter == null) {
             System.out.print (" " + symbol);
          }
          else {
             myPrintStateWriter.print (" " + symbol);
-         }           
+         }
       }
       if (myPrintStateWriter == null) {
          System.out.println (" ]");
       }
       else {
          myPrintStateWriter.println (" ]");
-         myPrintStateWriter.flush();
+         myPrintStateWriter.flush ();
       }
    }
 
    private synchronized void printState (String fmt, double t) {
       if (myPrintInterval != -1) {
          // reset last print time if necessary
-         if (TimeBase.compare (t, myLastPrintTime) < 0) {         
-            myLastPrintTime = ((int)(t/myPrintInterval))*myPrintInterval;
+         if (TimeBase.compare (t, myLastPrintTime) < 0) {
+            myLastPrintTime = ((int)(t / myPrintInterval)) * myPrintInterval;
          }
       }
-      if (myPrintInterval == -1 ||
-          TimeBase.compare (t, myLastPrintTime+myPrintInterval) >= 0) {
+      if (myPrintInterval == -1
+      || TimeBase.compare (t, myLastPrintTime + myPrintInterval) >= 0) {
 
-         updateDynamicComponentLists();
+         updateDynamicComponentLists ();
          VectorNd x = new VectorNd (myActivePosStateSize);
          VectorNd v = new VectorNd (myActiveVelStateSize);
          getActivePosState (x, 0);
          // Hack: get vel in body coords until data is converted ...
-         getActiveVelState (v, 0, /*bodyCoords=*/false);
+         getActiveVelState (v, 0, /* bodyCoords= */false);
          if (myPrintStateWriter == null) {
-            System.out.println ("t="+t+":");
+            System.out.println ("t=" + t + ":");
             System.out.println ("v: " + v.toString (fmt));
             System.out.println ("x: " + x.toString (fmt));
          }
          else {
-            myPrintStateWriter.println ("t="+t+":");
+            myPrintStateWriter.println ("t=" + t + ":");
             myPrintStateWriter.println ("v: " + v.toString (fmt));
             myPrintStateWriter.println ("x: " + x.toString (fmt));
-            myPrintStateWriter.flush();
+            myPrintStateWriter.flush ();
          }
          if (myPrintInterval != -1) {
             myLastPrintTime += myPrintInterval;
@@ -1074,23 +1104,23 @@ public abstract class MechSystemBase extends RenderableModelBase
    }
 
    protected void advanceState (double t0, double t1) {
-      updateAuxStateComponentList();
-      for (int i=0; i<myAuxStateComponents.size(); i++) {
-         myAuxStateComponents.get(i).advanceState (t0, t1);
+      updateAuxStateComponentList ();
+      for (int i = 0; i < myAuxStateComponents.size (); i++) {
+         myAuxStateComponents.get (i).advanceState (t0, t1);
       }
-   }      
+   }
 
    public StepAdjustment preadvance (double t0, double t1, int flags) {
       advanceState (t0, t1);
       // zero forces
-      updateDynamicComponentLists();
-      //FunctionTimer timer = new FunctionTimer();
-      //timer.start();
-      for (int i=0; i<myDynamicComponents.size(); i++) {
-         myDynamicComponents.get(i).zeroForces();
+      updateDynamicComponentLists ();
+      // FunctionTimer timer = new FunctionTimer();
+      // timer.start();
+      for (int i = 0; i < myDynamicComponents.size (); i++) {
+         myDynamicComponents.get (i).zeroForces ();
       }
-      //timer.stop();
-      //System.out.println ("preadvance=" + timer.result(1));
+      // timer.stop();
+      // System.out.println ("preadvance=" + timer.result(1));
       return null;
    }
 
@@ -1099,20 +1129,20 @@ public abstract class MechSystemBase extends RenderableModelBase
          return ComponentUtils.getPathName ((ModelComponent)obj);
       }
       else {
-         return obj.toString();
+         return obj.toString ();
       }
    }
 
    public StepAdjustment advance (double t0, double t1, int flags) {
 
       myInsideAdvanceP = true;
-      StepAdjustment stepAdjust = new StepAdjustment();
-      collectInitialForces();
+      StepAdjustment stepAdjust = new StepAdjustment ();
+      collectInitialForces ();
 
       double solveTime = 0;
       if (myProfilingP) {
-         solveTime = System.nanoTime();
-      }      
+         solveTime = System.nanoTime ();
+      }
 
       if (!myDynamicsEnabled) {
          mySolver.nonDynamicSolve (t0, t1, stepAdjust);
@@ -1131,52 +1161,52 @@ public abstract class MechSystemBase extends RenderableModelBase
          // precision level) differences in the results. t0 == 0 is ignored
          // because it is assume an analyze step will be performed there
          // regardless
-         if ((flags & Model.STATE_IS_VOLATILE) != 0 && t0 != 0 &&
-             !isBilateralStructureConstant()) {
-            mySolver.forceBilateralAnalysis();
+         if ((flags & Model.STATE_IS_VOLATILE) != 0 && t0 != 0
+         && !isBilateralStructureConstant ()) {
+            mySolver.forceBilateralAnalysis ();
          }
          mySolver.solve (t0, t1, stepAdjust);
-         //FunctionTimer timer = new FunctionTimer();
-         //timer.start();
-         DynamicComponent c = checkVelocityStability();
+         // FunctionTimer timer = new FunctionTimer();
+         // timer.start();
+         DynamicComponent c = checkVelocityStability ();
          if (c instanceof DynamicComponent) {
             throw new NumericalException (
-               "Unstable velocity detected, component " + getName(c));
+               "Unstable velocity detected, component " + getName (c));
          }
          else if (c != null) {
             throw new NumericalException (
                "Unstable velocity detected, dynamic agent " + c);
          }
          recursivelyFinalizeAdvance (stepAdjust, t0, t1, flags, 0);
-         //timer.stop();
-         //System.out.println ("finalize " + timer.result(1));
+         // timer.stop();
+         // System.out.println ("finalize " + timer.result(1));
          if (myPrintState != null) {
             printState (myPrintState, t1);
          }
       }
 
       if (myProfilingP) {
-         solveTime = System.nanoTime() - solveTime;
+         solveTime = System.nanoTime () - solveTime;
          int cnt = myProfilingCnt++;
-         myAvgSolveTime = (cnt*myAvgSolveTime + solveTime)/(cnt+1);
-         System.out.println (
-            "T1=" + t1 + " avgSolveTime=" + myAvgSolveTime/1e6 + " ms");
+         myAvgSolveTime = (cnt * myAvgSolveTime + solveTime) / (cnt + 1);
+         System.out
+            .println (
+               "T1=" + t1 + " avgSolveTime=" + myAvgSolveTime / 1e6 + " ms");
       }
       myInsideAdvanceP = false;
       return stepAdjust;
    }
 
-   public ComponentState createState (
-      ComponentState prevState) {
+   public ComponentState createState (ComponentState prevState) {
       NumericState state;
       if (prevState instanceof NumericState) {
          NumericState last = (NumericState)prevState;
          // use old state to set capacity. Make the capacity a 10%
          // bigger, just in case
-         int dcap = (int)(1.1*last.dsize());
-         int zcap = (int)(1.1*last.zsize());
+         int dcap = (int)(1.1 * last.dsize ());
+         int zcap = (int)(1.1 * last.zsize ());
          state = new NumericState (zcap, dcap, 0);
-       }
+      }
       else {
          state = new NumericState (1000, 1000, 0);
       }
@@ -1193,25 +1223,24 @@ public abstract class MechSystemBase extends RenderableModelBase
       }
    }
 
-   private HashMap<DynamicComponent,DynamicStateOffsets>
-      getDynamicCompOffsets (
-         ArrayList<Object> comps, int idx, int numc, int off) {
+   private HashMap<DynamicComponent,DynamicStateOffsets> getDynamicCompOffsets (
+      ArrayList<Object> comps, int idx, int numc, int off) {
 
       HashMap<DynamicComponent,DynamicStateOffsets> map =
-         new HashMap<DynamicComponent,DynamicStateOffsets>();
+         new HashMap<DynamicComponent,DynamicStateOffsets> ();
 
       int posOff = off;
       // calculate velOff first
       int velOff = off;
-      for (int i=0; i<numc; i++) {
-         DynamicComponent c = (DynamicComponent)comps.get(idx++);
-         velOff += c.getPosStateSize();
+      for (int i = 0; i < numc; i++) {
+         DynamicComponent c = (DynamicComponent)comps.get (idx++);
+         velOff += c.getPosStateSize ();
       }
-      for (int i=0; i<numc; i++) {
-         DynamicComponent c = (DynamicComponent)comps.get(idx++);
+      for (int i = 0; i < numc; i++) {
+         DynamicComponent c = (DynamicComponent)comps.get (idx++);
          map.put (c, new DynamicStateOffsets (posOff, velOff));
-         posOff += c.getPosStateSize();
-         velOff += c.getVelStateSize();
+         posOff += c.getPosStateSize ();
+         velOff += c.getVelStateSize ();
       }
       return map;
    }
@@ -1222,91 +1251,93 @@ public abstract class MechSystemBase extends RenderableModelBase
          throw new IllegalArgumentException ("pstate not a NumericState");
       }
       NumericState state = (NumericState)pstate;
-      state.resetOffsets();
+      state.resetOffsets ();
 
-      updateAuxStateComponentList();
-      updateDynamicComponentLists();
-      updateForceComponentList();
+      updateAuxStateComponentList ();
+      updateDynamicComponentLists ();
+      updateForceComponentList ();
 
-      int chk = state.zget();
+      int chk = state.zget ();
       if (chk != 0x1234) {
-         System.out.println (
-            "zoffset=" + state.zoffset() +
-            " size=" + state.dsize() + " " + state.zsize());
+         System.out
+            .println (
+               "zoffset=" + state.zoffset () + " size=" + state.dsize () + " "
+               + state.zsize ());
          throw new IllegalArgumentException (
-            "state checksum is "+chk+", expecting "+0x1234);
+            "state checksum is " + chk + ", expecting " + 0x1234);
       }
-      int numDynComps = state.zget();
-      int numAuxStateComps = state.zget();
+      int numDynComps = state.zget ();
+      int numAuxStateComps = state.zget ();
 
       if (useAllDynamicComps) {
-         if (numDynComps != myAllDynamicComponents.size()) {
+         if (numDynComps != myAllDynamicComponents.size ()) {
             throw new IllegalArgumentException (
-               "state contains "+numDynComps+" dynamic components, "+
-               "expecting "+myAllDynamicComponents.size());
+               "state contains " + numDynComps + " dynamic components, "
+               + "expecting " + myAllDynamicComponents.size ());
          }
-         if (numAuxStateComps != myAuxStateComponents.size()) {
+         if (numAuxStateComps != myAuxStateComponents.size ()) {
             throw new IllegalArgumentException (
-               "number of AuxState components is "+numAuxStateComps+
-               ", expecting "+myAuxStateComponents.size());
+               "number of AuxState components is " + numAuxStateComps
+               + ", expecting " + myAuxStateComponents.size ());
          }
          for (DynamicComponent c : myAllDynamicComponents) {
             c.setState (state);
          }
-         updateSlavePos();
-         updateSlaveVel();
+         updateSlavePos ();
+         updateSlaveVel ();
       }
       else {
-         if (numDynComps != myNumActive+myNumParametric) {
+         if (numDynComps != myNumActive + myNumParametric) {
             throw new IllegalArgumentException (
-               "state contains "+numDynComps+" active & parametric components, "+
-               "expecting "+(myNumActive+myNumParametric));
+               "state contains " + numDynComps
+               + " active & parametric components, " + "expecting "
+               + (myNumActive + myNumParametric));
          }
-         if (numAuxStateComps != myAuxStateComponents.size()) {
+         if (numAuxStateComps != myAuxStateComponents.size ()) {
             throw new IllegalArgumentException (
-               "number of AuxState components is "+numAuxStateComps+
-               ", expecting "+myAuxStateComponents.size());
+               "number of AuxState components is " + numAuxStateComps
+               + ", expecting " + myAuxStateComponents.size ());
          }
 
-         for (int i=0; i<myNumActive+myNumParametric; i++) {
-            DynamicComponent c = myDynamicComponents.get(i);
+         for (int i = 0; i < myNumActive + myNumParametric; i++) {
+            DynamicComponent c = myDynamicComponents.get (i);
             c.setState (state);
          }
-         updatePosState(); // do we need?
-         updateVelState(); // do we need?
+         updatePosState (); // do we need?
+         updateVelState (); // do we need?
       }
-      
-//      state.dskip (di);
+
+      // state.dskip (di);
 
       // setting aux state must be done here because it may change the number
       // of bilateral and unilateral forces expected by the constrainers
-      for (int i=0; i<myAuxStateComponents.size(); i++) {
-         myAuxStateComponents.get(i).setState (state);
+      for (int i = 0; i < myAuxStateComponents.size (); i++) {
+         myAuxStateComponents.get (i).setState (state);
       }
       myConstraintForceStateSaver.setState (state);
    }
-   
+
    // NEWX
    public void getState (ComponentState pstate) {
       if (!(pstate instanceof NumericState)) {
          throw new IllegalArgumentException ("pstate not a NumericState");
       }
       NumericState state = (NumericState)pstate;
-      state.clear();
+      state.clear ();
 
       // get the required sizes
-      updateAuxStateComponentList();
-      updateDynamicComponentLists();
-      updateForceComponentList();
+      updateAuxStateComponentList ();
+      updateDynamicComponentLists ();
+      updateForceComponentList ();
 
-      int numb = getNumBilateralForces();
-      int numu = getNumUnilateralForces();
+      int numb = getNumBilateralForces ();
+      int numu = getNumUnilateralForces ();
 
       state.zput (0x1234);
       if (useAllDynamicComps) {
-         state.zput (myAllDynamicComponents.size());
-         state.zput (myAuxStateComponents.size());
-         if (state.hasDataFrames()) {
+         state.zput (myAllDynamicComponents.size ());
+         state.zput (myAuxStateComponents.size ());
+         if (state.hasDataFrames ()) {
             state.addDataFrame (null);
          }
          for (DynamicComponent c : myAllDynamicComponents) {
@@ -1314,25 +1345,25 @@ public abstract class MechSystemBase extends RenderableModelBase
          }
       }
       else {
-         state.zput (myNumActive+myNumParametric);
-         state.zput (myAuxStateComponents.size());
-         if (state.hasDataFrames()) {
+         state.zput (myNumActive + myNumParametric);
+         state.zput (myAuxStateComponents.size ());
+         if (state.hasDataFrames ()) {
             state.addDataFrame (null);
          }
 
-         for (int i=0; i<myNumActive+myNumParametric; i++) {
-            DynamicComponent c = myDynamicComponents.get(i);
+         for (int i = 0; i < myNumActive + myNumParametric; i++) {
+            DynamicComponent c = myDynamicComponents.get (i);
             state.getState (c);
          }
       }
-      
-      updateAuxStateComponentList();
-      for (int i=0; i<myAuxStateComponents.size(); i++) {
-         state.getState (myAuxStateComponents.get(i));
+
+      updateAuxStateComponentList ();
+      for (int i = 0; i < myAuxStateComponents.size (); i++) {
+         state.getState (myAuxStateComponents.get (i));
       }
       state.getState (myConstraintForceStateSaver);
    }
- 
+
    public void getInitialState (
       ComponentState newstate, ComponentState oldstate) {
 
@@ -1341,14 +1372,14 @@ public abstract class MechSystemBase extends RenderableModelBase
       }
       NumericState nstate = (NumericState)newstate;
       nstate.setHasDataFrames (true);
-      nstate.clear();
+      nstate.clear ();
 
-      updateAuxStateComponentList();
-      updateDynamicComponentLists();
-      updateForceComponentList();
+      updateAuxStateComponentList ();
+      updateDynamicComponentLists ();
+      updateForceComponentList ();
 
-      HashMap<HasNumericState,NumericState.DataFrame> compMap = 
-         new HashMap<HasNumericState,NumericState.DataFrame>();
+      HashMap<HasNumericState,NumericState.DataFrame> compMap =
+         new HashMap<HasNumericState,NumericState.DataFrame> ();
 
       NumericState ostate = null;
       if (oldstate != null) {
@@ -1356,33 +1387,33 @@ public abstract class MechSystemBase extends RenderableModelBase
             throw new IllegalArgumentException ("oldstate not a NumericState");
          }
          ostate = (NumericState)oldstate;
-         if (!ostate.hasDataFrames()) {
-            throw new IllegalArgumentException ("oldstate does not have frames");
+         if (!ostate.hasDataFrames ()) {
+            throw new IllegalArgumentException (
+               "oldstate does not have frames");
          }
-         ostate.resetOffsets();
-         int chk = ostate.zget();
+         ostate.resetOffsets ();
+         int chk = ostate.zget ();
          if (chk != 0x1234) {
             throw new IllegalArgumentException (
-               "oldstate checksum is "+chk+", expecting "+0x1234);
+               "oldstate checksum is " + chk + ", expecting " + 0x1234);
          }
-         for (int k=0; k<ostate.numDataFrames(); k++) {
-            NumericState.DataFrame frame = ostate.getDataFrame(k);
-            compMap.put (frame.getComp(), frame);
+         for (int k = 0; k < ostate.numDataFrames (); k++) {
+            NumericState.DataFrame frame = ostate.getDataFrame (k);
+            compMap.put (frame.getComp (), frame);
          }
       }
-      
 
       if (useAllDynamicComps) {
          nstate.zput (0x1234);
-         nstate.zput (myAllDynamicComponents.size());
-         nstate.zput (myAuxStateComponents.size());
+         nstate.zput (myAllDynamicComponents.size ());
+         nstate.zput (myAuxStateComponents.size ());
          // specify -1 constrainers, to cause forces to be zeroed
 
          nstate.addDataFrame (null);
 
          for (DynamicComponent c : myAllDynamicComponents) {
-            NumericState.DataFrame frame = compMap.get(c);
-            if (frame != null && frame.getVersion() == c.getStateVersion()) {
+            NumericState.DataFrame frame = compMap.get (c);
+            if (frame != null && frame.getVersion () == c.getStateVersion ()) {
                nstate.getState (frame, ostate);
             }
             else {
@@ -1392,16 +1423,16 @@ public abstract class MechSystemBase extends RenderableModelBase
       }
       else {
          nstate.zput (0x1234);
-         nstate.zput (myNumActive+myNumParametric);
-         nstate.zput (myAuxStateComponents.size());
+         nstate.zput (myNumActive + myNumParametric);
+         nstate.zput (myAuxStateComponents.size ());
          // specify -1 constrainers, to cause forces to be zeroed
 
          nstate.addDataFrame (null);
 
-         for (int i=0; i<myNumActive+myNumParametric; i++) {
-            HasNumericState c = myDynamicComponents.get(i);
-            NumericState.DataFrame frame = compMap.get(c);
-            if (frame != null && frame.getVersion() == c.getStateVersion()) {
+         for (int i = 0; i < myNumActive + myNumParametric; i++) {
+            HasNumericState c = myDynamicComponents.get (i);
+            NumericState.DataFrame frame = compMap.get (c);
+            if (frame != null && frame.getVersion () == c.getStateVersion ()) {
                nstate.getState (frame, ostate);
             }
             else {
@@ -1409,10 +1440,10 @@ public abstract class MechSystemBase extends RenderableModelBase
             }
          }
       }
-      
+
       for (HasNumericState c : myAuxStateComponents) {
-         NumericState.DataFrame frame = compMap.get(c);
-         if (frame != null && frame.getVersion() == c.getStateVersion()) {
+         NumericState.DataFrame frame = compMap.get (c);
+         if (frame != null && frame.getVersion () == c.getStateVersion ()) {
             nstate.getState (frame, ostate);
          }
          else {
@@ -1420,32 +1451,32 @@ public abstract class MechSystemBase extends RenderableModelBase
          }
       }
       myConstraintForceStateSaver.getInitialState (nstate);
-      
-//      For debugging state frame errors:
-//
-//      System.out.println (
-//         "new initial state, num frames=" + nstate.numDataFrames() +
-//         ", state=" + nstate.hashCode());
-//      try {
-//         PrintWriter pw =
-//            ArtisynthIO.newIndentingPrintWriter ("stateComps.txt");
-//         for (int i=0; i<nstate.numDataFrames(); i++) {
-//            HasNumericState comp = nstate.getDataFrame(i).getComp();
-//            if (comp instanceof ModelComponent) {
-//               pw.println (ComponentUtils.getPathName ((ModelComponent)comp));
-//            }
-//            else if (comp != null) {
-//               pw.println (comp);
-//            }
-//            else {
-//               pw.println ("null");
-//            }
-//         }
-//         pw.close();
-//      }
-//      catch (Exception e) {
-//         e.printStackTrace(); 
-//      }
+
+      // For debugging state frame errors:
+      //
+      // System.out.println (
+      // "new initial state, num frames=" + nstate.numDataFrames() +
+      // ", state=" + nstate.hashCode());
+      // try {
+      // PrintWriter pw =
+      // ArtisynthIO.newIndentingPrintWriter ("stateComps.txt");
+      // for (int i=0; i<nstate.numDataFrames(); i++) {
+      // HasNumericState comp = nstate.getDataFrame(i).getComp();
+      // if (comp instanceof ModelComponent) {
+      // pw.println (ComponentUtils.getPathName ((ModelComponent)comp));
+      // }
+      // else if (comp != null) {
+      // pw.println (comp);
+      // }
+      // else {
+      // pw.println ("null");
+      // }
+      // }
+      // pw.close();
+      // }
+      // catch (Exception e) {
+      // e.printStackTrace();
+      // }
    }
 
    public void initialize (double t) {
@@ -1453,34 +1484,34 @@ public abstract class MechSystemBase extends RenderableModelBase
          myAvgSolveTime = 0;
          myProfilingCnt = 0;
       }
-      updatePosState();
-      updateVelState();
-      collectInitialForces();
+      updatePosState ();
+      updateVelState ();
+      collectInitialForces ();
       recursivelyInitialize (t, 0);
    }
 
    public void recursivelyInitialize (double t, int level) {
       if (level == 0) {
          if (t == 0) {
-            clearCachedData(null);
-            updateDynamicComponentLists();
-            updateForceComponentList();
-            for (int i=0; i<myNumParametric; i++) {
-               myParametricComponents.get(i).resetTargets();
+            clearCachedData (null);
+            updateDynamicComponentLists ();
+            updateForceComponentList ();
+            for (int i = 0; i < myNumParametric; i++) {
+               myParametricComponents.get (i).resetTargets ();
             }
             updateForces (t);
          }
-         //updateForces (t);
+         // updateForces (t);
       }
    }
 
    public void recursivelyPrepareAdvance (
       double t0, double t1, int flags, int level) {
-   }  
+   }
 
    public void recursivelyFinalizeAdvance (
       StepAdjustment stepAdjust, double t0, double t1, int flags, int level) {
-   }  
+   }
 
    public void setProfiling (boolean enable) {
       if (myProfilingP != enable) {
@@ -1492,23 +1523,24 @@ public abstract class MechSystemBase extends RenderableModelBase
       }
    }
 
-   public boolean getProfiling() {
+   public boolean getProfiling () {
       return myProfilingP;
    }
 
    public static void setDefaultMatrixSolver (SparseSolverId solverType) {
       if (!solverType.isCompatible (Matrix.SYMMETRIC)) {
          throw new IllegalArgumentException (
-            "Solver "+solverType+" will not solve symmetric indefinite matrices");
+            "Solver " + solverType
+            + " will not solve symmetric indefinite matrices");
       }
-      if (!solverType.isDirect()) {
+      if (!solverType.isDirect ()) {
          throw new IllegalArgumentException (
-            "Solver "+solverType+" is not a direct solver");
+            "Solver " + solverType + " is not a direct solver");
       }
       myDefaultMatrixSolver = solverType;
    }
-   
-   public static SparseSolverId getDefaultMatrixSolver() {
+
+   public static SparseSolverId getDefaultMatrixSolver () {
       return myDefaultMatrixSolver;
    }
 
@@ -1516,27 +1548,26 @@ public abstract class MechSystemBase extends RenderableModelBase
       myMatrixSolver = method;
       if (mySolver != null) {
          mySolver.setMatrixSolver (method);
-         myMatrixSolver = mySolver.getMatrixSolver();
+         myMatrixSolver = mySolver.getMatrixSolver ();
       }
    }
 
-   public SparseSolverId getMatrixSolver() {
+   public SparseSolverId getMatrixSolver () {
       return myMatrixSolver;
    }
 
-   public Range getMatrixSolverRange() {
-      return new EnumRange<SparseSolverId>(
-         SparseSolverId.class, new SparseSolverId[] {
-            SparseSolverId.Pardiso,
-            SparseSolverId.Umfpack });
+   public Range getMatrixSolverRange () {
+      return new EnumRange<SparseSolverId> (
+         SparseSolverId.class, new SparseSolverId[] { SparseSolverId.Pardiso,
+                                                      SparseSolverId.Umfpack });
    }
 
    public void setIntegrator (Integrator integrator) {
       myIntegrator = integrator;
       if (mySolver != null) {
          mySolver.setIntegrator (integrator);
-         if (mySolver.getIntegrator() != integrator) {
-            myIntegrator = mySolver.getIntegrator();
+         if (mySolver.getIntegrator () != integrator) {
+            myIntegrator = mySolver.getIntegrator ();
          }
       }
    }
@@ -1558,53 +1589,53 @@ public abstract class MechSystemBase extends RenderableModelBase
       myStructureVersion++; // maybe this should go elsewhere?
    }
 
-   public int numActiveComponents() {
-      updateDynamicComponentLists();
+   public int numActiveComponents () {
+      updateDynamicComponentLists ();
       return myNumActive;
    }
 
-   public int numParametricComponents() {
-      updateDynamicComponentLists();
+   public int numParametricComponents () {
+      updateDynamicComponentLists ();
       return myNumParametric;
    }
 
-  public int numAttachedComponents() {
-     updateDynamicComponentLists();
-     return myNumAttached;
-  }
+   public int numAttachedComponents () {
+      updateDynamicComponentLists ();
+      return myNumAttached;
+   }
 
-   /** 
-    * Returns the transpose of the attachment constraint matrix.  This is used
+   /**
+    * Returns the transpose of the attachment constraint matrix. This is used
     * only for debugging.
     *
     * @return transposed attachment constraint matrix
     */
    public SparseBlockMatrix getAttachmentConstraints () {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       // figure out the column sizes
-      ArrayList<DynamicAttachment> attachments = getAttachments();
-      int[] colSizes = new int[attachments.size()];
-      for (int k=0; k<attachments.size(); k++) {
-         DynamicComponent slave = attachments.get(k).getSlave();
-         int bj = attachments.size()-1-k;
-         colSizes[bj] = myDynamicSizes[slave.getSolveIndex()];
+      ArrayList<DynamicAttachment> attachments = getAttachments ();
+      int[] colSizes = new int[attachments.size ()];
+      for (int k = 0; k < attachments.size (); k++) {
+         DynamicComponent slave = attachments.get (k).getSlave ();
+         int bj = attachments.size () - 1 - k;
+         colSizes[bj] = myDynamicSizes[slave.getSolveIndex ()];
       }
       SparseBlockMatrix GT = new SparseBlockMatrix (myDynamicSizes, colSizes);
-      for (int k=0; k<attachments.size(); k++) {
-         int bj = attachments.size()-1-k;
-         DynamicAttachment a = attachments.get(k);
+      for (int k = 0; k < attachments.size (); k++) {
+         int bj = attachments.size () - 1 - k;
+         DynamicAttachment a = attachments.get (k);
          int ssize = colSizes[bj];
-         DynamicComponent[] masters = a.getMasters();
-         DynamicComponent slave = a.getSlave();
+         DynamicComponent[] masters = a.getMasters ();
+         DynamicComponent slave = a.getSlave ();
          MatrixNdBlock sblk = new MatrixNdBlock (ssize, ssize);
-         sblk.setIdentity();
-         GT.addBlock (slave.getSolveIndex(), bj, sblk);
-         for (int i=0; i<masters.length; i++) {
-            int bi = masters[i].getSolveIndex();
+         sblk.setIdentity ();
+         GT.addBlock (slave.getSolveIndex (), bj, sblk);
+         for (int i = 0; i < masters.length; i++) {
+            int bi = masters[i].getSolveIndex ();
             int msize = myDynamicSizes[bi];
             MatrixNdBlock mblk = new MatrixNdBlock (msize, ssize);
             a.mulSubGTM (mblk, sblk, i);
-            mblk.negate();
+            mblk.negate ();
             GT.addBlock (bi, bj, mblk);
          }
       }
@@ -1615,39 +1646,38 @@ public abstract class MechSystemBase extends RenderableModelBase
    protected static final int HAS_PARAMETRIC_MASTERS = 0x02;
 
    /**
-    * Recursively determines whether the underlying master components
-    * for an attachment are active, parametric, or both.
+    * Recursively determines whether the underlying master components for an
+    * attachment are active, parametric, or both.
     */
    protected int findMasterDisposition (DynamicAttachment a, int disp) {
-      for (DynamicComponent m : a.getMasters()) {
-         if (m.isActive()) {
+      for (DynamicComponent m : a.getMasters ()) {
+         if (m.isActive ()) {
             disp |= HAS_ACTIVE_MASTERS;
          }
-         else if (m.isParametric()) {
+         else if (m.isParametric ()) {
             disp |= HAS_PARAMETRIC_MASTERS;
          }
          else {
-            if (!m.isAttached()) {
+            if (!m.isAttached ()) {
                throw new InternalErrorException (
-                  "master component "+m+" for slave "+a.getSlave()+
-                  " is neither active, parametric, or attached");
+                  "master component " + m + " for slave " + a.getSlave ()
+                  + " is neither active, parametric, or attached");
             }
             else {
-               disp |= findMasterDisposition (m.getAttachment(), disp);
+               disp |= findMasterDisposition (m.getAttachment (), disp);
             }
          }
       }
       return disp;
    }
-   
-   protected void updateAttachmentLists() {
-      LinkedList<DynamicAttachment> list =
-         new LinkedList<DynamicAttachment>();
+
+   protected void updateAttachmentLists () {
+      LinkedList<DynamicAttachment> list = new LinkedList<DynamicAttachment> ();
       getAttachments (list, 0);
       myAttachments = myAttachmentWorker.createOrderedList (list);
       Collections.reverse (myAttachments);
-      myActiveAttachments = new ArrayList<DynamicAttachment>();
-      myParametricAttachments = new ArrayList<DynamicAttachment>();
+      myActiveAttachments = new ArrayList<DynamicAttachment> ();
+      myParametricAttachments = new ArrayList<DynamicAttachment> ();
       // create lists of attachments controlled by active and parametric
       // components
       for (DynamicAttachment a : myAttachments) {
@@ -1660,43 +1690,43 @@ public abstract class MechSystemBase extends RenderableModelBase
          }
       }
    }
-   
-   protected ArrayList<DynamicAttachment> getAttachments() {
+
+   protected ArrayList<DynamicAttachment> getAttachments () {
       if (myAttachments == null) {
-         updateAttachmentLists();
+         updateAttachmentLists ();
       }
       return myAttachments;
    }
 
-   protected ArrayList<DynamicAttachment> getActiveAttachments() {
+   protected ArrayList<DynamicAttachment> getActiveAttachments () {
       if (myActiveAttachments == null) {
-         updateAttachmentLists();
+         updateAttachmentLists ();
       }
       return myActiveAttachments;
    }
 
-   protected ArrayList<DynamicAttachment> getParametricAttachments() {
+   protected ArrayList<DynamicAttachment> getParametricAttachments () {
       if (myParametricAttachments == null) {
-         updateAttachmentLists();
+         updateAttachmentLists ();
       }
       return myParametricAttachments;
    }
 
-   public VectorNd getAttachmentDerivatives() {
-      updateDynamicComponentLists();
-      ArrayList<DynamicAttachment> attachments = getAttachments();
+   public VectorNd getAttachmentDerivatives () {
+      updateDynamicComponentLists ();
+      ArrayList<DynamicAttachment> attachments = getAttachments ();
       int csize = 0;
-      for (int k=0; k<attachments.size(); k++) {
-         DynamicAttachment a = attachments.get(k);
-         csize += myDynamicSizes[a.getSlave().getSolveIndex()];
+      for (int k = 0; k < attachments.size (); k++) {
+         DynamicAttachment a = attachments.get (k);
+         csize += myDynamicSizes[a.getSlave ().getSolveIndex ()];
       }
       VectorNd g = new VectorNd (csize);
-      double[] gbuf = g.getBuffer();
+      double[] gbuf = g.getBuffer ();
       int goff = csize;
-      for (int k=0; k<attachments.size(); k++) {
-         DynamicAttachment a = attachments.get(k);
-         int bj = attachments.size()-1-k;
-         goff -= myDynamicSizes[a.getSlave().getSolveIndex()];
+      for (int k = 0; k < attachments.size (); k++) {
+         DynamicAttachment a = attachments.get (k);
+         int bj = attachments.size () - 1 - k;
+         goff -= myDynamicSizes[a.getSlave ().getSolveIndex ()];
          a.getDerivative (gbuf, goff);
       }
       return g;
@@ -1704,85 +1734,85 @@ public abstract class MechSystemBase extends RenderableModelBase
 
    // Called from the top level
    public void addAttachmentJacobian (SparseNumberedBlockMatrix S, VectorNd f) {
-      //System.out.println ("addAttachmentJacobian");
-      updateDynamicComponentLists();
-      //FunctionTimer timer = new FunctionTimer();
-      //timer.start();
-      boolean[] reduced = new boolean[S.numBlockRows()];
+      // System.out.println ("addAttachmentJacobian");
+      updateDynamicComponentLists ();
+      // FunctionTimer timer = new FunctionTimer();
+      // timer.start();
+      boolean[] reduced = new boolean[S.numBlockRows ()];
       int i = 0;
-      for (DynamicAttachment a : getAttachments()) {
+      for (DynamicAttachment a : getAttachments ()) {
          myAttachmentWorker.addAttachmentJacobian (a, S, f, reduced);
          i++;
       }
-      //timer.stop();
-      //System.out.println ("addAttachmentJacobian " + timer.result(1));
+      // timer.stop();
+      // System.out.println ("addAttachmentJacobian " + timer.result(1));
    }
-   
+
    // Called from the top level
    public void addAttachmentSolveBlocks (SparseNumberedBlockMatrix S) {
-      boolean[] reduced = new boolean[S.numBlockRows()];
-      for (DynamicAttachment a : getAttachments()) {
+      boolean[] reduced = new boolean[S.numBlockRows ()];
+      for (DynamicAttachment a : getAttachments ()) {
          myAttachmentWorker.addSolveBlocks (a, S, reduced);
       }
    }
 
    // Called from the top level
-   public void updateAttachmentPos() {
-      updateAttachmentPos (getAttachments());
+   public void updateAttachmentPos () {
+      updateAttachmentPos (getAttachments ());
    }
-   
-   protected void updateAttachmentPos(ArrayList<DynamicAttachment> alist) {
-      for (int i=alist.size()-1; i>=0; i--) {
-         alist.get(i).updatePosStates();
+
+   protected void updateAttachmentPos (ArrayList<DynamicAttachment> alist) {
+      for (int i = alist.size () - 1; i >= 0; i--) {
+         alist.get (i).updatePosStates ();
       }
    }
-   
+
    // Called from the top level
-   public void updateAttachmentVel() {
-      updateAttachmentVel (getAttachments());
+   public void updateAttachmentVel () {
+      updateAttachmentVel (getAttachments ());
    }
-   
+
    protected void updateAttachmentVel (ArrayList<DynamicAttachment> alist) {
-      for (int i=alist.size()-1; i>=0; i--) {
-         alist.get(i).updateVelStates();
+      for (int i = alist.size () - 1; i >= 0; i--) {
+         alist.get (i).updateVelStates ();
       }
    }
- 
-   private void updateSlavePos() {
-      updateSlaveObjectComponentList();
-      for (int i=0; i<mySlaveObjectComponents.size(); i++) {
-         mySlaveObjectComponents.get(i).updateSlavePos();
-      }       
-   }
-   
-   private void updateSlaveVel() {
-      updateSlaveObjectComponentList();
-      for (int i=0; i<mySlaveObjectComponents.size(); i++) {
-         mySlaveObjectComponents.get(i).updateSlaveVel();
-      }       
-   }
-   
-   public void updatePosState() {
-      updateAttachmentPos();
-      updateSlavePos();
+
+   private void updateSlavePos () {
+      updateSlaveObjectComponentList ();
+      for (int i = 0; i < mySlaveObjectComponents.size (); i++) {
+         mySlaveObjectComponents.get (i).updateSlavePos ();
+      }
    }
 
-   public void updateVelState() {
-      updateAttachmentVel();
-      updateSlaveVel();
+   private void updateSlaveVel () {
+      updateSlaveObjectComponentList ();
+      for (int i = 0; i < mySlaveObjectComponents.size (); i++) {
+         mySlaveObjectComponents.get (i).updateSlaveVel ();
+      }
+   }
+
+   public void updatePosState () {
+      updateAttachmentPos ();
+      updateSlavePos ();
+   }
+
+   public void updateVelState () {
+      updateAttachmentVel ();
+      updateSlaveVel ();
    }
 
    // Called from the top level
-   public void applyAttachmentForces() {
-      for (DynamicAttachment a : getAttachments()) {
-         a.applyForces();
+   public void applyAttachmentForces () {
+      for (DynamicAttachment a : getAttachments ()) {
+         a.applyForces ();
       }
    }
 
    public boolean buildMassMatrix (SparseNumberedBlockMatrix M) {
 
-      updateDynamicComponentLists();
-      if (M.numBlockRows() != 0 || M.numBlockCols() != 0) {
+      updateDynamicComponentLists ();
+      if (M.numBlockRows () != 0 || M.numBlockCols () != 0) {
          throw new IllegalArgumentException (
             "On entry, M should be empty with zero size");
       }
@@ -1790,11 +1820,11 @@ public abstract class MechSystemBase extends RenderableModelBase
       M.addCols (myDynamicSizes, myDynamicSizes.length);
       boolean isConstant = true;
       int bi;
-      for (int i=0; i<myDynamicComponents.size(); i++) {
-         DynamicComponent c = myDynamicComponents.get(i);
-         if ((bi = c.getSolveIndex()) != -1) {
-            M.addBlock (bi, bi, c.createMassBlock());
-            isConstant &= c.isMassConstant();
+      for (int i = 0; i < myDynamicComponents.size (); i++) {
+         DynamicComponent c = myDynamicComponents.get (i);
+         if ((bi = c.getSolveIndex ()) != -1) {
+            M.addBlock (bi, bi, c.createMassBlock ());
+            isConstant &= c.isMassConstant ();
          }
       }
       addGeneralMassBlocks (M);
@@ -1803,73 +1833,75 @@ public abstract class MechSystemBase extends RenderableModelBase
    }
 
    private boolean checkMatrixSize (SparseBlockMatrix M) {
-      return (M.numBlockRows() == myNumComponents && 
-              M.numBlockCols() == myNumComponents &&
-              M.rowSize() == mySystemSize &&
-              M.colSize() == mySystemSize);
+      return (M.numBlockRows () == myNumComponents
+      && M.numBlockCols () == myNumComponents && M.rowSize () == mySystemSize
+      && M.colSize () == mySystemSize);
    }
 
-   public void getMassMatrix (SparseNumberedBlockMatrix M, VectorNd f, double t) {
-      updateDynamicComponentLists();
+   public void getMassMatrix (
+      SparseNumberedBlockMatrix M, VectorNd f, double t) {
+      updateDynamicComponentLists ();
       if (!checkMatrixSize (M)) {
          throw new IllegalArgumentException (
             "M improperly sized; perhaps not created with buildMassMatrix()?");
       }
       if (f != null) {
          f.setSize (mySystemSize);
-      } else {
-         f = new VectorNd(mySystemSize); // XXX it seems some components require it to exist
       }
-      //FunctionTimer timer = new FunctionTimer();
-      for (int i=0; i<myDynamicComponents.size(); i++) {
-         myDynamicComponents.get(i).resetEffectiveMass();
+      else {
+         f = new VectorNd (mySystemSize); // XXX it seems some components
+                                          // require it to exist
       }
-      //timer.start();
-      for (DynamicAttachment a : getAttachments()) {
+      // FunctionTimer timer = new FunctionTimer();
+      for (int i = 0; i < myDynamicComponents.size (); i++) {
+         myDynamicComponents.get (i).resetEffectiveMass ();
+      }
+      // timer.start();
+      for (DynamicAttachment a : getAttachments ()) {
          a.addMassToMasters ();
       }
-      //timer.stop();
-      //System.out.println ("add mass to masters " + timer.result(1));
+      // timer.stop();
+      // System.out.println ("add mass to masters " + timer.result(1));
       getMassMatrixValues (M, f, t);
       // TODO - need to fix this for non-block diagonal mass matrices:
       // for (DynamicAttachment a : getOrderedAttachments()) {
-      //    a.reduceMass (M, f);
-      // } 
+      // a.reduceMass (M, f);
+      // }
    }
 
    public void getInverseMassMatrix (
       SparseBlockMatrix Minv, SparseBlockMatrix M) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       if (!checkMatrixSize (Minv)) {
          throw new IllegalArgumentException (
             "Minv improperly sized; perhaps not created with buildMassMatrix()?");
-      }         
+      }
       if (!checkMatrixSize (M)) {
          throw new IllegalArgumentException (
             "M improperly sized; perhaps not created with buildMassMatrix()?");
-      }         
-      for (int i=0; i<myNumActive; i++) {
-         DynamicComponent c = myDynamicComponents.get(i);
+      }
+      for (int i = 0; i < myNumActive; i++) {
+         DynamicComponent c = myDynamicComponents.get (i);
          int bi;
-         if ((bi = c.getSolveIndex()) != -1) {
+         if ((bi = c.getSolveIndex ()) != -1) {
             c.getInverseMass (Minv.getBlock (bi, bi), M.getBlock (bi, bi));
          }
       }
    }
 
    public void buildSolveMatrix (SparseNumberedBlockMatrix S) {
-      updateDynamicComponentLists();
-      
-      if (S.numBlockRows() != 0 || S.numBlockCols() != 0) {
+      updateDynamicComponentLists ();
+
+      if (S.numBlockRows () != 0 || S.numBlockCols () != 0) {
          throw new IllegalArgumentException (
             "On entry, S should be empty with zero size");
       }
       S.addRows (myDynamicSizes, myDynamicSizes.length);
       S.addCols (myDynamicSizes, myDynamicSizes.length);
       S.setVerticallyLinked (true);
-      for (int i=0; i<myDynamicComponents.size(); i++) {
-         DynamicComponent c = myDynamicComponents.get(i);
-         if (c.getSolveIndex() != -1) {
+      for (int i = 0; i < myDynamicComponents.size (); i++) {
+         DynamicComponent c = myDynamicComponents.get (i);
+         if (c.getSolveIndex () != -1) {
             c.addSolveBlock (S);
          }
       }
@@ -1887,7 +1919,7 @@ public abstract class MechSystemBase extends RenderableModelBase
    }
 
    public PosStabilization getStabilization () {
-      return mySolver.getStabilization();
+      return mySolver.getStabilization ();
    }
 
    public void setStabilization (PosStabilization stablizer) {
@@ -1897,127 +1929,130 @@ public abstract class MechSystemBase extends RenderableModelBase
    public void setUpdateForcesAtStepEnd (boolean enable) {
       myUpdateForcesAtStepEnd = enable;
       myUpdateForcesAtStepEndMode =
-      PropertyUtils.propagateValue(
-         this, "updateForcesAtStepEnd",
-         myUpdateForcesAtStepEnd, myUpdateForcesAtStepEndMode);
+         PropertyUtils
+            .propagateValue (
+               this, "updateForcesAtStepEnd", myUpdateForcesAtStepEnd,
+               myUpdateForcesAtStepEndMode);
       if (mySolver != null) {
          mySolver.setUpdateForcesAtStepEnd (enable);
       }
    }
 
-   public boolean getUpdateForcesAtStepEnd() {
+   public boolean getUpdateForcesAtStepEnd () {
       return myUpdateForcesAtStepEnd;
    }
 
    public void setUpdateForcesAtStepEndMode (PropertyMode mode) {
       myUpdateForcesAtStepEndMode =
-      PropertyUtils.setModeAndUpdate(
-         this, "updateForcesAtStepEnd", myUpdateForcesAtStepEndMode, mode);
+         PropertyUtils
+            .setModeAndUpdate (
+               this, "updateForcesAtStepEnd", myUpdateForcesAtStepEndMode,
+               mode);
    }
 
-   public PropertyMode getUpdateForcesAtStepEndMode() {
+   public PropertyMode getUpdateForcesAtStepEndMode () {
       return myUpdateForcesAtStepEndMode;
    }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
-   public int getParametricPosStateSize() {
-      updateDynamicComponentLists();
+   public int getParametricPosStateSize () {
+      updateDynamicComponentLists ();
       return myParametricPosStateSize;
    }
-      
-   /** 
+
+   /**
     * {@inheritDoc}
     */
    public void getParametricPosTarget (VectorNd q, double s, double h) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       q.setSize (myParametricPosStateSize);
-      double[] buf = q.getBuffer();
+      double[] buf = q.getBuffer ();
       int idx = 0;
-      for (int i=0; i<myNumParametric; i++) {
-         idx = myParametricComponents.get(i).getTargetPos (buf, s, h, idx);
+      for (int i = 0; i < myNumParametric; i++) {
+         idx = myParametricComponents.get (i).getTargetPos (buf, s, h, idx);
       }
    }
-   
-   /** 
+
+   /**
     * {@inheritDoc}
     */
    public void getParametricPosState (VectorNd q) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       q.setSize (myParametricPosStateSize);
       getParametricPosState (q, 0);
    }
 
    protected int getParametricPosState (VectorNd q, int idx) {
-      double[] buf = q.getBuffer();
-      for (int i=0; i<myNumParametric; i++) {
-         idx = myParametricComponents.get(i).getPosState (buf, idx);
+      double[] buf = q.getBuffer ();
+      for (int i = 0; i < myNumParametric; i++) {
+         idx = myParametricComponents.get (i).getPosState (buf, idx);
       }
       return idx;
-   }      
+   }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
    public void setParametricPosState (VectorNd q) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       setParametricPosState (q, 0);
    }
 
    protected int setParametricPosState (VectorNd q, int idx) {
-      double[] buf = q.getBuffer();
-      for (int i=0; i<myNumParametric; i++) {
-         idx = myParametricComponents.get(i).setPosState (buf, idx);
+      double[] buf = q.getBuffer ();
+      for (int i = 0; i < myNumParametric; i++) {
+         idx = myParametricComponents.get (i).setPosState (buf, idx);
       }
-      if (getParametricPosStateSize() > 0) {
-         updateAttachmentPos (getParametricAttachments());
-         updateSlavePos();
-         updateAttachmentVel (getParametricAttachments()); // AVEL
-         updateSlaveVel(); // AVEL
+      if (getParametricPosStateSize () > 0) {
+         updateAttachmentPos (getParametricAttachments ());
+         updateSlavePos ();
+         updateAttachmentVel (getParametricAttachments ()); // AVEL
+         updateSlaveVel (); // AVEL
       }
       return idx;
-   }      
+   }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
-   public int getParametricVelStateSize() {
-      updateDynamicComponentLists();
+   public int getParametricVelStateSize () {
+      updateDynamicComponentLists ();
       return myParametricVelStateSize;
    }
-      
-   /** 
+
+   /**
     * {@inheritDoc}
     */
    public void getParametricVelTarget (VectorNd u, double s, double h) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       u.setSize (myParametricVelStateSize);
-      double[] buf = u.getBuffer();
+      double[] buf = u.getBuffer ();
       int idx = 0;
-      for (int i=0; i<myNumParametric; i++) {
-         idx = myParametricComponents.get(i).getTargetVel (buf, s, h, idx);
+      for (int i = 0; i < myNumParametric; i++) {
+         idx = myParametricComponents.get (i).getTargetVel (buf, s, h, idx);
       }
    }
-   
-   /** 
+
+   /**
     * {@inheritDoc}
     */
    public void getParametricVelState (VectorNd u) {
-      updateDynamicComponentLists();
+      updateDynamicComponentLists ();
       u.setSize (myParametricVelStateSize);
       getParametricVelState (u, 0);
    }
 
    protected int getParametricVelState (VectorNd u, int idx) {
-      double[] buf = u.getBuffer();
-      for (int i=0; i<myNumParametric; i++) {
-         idx = myParametricComponents.get(i).getVelState (buf, idx);
+      double[] buf = u.getBuffer ();
+      for (int i = 0; i < myNumParametric; i++) {
+         idx = myParametricComponents.get (i).getVelState (buf, idx);
       }
       return idx;
-   }      
+   }
 
-   /** 
+   /**
     * {@inheritDoc}
     */
    public void setParametricVelState (VectorNd q) {
@@ -2025,19 +2060,19 @@ public abstract class MechSystemBase extends RenderableModelBase
    }
 
    protected int setParametricVelState (VectorNd u, int idx) {
-      updateDynamicComponentLists();
-      double[] buf = u.getBuffer();
-      for (int i=0; i<myNumParametric; i++) {
-         idx = myParametricComponents.get(i).setVelState (buf, idx);
+      updateDynamicComponentLists ();
+      double[] buf = u.getBuffer ();
+      for (int i = 0; i < myNumParametric; i++) {
+         idx = myParametricComponents.get (i).setVelState (buf, idx);
       }
-      if (getParametricVelStateSize() > 0) {
-         updateAttachmentVel (getParametricAttachments());
-         updateSlaveVel();
+      if (getParametricVelStateSize () > 0) {
+         updateAttachmentVel (getParametricAttachments ());
+         updateSlaveVel ();
       }
       return idx;
-   }      
+   }
 
-   protected VectorNd myParametricTarget = new VectorNd();
+   protected VectorNd myParametricTarget = new VectorNd ();
 
    public MechSystemBase copy (
       int flags, Map<ModelComponent,ModelComponent> copyMap) {
@@ -2064,19 +2099,19 @@ public abstract class MechSystemBase extends RenderableModelBase
       msb.setUpdateForcesAtStepEndMode (myUpdateForcesAtStepEndMode);
       if (myUpdateForcesAtStepEndMode == PropertyMode.Explicit) {
          msb.setUpdateForcesAtStepEnd (myUpdateForcesAtStepEnd);
-      }      
+      }
 
       msb.myMassMatrix = null;
 
-      //msb.myStabilization = myStabilization;
+      // msb.myStabilization = myStabilization;
       msb.myDynamicsEnabled = myDynamicsEnabled;
 
       msb.allocateSolver (mySolver);
-      //msb.myPosSolver = new KKTSolver();
-      msb.myRg = new VectorNd(0);
-      msb.myBg = new VectorNd(0);
-      msb.myRn = new VectorNd(0);
-      msb.myBn = new VectorNd(0);
+      // msb.myPosSolver = new KKTSolver();
+      msb.myRg = new VectorNd (0);
+      msb.myBg = new VectorNd (0);
+      msb.myRn = new VectorNd (0);
+      msb.myBn = new VectorNd (0);
 
       msb.setIntegrator (myIntegrator);
       msb.setMatrixSolver (myMatrixSolver);
@@ -2084,99 +2119,101 @@ public abstract class MechSystemBase extends RenderableModelBase
       return msb;
    }
 
-   public void printActiveStiffness() {
+   public void printActiveStiffness () {
       printActiveStiffness ("%.6g");
    }
 
    public void printActiveStiffness (String fmtStr) {
-      MatrixNd K = new MatrixNd (getActiveStiffnessMatrix());
+      MatrixNd K = new MatrixNd (getActiveStiffnessMatrix ());
       System.out.println ("K=\n" + K.toString (fmtStr));
    }
 
    public SparseBlockMatrix getActiveStiffnessMatrix () {
-      updatePosState();
-      return mySolver.createActiveStiffnessMatrix(1);
+      updatePosState ();
+      return mySolver.createActiveStiffnessMatrix (1);
    }
 
-   public void printActiveMass() {
+   public void printActiveMass () {
       printActiveMass ("%.6g");
    }
 
    public void printActiveMass (String fmtStr) {
-      MatrixNd M = new MatrixNd (getActiveMassMatrix());
+      MatrixNd M = new MatrixNd (getActiveMassMatrix ());
       System.out.println ("M=\n" + M.toString (fmtStr));
    }
 
    public SparseBlockMatrix getActiveMassMatrix () {
-      updatePosState();
-      return mySolver.createActiveMassMatrix(0);
+      updatePosState ();
+      return mySolver.createActiveMassMatrix (0);
    }
 
    public void writeStiffnessMatrix (
-      String fileName, double h, Matrix.WriteFormat matfmt) throws IOException {
-      updatePosState();
-      SparseBlockMatrix K = mySolver.createActiveStiffnessMatrix(h);
+      String fileName, double h, Matrix.WriteFormat matfmt)
+      throws IOException {
+      updatePosState ();
+      SparseBlockMatrix K = mySolver.createActiveStiffnessMatrix (h);
       PrintWriter pw = ArtisynthIO.newIndentingPrintWriter (fileName);
-      int size = getActiveVelStateSize();
+      int size = getActiveVelStateSize ();
       NumberFormat fmt = new NumberFormat ("%g");
       K.write (pw, fmt, matfmt, size, size);
-      pw.close();
+      pw.close ();
    }
 
-   public void writeStiffnessMatrix (
-      String fileName, double h) throws IOException {
+   public void writeStiffnessMatrix (String fileName, double h)
+      throws IOException {
       writeStiffnessMatrix (fileName, h, Matrix.WriteFormat.MatrixMarket);
-   }                                        
+   }
 
    public void writeMassMatrix (String fileName, Matrix.WriteFormat matfmt)
-      throws IOException {      
-      updatePosState();
+      throws IOException {
+      updatePosState ();
       PrintWriter pw = ArtisynthIO.newIndentingPrintWriter (fileName);
       SparseBlockMatrix M = mySolver.createActiveMassMatrix (0);
       NumberFormat fmt = new NumberFormat ("%g");
       M.write (pw, fmt, matfmt);
-      pw.close();
+      pw.close ();
    }
 
-   public void writeMassMatrix (String fileName)
-      throws IOException {
+   public void writeMassMatrix (String fileName) throws IOException {
       writeMassMatrix (fileName, Matrix.WriteFormat.MatrixMarket);
    }
 
    public void writeBilateralConstraintMatrix (
-      String fileName, Matrix.WriteFormat matfmt) throws IOException {
+      String fileName, Matrix.WriteFormat matfmt)
+      throws IOException {
       PrintWriter pw = ArtisynthIO.newIndentingPrintWriter (fileName);
       SparseBlockMatrix GT = mySolver.createActiveBilateralMatrix (0);
       NumberFormat fmt = new NumberFormat ("%g");
       GT.write (pw, fmt, matfmt);
-      pw.close();
+      pw.close ();
    }
 
    public void writeBilateralConstraintMatrix (String fileName)
       throws IOException {
-      writeBilateralConstraintMatrix (fileName, Matrix.WriteFormat.MatrixMarket);
+      writeBilateralConstraintMatrix (
+         fileName, Matrix.WriteFormat.MatrixMarket);
    }
 
    public void collectInitialForces () {
-      //FunctionTimer timer = new FunctionTimer();
-      //timer.start();
-      updateDynamicComponentLists();
-      updateForceComponentList();
+      // FunctionTimer timer = new FunctionTimer();
+      // timer.start();
+      updateDynamicComponentLists ();
+      updateForceComponentList ();
       // add external forces
-      for (int i=0; i<myDynamicComponents.size(); i++) {
-         myDynamicComponents.get(i).applyExternalForces();
+      for (int i = 0; i < myDynamicComponents.size (); i++) {
+         myDynamicComponents.get (i).applyExternalForces ();
       }
-      //timer.stop();
+      // timer.stop();
       getForces (myInitialForces);
 
-      //System.out.println ("  collect " + timer.result(1));
+      // System.out.println (" collect " + timer.result(1));
    }
 
    public void updateForces (double t) {
-      updateDynamicComponentLists();
-      updateForceComponentList();
-      // initialize the forces by adding the initial forces that 
-      // were collected at the beginning of the advance. 
+      updateDynamicComponentLists ();
+      updateForceComponentList ();
+      // initialize the forces by adding the initial forces that
+      // were collected at the beginning of the advance.
       // We only do this if updateForces is being called from *within*
       // the advance method, since otherwise myInitialForces won't be properly
       // set.
@@ -2188,83 +2225,83 @@ public abstract class MechSystemBase extends RenderableModelBase
          // in two passes since applying external forces to component A
          // may cause forces to be applied to other components to which
          // A is implicitly attached (such as frames associated with points).
-         for (int i=0; i<myDynamicComponents.size(); i++) {
-            myDynamicComponents.get(i).zeroForces();
+         for (int i = 0; i < myDynamicComponents.size (); i++) {
+            myDynamicComponents.get (i).zeroForces ();
          }
-         for (int i=0; i<myDynamicComponents.size(); i++) {
-            myDynamicComponents.get(i).applyExternalForces();
+         for (int i = 0; i < myDynamicComponents.size (); i++) {
+            myDynamicComponents.get (i).applyExternalForces ();
          }
       }
-      for (int i=0; i<myForceEffectors.size(); i++) {
-         myForceEffectors.get(i).applyForces (t);
+      for (int i = 0; i < myForceEffectors.size (); i++) {
+         myForceEffectors.get (i).applyForces (t);
       }
-      applyAttachmentForces();
+      applyAttachmentForces ();
    }
 
    public void addPosJacobian (
       SparseNumberedBlockMatrix S, VectorNd f, double s) {
-      updateDynamicComponentLists();
-      updateForceComponentList();
+      updateDynamicComponentLists ();
+      updateForceComponentList ();
       if (!checkMatrixSize (S)) {
          throw new IllegalArgumentException (
             "S improperly sized; perhaps not created with buildSolveMatrix()?");
       }
       if (f != null) {
          f.setSize (mySystemSize);
-         f.setZero();
+         f.setZero ();
       }
-      for (int i=0; i<myForceEffectors.size(); i++) {
-         myForceEffectors.get(i).addPosJacobian (S, s);
+      for (int i = 0; i < myForceEffectors.size (); i++) {
+         myForceEffectors.get (i).addPosJacobian (S, s);
       }
-      addAttachmentJacobian(S, f);
-   }   
+      addAttachmentJacobian (S, f);
+   }
 
    public void addVelJacobian (
       SparseNumberedBlockMatrix S, VectorNd f, double s) {
-      updateDynamicComponentLists();
-      updateForceComponentList();
+      updateDynamicComponentLists ();
+      updateForceComponentList ();
       if (!checkMatrixSize (S)) {
          throw new IllegalArgumentException (
             "S improperly sized; perhaps not created with buildSolveMatrix()?");
       }
       if (f != null) {
          f.setSize (mySystemSize);
-         f.setZero();
+         f.setZero ();
       }
-      for (int i=0; i<myForceEffectors.size(); i++) {
-         myForceEffectors.get(i).addVelJacobian (S, s);
+      for (int i = 0; i < myForceEffectors.size (); i++) {
+         myForceEffectors.get (i).addVelJacobian (S, s);
       }
-      addAttachmentJacobian(S, f);
-   }    
+      addAttachmentJacobian (S, f);
+   }
 
    public void addGeneralMassBlocks (SparseNumberedBlockMatrix M) {
       // do nothing if mass matrix is block diagonal
    }
 
    public void addGeneralSolveBlocks (SparseNumberedBlockMatrix M) {
-      updateForceComponentList();
-      int numb = M.numBlocks();
-      for (int i=0; i<myForceEffectors.size(); i++) {
-         myForceEffectors.get(i).addSolveBlocks (M);
+      updateForceComponentList ();
+      int numb = M.numBlocks ();
+      for (int i = 0; i < myForceEffectors.size (); i++) {
+         myForceEffectors.get (i).addSolveBlocks (M);
       }
    }
 
-   public double getActiveMass() {
+   public double getActiveMass () {
       double m = 0;
-      updateDynamicComponentLists();      
+      updateDynamicComponentLists ();
       // restrict mass to active components, esp. since mass for parametric
       // components maybe arbitrary
-      for (int i=0; i<myNumActive; i++) {
-         m += myDynamicComponents.get(i).getMass(0);
+      for (int i = 0; i < myNumActive; i++) {
+         m += myDynamicComponents.get (i).getMass (0);
       }
       return m;
    }
 
-   public int getSolveMatrixType() {
-      updateForceComponentList();
+   public int getSolveMatrixType () {
+      updateForceComponentList ();
       int type = Matrix.SPD;
-      for (int i=0; i<myForceEffectors.size(); i++) {
-         type &= myForceEffectors.get(i).getJacobianType();
+      for (int i = 0; i < myForceEffectors.size (); i++) {
+         type &= myForceEffectors.get (i).getJacobianType ();
       }
       return type;
    }
@@ -2272,17 +2309,18 @@ public abstract class MechSystemBase extends RenderableModelBase
    protected <T> void recursivelyGetLocalComponents (
       CompositeComponent comp, List<T> list, Class<T> type) {
 
-      for (int i=0; i<comp.numComponents(); i++) {
+      for (int i = 0; i < comp.numComponents (); i++) {
          ModelComponent c = comp.get (i);
          if (!(c instanceof MechSystemModel)) {
-            if (type.isAssignableFrom(c.getClass())) {
-               T t = type.cast(c);      // checked cast
+            if (type.isAssignableFrom (c.getClass ())) {
+               T t = type.cast (c); // checked cast
                list.add (t);
             }
             // sometimes a component can be a of type T
             // with sub-components also of type T
             if (c instanceof CompositeComponent) {
-               recursivelyGetLocalComponents ((CompositeComponent)c, list, type);
+               recursivelyGetLocalComponents (
+                  (CompositeComponent)c, list, type);
             }
          }
       }
@@ -2295,15 +2333,16 @@ public abstract class MechSystemBase extends RenderableModelBase
    protected <T> void recursivelyGetTopLocalComponents (
       CompositeComponent comp, List<T> list, Class<T> type) {
 
-      for (int i=0; i<comp.numComponents(); i++) {
+      for (int i = 0; i < comp.numComponents (); i++) {
          ModelComponent c = comp.get (i);
          if (!(c instanceof MechSystemModel)) {
-            if (type.isAssignableFrom(c.getClass())) {
-               T t = type.cast(c);      // checked cast
+            if (type.isAssignableFrom (c.getClass ())) {
+               T t = type.cast (c); // checked cast
                list.add (t);
             }
             else if (c instanceof CompositeComponent) {
-               recursivelyGetLocalComponents ((CompositeComponent)c, list, type);
+               recursivelyGetLocalComponents (
+                  (CompositeComponent)c, list, type);
             }
          }
       }
@@ -2312,7 +2351,7 @@ public abstract class MechSystemBase extends RenderableModelBase
    private static MechSystemBase getTopMechSystem (ModelComponent comp) {
       MechSystemBase sys = null;
       CompositeComponent cc;
-      for (cc=comp.getParent(); cc!=null; cc=cc.getParent()) {
+      for (cc = comp.getParent (); cc != null; cc = cc.getParent ()) {
          if (cc instanceof MechSystemBase) {
             sys = (MechSystemBase)cc;
          }
@@ -2327,8 +2366,8 @@ public abstract class MechSystemBase extends RenderableModelBase
 
          // Do an updatePosState() on all top-most MechSystems, if any are
          // found.
-         HashSet<MechSystemBase> systems = new HashSet<MechSystemBase>();
-         for (TransformableGeometry tg : context.getTransformables()) {
+         HashSet<MechSystemBase> systems = new HashSet<MechSystemBase> ();
+         for (TransformableGeometry tg : context.getTransformables ()) {
             if (tg instanceof ModelComponent) {
                MechSystemBase sys = getTopMechSystem ((ModelComponent)tg);
                if (sys != null) {
@@ -2337,11 +2376,11 @@ public abstract class MechSystemBase extends RenderableModelBase
             }
          }
          for (MechSystemBase sys : systems) {
-            sys.updateAttachmentPos();
+            sys.updateAttachmentPos ();
          }
       }
    }
-   
-   static UpdateAttachmentsAction myAttachmentsPosAction = 
-      new UpdateAttachmentsAction();
+
+   static UpdateAttachmentsAction myAttachmentsPosAction =
+      new UpdateAttachmentsAction ();
 }

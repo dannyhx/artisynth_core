@@ -8,6 +8,7 @@ import maspack.geometry.MeshFactory;
 import maspack.geometry.PolygonalMesh;
 import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
+import maspack.matrix.Vector3d;
 
 /* Top-Camera:
 
@@ -70,6 +71,14 @@ public class Intricate_Fruit extends GrowDemo {
       cfg = mRendCfgPresets.get (RenderMode.MORPHOLOGY);
       cfg.mFrontMeshColor = new Color (255, 102, 0);
       cfg.mBackgroundColor = Color.white;
+   }
+
+   protected void build_post () {
+      super.build_post ();
+
+      // PolarityElementAux.createPolGradient (mFemModel[0], 1, +1);
+      this.mFixedParDir = new Vector3d (0, 1, 0);
+      this.mFixedParDir = null;
    }
 
    public void advanceCustom (double t0, double t1, int flags) {

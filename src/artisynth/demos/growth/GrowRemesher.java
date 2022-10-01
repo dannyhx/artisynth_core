@@ -350,6 +350,7 @@ public class GrowRemesher extends ShellRemesher {
       buf.dput (mMeshChems.getVtxChems (n));
       buf.dput (node.m_ES_front_vel);
       buf.dput (node.m_ES_back_vel);
+      buf.dput (node.mPolConc);
 
       return buf;
    }
@@ -361,6 +362,7 @@ public class GrowRemesher extends ShellRemesher {
       buf.dget (mMeshChems.getVtxChems (n));
       buf.dget (node.m_ES_front_vel);
       buf.dget (node.m_ES_back_vel);
+      node.mPolConc = buf.dget ();
    }
 
    protected double edgeMetric (HalfEdge edge) {

@@ -22,6 +22,7 @@ import maspack.matrix.VectorNd;
 public class MathUtil {
 
    public static final double ELIPSON = 1e-6;
+   public static final double ELIPSON_EX = 1e-12;
 
    public static void max (
       DenseMatrixBase A, DenseMatrixBase B, DenseMatrixBase C) {
@@ -546,7 +547,7 @@ public class MathUtil {
 
       Vector2d ab = new Vector2d ();
 
-      if (Math.abs (det) > ELIPSON) {
+      if (Math.abs (det) > ELIPSON_EX) {
          Matrix2d D = new Matrix2d (d22, -d12, -d12, d11);
          ab.set (x10, x20);
          D.mul (ab);
@@ -567,7 +568,7 @@ public class MathUtil {
    public static Point3d avg (Point3d p0, Point3d p1) {
       return (Point3d)new Point3d ().add (p0, p1).scale (0.5);
    }
-
+v
    protected static Vector3d avg (Vector3d p0, Vector3d p1) {
       return new Vector3d ().add (p0, p1).scale (0.5);
    }
@@ -666,10 +667,7 @@ public class MathUtil {
     * Project vector A onto vector B.
     */
    public static Vector3d vectorProjection (Vector3d A, Vector3d B) {
-      Vector3d normalizedB = new Vector3d ();
-      normalizedB.normalize (B);
-
-      double bScale = A.dot (B);
+      double bScale = A.dot (B) / B.normSquared ();
 
       Vector3d projA = new Vector3d ();
       projA.scaledAdd (bScale, B);
