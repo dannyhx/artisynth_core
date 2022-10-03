@@ -12,7 +12,7 @@
     <booleanAttribute key="org.eclipse.jdt.launching.ATTR_USE_CLASSPATH_ONLY_JAR" value="false"/>
     <stringAttribute key="org.eclipse.jdt.launching.MAIN_TYPE" value="artisynth.core.driver.Launcher"/>
     <stringAttribute key="org.eclipse.jdt.launching.MODULE_NAME" value="artisynth_core"/>
-    <stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value="-model artisynth.demos.growth.models.paper.Basic_Base&#13;&#10;-noTimeline     &#13;&#10;-play                   &#13;&#10;-disableHybridSolves    &#13;&#10;-numSolverThreads 1"/>
+    <stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value="-model artisynth.demos.growth.models.paper.Intricate_Wrinkles&#13;&#10;-noTimeline     &#13;&#10;-play                   &#13;&#10;-disableHybridSolves    &#13;&#10;-numSolverThreads 1"/>
     <stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="artisynth_core"/>
     <stringAttribute key="org.eclipse.jdt.launching.VM_ARGUMENTS" value="-Xmx10g&#13;&#10;-Xss5m"/>
 </launchConfiguration>

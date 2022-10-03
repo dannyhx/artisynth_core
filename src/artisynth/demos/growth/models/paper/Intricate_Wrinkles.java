@@ -7,14 +7,18 @@ import artisynth.demos.growth.models.base.GrowDemo;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
 
-/**
- * Run this for 3 seconds.
+/*
+ * -model artisynth.demos.growth.models.paper.Intricate_Wrinkles
  * 
- * Zoom-in of mesh corner: Eye: -0.226606 -0.261661 0.999019 Center: -0.226606
- * -0.261661 1.91022e-18 Latex Crop: 732 134 688 166
+ * Zoom-in of mesh corner: 
+ * 
+ * Eye: -0.226606 -0.261661 0.999019 
+ * 
+ * Center: -0.226606 -0.261661 1.91022e-18 
+ * 
+ * Latex Crop: 732 134 688 166
  * 
  */
-// -model artisynth.demos.growth.models.paper.Intricate_Wrinkles
 public class Intricate_Wrinkles extends GrowDemo {
 
    protected double morphogenSrcDuration = 2;
@@ -28,26 +32,29 @@ public class Intricate_Wrinkles extends GrowDemo {
       mMeshYDiv = 10;
       m_shellThickness = 0.1 / (1e3);
       m_youngsModulus = 100000.0 / (1e3); // 5e5
+      mRemeshFreq = 0.25;
+      mEnableCollisionHandling = false;
 
       mRenderMode = RenderMode.MORPHOLOGY;
       mPauseEveryInterval = 1; // 1
       mDiffusionTimestepScale *= 0.5;
-
-      // Benchmark:
-      // Required to reproduce figure
-      mRemeshFreq = 0.25;
-      mPauseEveryInterval = 3.00;
-      mEnableCollisionHandling = false;
-
       mShowColorBar = false;
+
+      mPauseEveryInterval = 3.00;
    }
 
    protected void build_renderConfig () {
       super.build_renderConfig ();
 
       mRendCfg = mRendCfgPresets.get (RenderMode.MORPHOLOGY);
-      mRendCfg.mDrawEdges = true;
+      mRendCfg.mDrawEdges = false;
       mRendCfg.mNodeRadius = 0;
+
+      // mRendCfg = mRendCfgPresets.get (RenderMode.TOPOLOGY);
+      // mRendCfg.mDrawEdges = true;
+      // mRendCfg.mNodeRadius = 0;
+      // mCameraEye = new Point3d (-0.226606, -0.261661, 0.999019);
+      // mCameraCenter = new Point3d (-0.226606, -0.261661, 1.91022e-18);
    }
 
    protected void build_post () {
@@ -74,8 +81,6 @@ public class Intricate_Wrinkles extends GrowDemo {
       Vertex3d vtx = mMesh[0].getVertex (v);
       Point3d pnt = vtx.getPosition ();
 
-      return (
-      // pnt.norm () < 0.401
-      pnt.norm () < 0.201);
+      return (pnt.norm () < 0.201);
    }
 }

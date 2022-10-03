@@ -39,7 +39,7 @@ public class Basic_Base extends GrowDemo {
       // High Resistance
       m_shellThickness = 0.1;
       m_youngsModulus = 1e7;
-      mPauseEveryInterval = 5.00;
+      mPauseEveryInterval = 4.00;
 
       // Low Resistance
       // m_shellThickness = 0.0001;
