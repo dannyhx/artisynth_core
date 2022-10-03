@@ -229,7 +229,7 @@ public class GrowColorer {
       mFemModel.getRenderProps ().setLineColor (Color.WHITE);
       mSurfaceMesh.getRenderProps ().setFaceStyle (FaceStyle.FRONT_AND_BACK);
       mSurfaceMesh.getRenderProps ().setBackColor (Color.CYAN);
-      mFemModel.getRenderProps ().setLineWidth (1);
+      // mFemModel.getRenderProps ().setLineWidth (0);
    }
 
    /**
@@ -257,7 +257,7 @@ public class GrowColorer {
             mFemModel.getSurfaceMeshComp (), FaceStyle.FRONT_AND_BACK);
       mSurfaceMesh = mFemModel.getSurfaceMesh ();
       mSurfaceMesh.clearColors ();
-      mFemModel.getRenderProps ().setLineWidth (1);
+      // mFemModel.getRenderProps ().setLineWidth (1);
    }
 
    /** Get an interpolated RGB value between two given RGB values. */

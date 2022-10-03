@@ -30,16 +30,28 @@ public class Intricate_RippleBouquet extends GrowDemo {
    /* Figure uses default polarity. Use mPolDir=(0,0,1) to grow upwards */
 
    /*
-    * Top-Down: mCameraEye = new Point3d(0.00840759, 0.00982214, 10.2219);
+    * Top-Down:
+    * 
+    * mCameraEye = new Point3d(0.00840759, 0.00982214, 10.2219);
+    * 
     * mCameraCenter = new Point3d(0.00528906, 0.0176713, -0.384257);
     * 
-    * Perspective: mCameraEye = new Point3d(1.55666, -8.16246, 4.52825);
-    * mCameraCenter = new Point3d(-0.0481113, -0.20805, -0.559241);
+    * Perspective:
     * 
-    * Side: mCameraEye = new Point3d(0.0316826, -8.00221, -0.49313);
+    * mCameraEye = new Point3d(1.55666, -8.16246, 4.52825);
+    * 
+    * mCameraCenter = new Point3d(-0.0481113 -0.20805 -0.559241);
+    * 
+    * Side:
+    * 
+    * mCameraEye = new Point3d(0.0316826, -8.00221, -0.49313);
+    * 
     * mCameraCenter = new Point3d(0.0316826, 0.0176713, -0.49313);
     * 
-    * Top-Down (no edge exp): mCameraEye = new Point3d(0.0322226 0.00913619
+    * Top-Down (no edge exp):
+    * 
+    * mCameraEye = new Point3d(0.0322226 0.00913619
+    * 
     * 10.2464); mCameraCenter = new Point3d(0.0316826 0.0176713 -0.49313);
     * 
     */
@@ -77,8 +89,8 @@ public class Intricate_RippleBouquet extends GrowDemo {
       mRemeshFreq = 0.25;
 
       // Camera
-      mCameraEye = new Point3d (0.0322226, 0.00913619, 10.2464);
-      mCameraCenter = new Point3d (0.0316826, 0.0176713, -0.49313);
+      mCameraEye = new Point3d (0.00840759, 0.00982214, 10.2219);
+      mCameraCenter = new Point3d (0.00528906, 0.0176713, -0.384257);
    }
 
    protected void build_modelSkeleton () {
@@ -184,11 +196,10 @@ public class Intricate_RippleBouquet extends GrowDemo {
       super.build_renderConfig ();
 
       RenderConfig defaultCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
-      defaultCfg.mNodeRadius = 0.01;
+      defaultCfg.mNodeRadius = 0.00;
 
       mRendCfg = mRendCfgPresets.get (RenderMode.MORPHOLOGY);
-      mRendCfg.mDrawEdges = false;
-      mRendCfg.mNodeRadius = 0.01;
+      mRendCfg.mNodeRadius = 0.00;
    }
 
    protected void build_femRendering () {
