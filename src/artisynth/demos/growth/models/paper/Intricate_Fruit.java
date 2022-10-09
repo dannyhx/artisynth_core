@@ -10,12 +10,9 @@ import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector3d;
 
-/* Top-Camera:
-
-      mCameraEye = new Point3d(0, -4.9771, 0);
-      mCameraCenter = new Point3d(0,0,0);
+/* 
+ * -model artisynth.demos.growth.models.paper.Intricate_Fruit
  */
-// -model artisynth.demos.growth.models.paper.Intricate_Fruit
 public class Intricate_Fruit extends GrowDemo {
 
    protected void build_modelSkeleton () {
@@ -44,22 +41,26 @@ public class Intricate_Fruit extends GrowDemo {
 
       // Benchmark:
       mRemeshFreq = 0.25;
-      mPauseEveryInterval = 20;
+      mPauseEveryInterval = 25;
       mEnableCollisionHandling = false;
       mRenderMode = RenderMode.MORPHOLOGY;
 
       // Post bug fix: Young modulus was previous capped to 1e5
-      m_youngsModulus = 1e5;
+      // m_youngsModulus = 1e5;
       mPauseEveryInterval = 20; // 6.66
       mShowColorBar = false;
 
       // Perspective
-      // mCameraEye = new Point3d(1.70087, -3.15077, -3.87599);
-      // mCameraCenter = new Point3d(0,0,0);
+      mCameraEye = new Point3d (1.70087, -3.15077, -3.87599);
+      mCameraCenter = new Point3d (0, 0, 0);
 
       // Top-Down
-      mCameraEye = new Point3d (0, -4.9771, 0);
-      mCameraCenter = new Point3d (0, 0, 0);
+      // mCameraEye = new Point3d (0, -4.9771, 0);
+      // mCameraCenter = new Point3d (0, 0, 0);
+
+      this.mIsActivatePAR = true;
+      this.mIsActivatePER = true;
+      this.mIsActivateNOR = false;
    }
 
    protected void build_renderConfig () {
@@ -70,40 +71,28 @@ public class Intricate_Fruit extends GrowDemo {
 
       cfg = mRendCfgPresets.get (RenderMode.MORPHOLOGY);
       cfg.mFrontMeshColor = new Color (255, 102, 0);
-      cfg.mBackgroundColor = Color.white;
+      cfg.mBackgroundColor = Color.WHITE;
    }
 
    protected void build_post () {
       super.build_post ();
 
-      // PolarityElementAux.createPolGradient (mFemModel[0], 1, +1);
+      // PolarityElementAux.createPolGradientAgainstAxis (mFemModel[0], 1, +1);
       this.mFixedParDir = new Vector3d (0, 1, 0);
-      this.mFixedParDir = null;
+      this.mFixedPerDir = null;
    }
 
    public void advanceCustom (double t0, double t1, int flags) {
-      // mMechModel.setCollisionBehavior (mFemModel, mFemModel, true);
-
-      // mRemesher.isDebug = true;
-
-      // mRemeshFreq = 0.01;
-
       for (int v = 0; v < mMesh[0].numVertices (); v++) {
          if (isMorphogenSrcNode (v)) {
             GrowNode3d gNode = (GrowNode3d)mFemModel[0].getNode (v);
             gNode.mChems.set (3, 0.5);
          }
       }
-      // mMorphogen2GrowthTensor.unapplyGrowthTensors ();
-
       super.advanceCustom (t0, t1, flags);
    }
 
    public boolean isMorphogenSrcNode (int v) {
-      // Vertex3d vtx = mMesh.getVertex (v);
-      // Point3d pnt = vtx.getPosition ();
-      //
-      // return (pnt.y > -0.01 && pnt.y < +0.01);
       return true;
    }
 

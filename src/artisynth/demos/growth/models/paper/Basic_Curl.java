@@ -17,17 +17,8 @@ public class Basic_Curl extends Basic_Base {
    protected void build_pre () {
       super.build_pre ();
 
-      // mIsActivatePAR = false;
-
       m_shellThickness = 1e-2;
       m_youngsModulus = 1e5;
-
-      // Paper
-      // m_shellThickness = 1e-4;
-      // m_youngsModulus = 1e8;
-
-      // m_shellThickness = 0.0001;
-      // m_youngsModulus = 1e5;
 
       mEnableRemesh = true;
       mSizeMin = 0.05;
@@ -36,7 +27,7 @@ public class Basic_Curl extends Basic_Base {
       mEnableCollisionHandling = true;
 
       mShowColorBar = false;
-      mPauseEveryInterval = 15;
+      mPauseEveryInterval = 30;
 
       mIsActivatePAR = true;
       mIsActivatePER = false;
@@ -50,8 +41,6 @@ public class Basic_Curl extends Basic_Base {
 
       mSurfaceColor = SurfaceColor.MORPHOGEN;
       mRendCfg = mRendCfgPresets.get (RenderMode.MORPHOLOGY);
-      // mRendCfg.mNodeRadius = 0;
-      mFemModel[0].setDirectorRenderLen (100);
       mRendCfg.mNodeRadius = 0.00;
    }
 

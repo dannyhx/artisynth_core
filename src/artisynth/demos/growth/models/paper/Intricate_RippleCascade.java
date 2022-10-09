@@ -75,21 +75,21 @@ public class Intricate_RippleCascade extends GrowDemo {
       cfg.mBackgroundColor = Color.WHITE;
 
       // Front-View
-      // mCameraEye = new Point3d (0.00221373, -3.18407, 0.00573919);
-      // mCameraCenter = new Point3d (0.00221373, -0.0263626, 0.00573919);
+      mCameraEye = new Point3d (0.00221373, -3.18407, 0.00573919);
+      mCameraCenter = new Point3d (0.00221373, -0.0263626, 0.00573919);
 
       // Perspective
       // mCameraEye = new Point3d (1.981, -1.84654, 0.301408);
       // mCameraCenter = new Point3d (0.302009, -0.301062, -0.0870515);
 
       // Close-up
-      mCameraEye = new Point3d (0.214431, -0.687118, 0.08121);
-      mCameraCenter = new Point3d (-0.0160858, -0.521149, 0.0225617);
+      // mCameraEye = new Point3d (0.214431, -0.687118, 0.08121);
+      // mCameraCenter = new Point3d (-0.0160858, -0.521149, 0.0225617);
 
       // Top-Down for ablation topology
       // mCameraEye = new Point3d (-0.0103429, -0.00136385, 2.64955);
       // mCameraCenter = new Point3d (-0.0103429, -0.00136385, -0.00338145);
-      cfg = mRendCfgPresets.get (RenderMode.TOPOLOGY);
+      // cfg = mRendCfgPresets.get (RenderMode.TOPOLOGY);
       // cfg.mFrontMeshColor = new Color (204, 204, 204);
       // cfg.mRearMeshColor = new Color (204, 204, 240);
       // cfg.mBackgroundColor = Color.WHITE;
