@@ -15,9 +15,9 @@ import artisynth.core.materials.LinearMaterial;
 import artisynth.demos.growth.models.paper.Basic_Base;
 import artisynth.demos.growth.models.ts.ThinShellType;
 import artisynth.demos.growth.models.ts.evouga.DiscreteShell;
+import artisynth.demos.growth.util.BackUtil;
 import artisynth.demos.growth.util.FemUtil;
 import artisynth.demos.growth.util.MeshUtil;
-import maspack.geometry.PolygonalMesh;
 import maspack.geometry.Vertex3d;
 import maspack.matrix.Matrix3d;
 import maspack.matrix.Point3d;
@@ -85,7 +85,7 @@ public class DualCurl extends Basic_Base {
    // Discrete Shell Variables
 
    protected String mDiscreteShellCacheDir =
-      "C:\\Users\\dan\\pj\\libshell\\example";
+      "C:\\Users\\dah208\\Documents\\pj\\_learn\\libshell";
    protected boolean mIsBuildingRestState = false;
 
    /**
@@ -93,9 +93,7 @@ public class DualCurl extends Basic_Base {
     */
    protected double mReg = 2e-2; // 0.20
 
-   protected boolean mIsSolidCylinderRef = false;
-
-   protected PolygonalMesh mBackMesh = null;
+   protected boolean mIsSolidCylinderRef = true;
 
    protected void build_pre () {
       super.build_pre ();
@@ -115,7 +113,7 @@ public class DualCurl extends Basic_Base {
       // mEleClass = ElementClass.MEMBRANE;
 
       // this.mTsType = ThinShellType.NARAIN;
-      // this.mTsType = ThinShellType.EVOUGA;
+      this.mTsType = ThinShellType.EVOUGA;
 
       int meshDiv = 100; // 100
 
@@ -156,8 +154,12 @@ public class DualCurl extends Basic_Base {
          mCameraEye = new Point3d (1.8275, -0.536991, 0.506706);
       }
 
-      double[] thicknesses = new double[] { 1e-3, 1e-2, 1e-1, 1e-2 };
+      double[] thicknesses = new double[] { 1e-3, 1e-2, 1e-1, 5e-3 }; // 1e-2
+      double[] thicknesses_ts = new double[] { 1e-3, 1e-2, 1e-1, 5e-3 };
+
       double[] youngModuluses = new double[] { 1e4, 1e4, 1e4, 1e4 };
+      double[] youngModuluses_ts = new double[] { 1e4, 1e4, 1e4, 1e4 };
+
       double strain =
          FemUtil
             .getBottomSurfaceStretchNeededForCurl (
@@ -169,8 +171,6 @@ public class DualCurl extends Basic_Base {
       double[] pauses_vol = new double[] { 999, 999, 999, 3 };
       double[] pauses_shell = new double[] { 999, 999, 999, 3 };
 
-      double[] thicknesses_ts = new double[] { 1e-3, 1e-2, 1e-1, 1e-2 };
-      double[] youngModuluses_ts = new double[] { 1e4, 1e4, 1e4, 1e4 };
       double[] angularStrainsQual =
          new double[] { 2 * PI, 2 * PI, 2 * PI,
                         2 * PI * AMPLIFIED_STRESS_MULTIPLIER };
@@ -209,8 +209,6 @@ public class DualCurl extends Basic_Base {
                                 new double[] { 0, 0, 0 } });
 
          mPauseEveryInterval = pauses_shell[t];
-
-         m_youngsModulus = youngModuluses_ts[t];
 
          if (mIsSolidCylinderRef) {
             mFixedBendingStrainMtx = null;
@@ -278,25 +276,14 @@ public class DualCurl extends Basic_Base {
                      (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
             // }
          }
-         else if (mEleClass == ElementClass.SHELL && mIsSolidCylinderRef) {
+         else if ((mEleClass == ElementClass.VOLUMETRIC
+         || mEleClass == ElementClass.SHELL) && mIsSolidCylinderRef) {
             mIsBuildingRestState = true;
             mMesh[0] =
                MeshUtil
                   .createCylinderFromPlane_YAxisCurved (
                      mMeshX, mMeshY, mMeshXDiv, mMeshYDiv,
                      (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
-
-            // // Create cylinder of the back nodes
-            // // (i.e. r = original radius + thickness).
-            // double originalRadius = mMeshX / (2 * PI);
-            // double newRadius = originalRadius + m_shellThickness;
-            // double newMeshX = newRadius * (2 * PI);
-            //
-            // mBackMesh =
-            // MeshUtil
-            // .createCylinderFromPlane_YAxisCurved (
-            // newMeshX, newMeshX, mMeshXDiv, mMeshYDiv,
-            // (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
          }
       }
       catch (Exception ex) {
@@ -329,19 +316,12 @@ public class DualCurl extends Basic_Base {
          // Set other DS parameters.
          ds.mReg = mReg;
       }
-      else if (mEleClass == ElementClass.SHELL) {
+      else if (mEleClass == ElementClass.SHELL
+      || mEleClass == ElementClass.VOLUMETRIC) {
          if (mIsBuildingRestState) {
             super.build_modelStructure ();
 
-            // // Use proper back rest positions.
-            // // Back positions aren't necessarily simply adding the thickness
-            // // length to the z-coordinate of the world-position.
-            // for (int v = 0; v < mBackMesh.numVertices (); v++) {
-            // Vertex3d vtx = mBackMesh.getVertex (v);
-            // FemNode3d node = mFemModel[0].getNode (v);
-            //
-            // node.setBackRestPosition (vtx.getPosition ());
-            // }
+            BackUtil.initRestBackNodes (mFemModel[0], m_shellThickness);
 
             // Restore original mesh.
             super.build_modelSkeleton ();
@@ -352,25 +332,31 @@ public class DualCurl extends Basic_Base {
 
          // Set world to flat sheet
 
-         for (boolean isFront : new boolean[] { true, false }) {
-            for (int v = 0; v < mMesh[0].numVertices (); v++) {
-               Vertex3d vtx = mMesh[0].getVertex (v);
+         for (int v = 0; v < mMesh[0].numVertices (); v++) {
+            Vertex3d vtx = mMesh[0].getVertex (v);
 
-               FemNode3d node = mFemModel[0].getNode (v);
-               if (isFront) {
-                  node.setPosition (vtx.getPosition ());
-               }
-               else {
-                  node
-                     .setBackPosition (
-                        (Point3d)new Point3d (vtx.getPosition ())
-                           .add (0, 0, -m_shellThickness));
-               }
+            FemNode3d node = mFemModel[0].getNode (v);
+            node.setPosition (vtx.getPosition ());
+
+            if (mEleClass == ElementClass.SHELL) {
+               node
+                  .setBackPosition (
+                     (Point3d)new Point3d (vtx.getPosition ())
+                        .add (0, 0, +m_shellThickness));
+            }
+            else {
+               FemNode3d bnode =
+                  mFemModel[0].getNode (mMesh[0].numVertices () + v);
+
+               bnode
+                  .setPosition (
+                     (Point3d)new Point3d (vtx.getPosition ())
+                        .add (0, 0, +m_shellThickness));
             }
          }
       }
       else {
-         super.build_modelStructure ();
+         throw new AssertionError ("Unexpected case");
       }
    }
 
@@ -389,9 +375,9 @@ public class DualCurl extends Basic_Base {
       super.build_renderConfig ();
 
       mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
-      mRendCfg.mNodeRadius = 0;
+      mRendCfg.mNodeRadius = 0.00;
 
-      mRendCfg.mDirectorLen = 0;
+      mRendCfg.mDirectorLen = 1;
       mRendCfg.mFrontMeshColor = Color.LIGHT_GRAY;
       mRendCfg.mRearMeshColor = Color.GREEN;
 
