@@ -91,7 +91,7 @@ public class DualCurl extends Basic_Base {
    /**
     * Mass of each DoF for Discrete Shell.
     */
-   protected double mReg = 2e-2; // 0.20
+   protected double mReg = 3e-2; // 2e-2
 
    protected boolean mIsSolidCylinderRef = true;
 
@@ -109,11 +109,11 @@ public class DualCurl extends Basic_Base {
       t = 3;
 
       // mEleClass = ElementClass.VOLUMETRIC;
-      mEleClass = ElementClass.SHELL;
-      // mEleClass = ElementClass.MEMBRANE;
+      // mEleClass = ElementClass.SHELL;
+      mEleClass = ElementClass.MEMBRANE;
 
-      // this.mTsType = ThinShellType.NARAIN;
-      this.mTsType = ThinShellType.EVOUGA;
+      this.mTsType = ThinShellType.NARAIN;
+      // this.mTsType = ThinShellType.EVOUGA;
 
       int meshDiv = 100; // 100
 
@@ -168,13 +168,10 @@ public class DualCurl extends Basic_Base {
          new double[] { strain, strain, strain, strain };
       double[] sidedStrains_shell =
          new double[] { strain, strain, strain, strain };
-      double[] pauses_vol = new double[] { 999, 999, 999, 3 };
-      double[] pauses_shell = new double[] { 999, 999, 999, 3 };
 
       double[] angularStrainsQual =
          new double[] { 2 * PI, 2 * PI, 2 * PI,
                         2 * PI * AMPLIFIED_STRESS_MULTIPLIER };
-      double[] pauses_ts = new double[] { 999, 999, 999, 3 };
 
       if (mEleClass == ElementClass.MEMBRANE
       && mTsType == ThinShellType.NARAIN) {
@@ -190,7 +187,7 @@ public class DualCurl extends Basic_Base {
                                                                               // PI
                                 new double[] { 0, 0, 0 } });
 
-         mPauseEveryInterval = pauses_ts[t];
+         mPauseEveryInterval = 20;
       }
       else if (mEleClass == ElementClass.MEMBRANE
       && mTsType == ThinShellType.EVOUGA) {
@@ -208,7 +205,7 @@ public class DualCurl extends Basic_Base {
                                 new double[] { 0, sidedStrains_shell[t], 0 },
                                 new double[] { 0, 0, 0 } });
 
-         mPauseEveryInterval = pauses_shell[t];
+         mPauseEveryInterval = 6;
 
          if (mIsSolidCylinderRef) {
             mFixedBendingStrainMtx = null;
@@ -225,7 +222,7 @@ public class DualCurl extends Basic_Base {
                                 new double[] { 0, sidedStrains_vol[t], 0 },
                                 new double[] { 0, 0, 0 } });
 
-         mPauseEveryInterval = pauses_vol[t];
+         mPauseEveryInterval = 10;
 
          if (mIsSolidCylinderRef) {
             mFixedBendingStrainMtx = null;
@@ -250,8 +247,6 @@ public class DualCurl extends Basic_Base {
          // mCameraEye = new Point3d(0.0, 0, 2.1991);
          // mAxisAlignedRotation = AxisAlignedRotation.NY_X;
       }
-
-      mPauseEveryInterval = 999;
    }
 
    protected void build_modelSkeleton () {
@@ -279,10 +274,15 @@ public class DualCurl extends Basic_Base {
          else if ((mEleClass == ElementClass.VOLUMETRIC
          || mEleClass == ElementClass.SHELL) && mIsSolidCylinderRef) {
             mIsBuildingRestState = true;
+
+            double radius = mMeshX / (2 * PI);
+            double newRadius = radius + (m_shellThickness / 2);
+            mMeshX = newRadius * (2 * PI);
+
             mMesh[0] =
                MeshUtil
                   .createCylinderFromPlane_YAxisCurved (
-                     mMeshX, mMeshY, mMeshXDiv, mMeshYDiv,
+                     mMeshX, mMeshX, mMeshXDiv, mMeshYDiv,
                      (t == 3) ? AMPLIFIED_STRESS_MULTIPLIER : 1);
          }
       }
@@ -356,7 +356,7 @@ public class DualCurl extends Basic_Base {
          }
       }
       else {
-         throw new AssertionError ("Unexpected case");
+         super.build_modelStructure ();
       }
    }
 
@@ -377,7 +377,7 @@ public class DualCurl extends Basic_Base {
       mRendCfg = mRendCfgPresets.get (RenderMode.DEFAULT);
       mRendCfg.mNodeRadius = 0.00;
 
-      mRendCfg.mDirectorLen = 1;
+      mRendCfg.mDirectorLen = 0;
       mRendCfg.mFrontMeshColor = Color.LIGHT_GRAY;
       mRendCfg.mRearMeshColor = Color.GREEN;
 
