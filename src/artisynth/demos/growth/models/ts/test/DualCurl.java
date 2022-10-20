@@ -23,42 +23,21 @@ import maspack.matrix.Matrix3d;
 import maspack.matrix.Point3d;
 
 //-model artisynth.demos.growth.models.ts.test.DualCurl
-//-noTimeline     
-//-disableHybridSolves
-//-playFor 3
 
 /**
  * Simulation to make a square patch curl into a cylinder.
  * 
  * Adjustable parameters:
  * 
- * // Element type mEleClass = VOLUMETRIC SHELL MEMBRANE
+ * // Element type (VOLUMETRIC, SHELL, MEMBRANE):
  * 
- * // Membrane type mTsType = NARAIN (Bending Energy based on Angular Strain)
- * EVOUGA (Bending Energy based on 2nd Fundamental Form)
+ * mEleClass
  * 
- * // Thickness variations. Can leave at 1 for 0.01 (1e-2) thickness. t = 0
- * (1e-3) 1 (1e-2) 2 (1e-1) 3 (1e-2 with 7.5x stress)
+ * // Thin-Shell type; applicable when mEleClass == MEMBRANE. (NARAIN, EVOUGA):
  * 
- * Use t=1 for the 2PI cylinder curl experiment. Use t=3 for the amplified curl
- * experiment.
- * 
- * meshDiv = 25 (1250 Elements) | 50 (5000 Elements) | 100 (20,000 Elements)
- * 
- * Use mMinEnergyBeforePausing = 1e-4 for single cylinder. Use
- * mMinEnergyBeforePausing = 1e-3 for tight cylinder.
- * 
- * Use mReg = 2e-2 for single cylinder. Speeds up simulation. Use mReg = 0.3 for
- * tight cylinder.
- * 
- * Notes: For single cylinder, use
+ * mTsType
  */
 
-/*
- * MODS
- *
- * meshDiv mMinEnergyBeforePausing mIsEnableMorphogen2GrowthTensor = false
- */
 public class DualCurl extends Basic_Base {
 
    /**
@@ -74,10 +53,6 @@ public class DualCurl extends Basic_Base {
    protected Matrix3d mFixedBendingStrainMtx = null;
 
    static {
-      // for (int i = 0; i < 6; i++) {
-      // ShellTriElement.INTEGRATION_COORDS_GAUSS_6[i*4 + 2] /= 1/Math.sqrt(3);
-      // }
-
       ShellTriElement.myDefaultIntegrationCoords =
          ShellTriElement.INTEGRATION_COORDS_GAUSS_6;
    }
@@ -112,8 +87,8 @@ public class DualCurl extends Basic_Base {
       // mEleClass = ElementClass.SHELL;
       mEleClass = ElementClass.MEMBRANE;
 
-      this.mTsType = ThinShellType.NARAIN;
-      // this.mTsType = ThinShellType.EVOUGA;
+      // this.mTsType = ThinShellType.NARAIN;
+      this.mTsType = ThinShellType.EVOUGA;
 
       int meshDiv = 100; // 100
 

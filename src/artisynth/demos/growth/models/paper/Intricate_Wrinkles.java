@@ -13,10 +13,7 @@ import maspack.matrix.Point3d;
  * Zoom-in of mesh corner: 
  * 
  * Eye: -0.226606 -0.261661 0.999019 
- * 
  * Center: -0.226606 -0.261661 1.91022e-18 
- * 
- * Latex Crop: 732 134 688 166
  * 
  */
 public class Intricate_Wrinkles extends GrowDemo {
@@ -47,7 +44,7 @@ public class Intricate_Wrinkles extends GrowDemo {
       super.build_renderConfig ();
 
       mRendCfg = mRendCfgPresets.get (RenderMode.MORPHOLOGY);
-      mRendCfg.mDrawEdges = false;
+      mRendCfg.mDrawEdges = true;
       mRendCfg.mNodeRadius = 0;
 
       // mRendCfg = mRendCfgPresets.get (RenderMode.TOPOLOGY);

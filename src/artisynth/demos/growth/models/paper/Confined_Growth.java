@@ -28,8 +28,8 @@ import maspack.render.RenderProps;
 import maspack.render.Renderer;
 import maspack.render.Renderer.Shading;
 
-// -model artisynth.demos.growth.models.paper._Exp_LeafRing
-public class _Exp_LeafRing extends GrowDemo {
+// -model artisynth.demos.growth.models.paper.Confined_Growth
+public class Confined_Growth extends GrowDemo {
 
    /**
     * Use 0, 8.33, 16.66, and 25.00 as time increments Color = 5th color on left

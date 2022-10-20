@@ -1,9 +1,9 @@
 # Large Growth Deformations of Thin Tissue using Solid-Shells
 
 This is a fork of [ArtiSynth](https://www.artisynth.org) to enable growth for
-solid-shells. The growth simulator was developed for the thesis titled
-_Large Growth Deformations of Thin Tissue using Solid-Shells_, and has been made open-source to ensure reproducibility of the methods and 
-experiments.
+solid-shells. The growth simulator was developed for the paper titled
+_Large Growth Deformations of Thin Tissue using Solid-Shells_, and has been made open-source to 
+ensure reproducibility of the methods and experiments.
 
 ## Installation
 
@@ -46,9 +46,7 @@ unzip eclipseSettings.zip
 # When prompted for the workspace directory, specify the workspace
 # directory that was created earlier.
 
-# Restore the UI view by clicking on the "dual window" symbol located 
-# in the top-left corner. This should automatically open the 
-# Java Perspective view. 
+# Open the Java Perspective view. Its icon is located in the top-right corner.
 
 # Import the Artisynth git repository.
 File (located in top taskbar) > Import > Git > Projects from Git > Next >
@@ -102,6 +100,8 @@ growth.remesh                        # Provides remeshing.
 growth.util                          # Mesh and math utilities.
 growth.models.base.ShellPatch.java   # Sandbox demo for elastic solid-shells.
 growth.models.base.GrowthDemo.java   # Subclass of ShellPatch.java to enable growth.
+growth.models.ts.evouga              # Java port of Discrete Thin-Shells
+growth.models.ts.narain              # Java port of Hinge-based Thin-Shells                
 growth.models.paper                  # Subclasses of GrowthDemo.java for specific growth experiments.
 ```
 
@@ -111,6 +111,38 @@ created in the `growth.models.paper` package. The paper package itself provides 
 custom growth experiments.
 
 Documentation on ArtiSynth itself can be found at https://www.artisynth.org/Software/Documentation.
+
+## Paper Experiments
+
+You can update the java command-line arguments in the Run Configurations to specify the desired experiment to be simulated.
+
+```bash
+# Basic Shapes
+-model artisynth.demos.growth.models.paper.Basic_Base
+-model artisynth.demos.growth.models.paper.Basic_Boundary
+-model artisynth.demos.growth.models.paper.Basic_Strip
+
+# Intricate Wrinkle
+-model artisynth.demos.growth.models.paper.Intricate_Wrinkles
+
+# Ripple Cascade
+-model artisynth.demos.growth.models.paper.Intricate_RippleCascade
+
+# Fruit-like
+-model artisynth.demos.growth.models.paper.Intricate_Fruit
+
+# Curling Sheet
+-model artisynth.demos.growth.models.paper.Basic_Curl
+
+# Collision Handling Demo 1 - Teaser figure
+-model artisynth.demos.growth.models.paper.Intricate_RippleBouquet
+
+# Collision Handling Demo 2 - Confined growth
+-model artisynth.demos.growth.models.paper.Confined_Growth
+
+# Volume, Solid-Shell, and Thin-Shell Cylinder Curling
+-model artisynth.demos.growth.models.ts.test.DualCurl
+```
 
 ## Coding Settings
 

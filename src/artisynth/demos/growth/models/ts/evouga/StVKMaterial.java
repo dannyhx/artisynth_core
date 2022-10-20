@@ -20,7 +20,9 @@ public class StVKMaterial extends DiscreteShellMaterial {
 
    public StVKMaterial (double young, double poissons) {
       // main.cpp::lameParameters
-      this.lameAlpha_ = young * poissons / (1.0 - poissons * poissons);
+      // * (1 + poissons) is added to match LinearMaterial.java::multiplyC
+      this.lameAlpha_ =
+         young * poissons / ((1.0 - poissons * poissons) * (1 + poissons));
       this.lameBeta_ = young / 2.0 / (1.0 + poissons);
    }
 
