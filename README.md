@@ -146,7 +146,7 @@ You can update the java command-line arguments in the Run Configurations to spec
 
 ## Coding Settings
 
-I recommend using plugin which allows you to cut/copy/paste lines of code
+I recommend using an Eclipse plugin that allows you to cut/copy/paste lines of code
 much like in Visual Studio Code.
 [https://code.google.com/archive/p/copycutcurrentline/](https://code.google.com/archive/p/copycutcurrentline/)
 
