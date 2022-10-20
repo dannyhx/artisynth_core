@@ -7,9 +7,6 @@ import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
 
 /*
-1.25093 -1.1616 1.03499
-0.0225034 -0.0624607 -0.0503307
-
 -model artisynth.demos.growth.models.paper.Basic_Curl
 */
 

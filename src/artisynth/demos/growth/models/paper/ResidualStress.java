@@ -11,7 +11,9 @@ import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector3d;
 
-// artisynth.models.plants.growth.paperdemos.ResidualStress
+// -model artisynth.demos.growth.models.paper.ResidualStress
+//
+// Note that this demo requires manual incision part-way during simulation.
 public class ResidualStress extends GrowDemo {
 
    protected double mMorphogenSrcConc = 1;

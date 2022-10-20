@@ -7,6 +7,9 @@ import maspack.matrix.Point3d;
 /* 
  * -model artisynth.demos.growth.models.paper.Basic_Boundary
  * 
+ * By default, sheet is set to a high stiffness.
+ * Uncomment the `Low Resistance` block for low stiffness.
+ * 
  * High resistance camera center:
  *     2.35248 -1.37514 -0.0954112
  * 

@@ -62,6 +62,8 @@ public class Confined_Growth extends GrowDemo {
       mEnableContinuousDetection = false;
       mEnableImpactZoneDetection = true;
 
+      // Individual leaves do not growth large enough in this demo to cause
+      // self-intersection. Disable self-collision to speed up simulation.
       mEnableSelfCollision = false;
 
       // -disableHybridSolves
