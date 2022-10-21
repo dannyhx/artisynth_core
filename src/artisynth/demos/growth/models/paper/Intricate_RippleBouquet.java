@@ -5,8 +5,6 @@ import java.util.ArrayList;
 
 import artisynth.demos.growth.GrowNode3d;
 import artisynth.demos.growth.PolarityElementAux;
-import artisynth.demos.growth.collision.CollisionDetector;
-import artisynth.demos.growth.collision.ContinuousRenderable;
 import artisynth.demos.growth.models.base.GrowDemo;
 import artisynth.demos.growth.util.MeshUtil;
 import maspack.geometry.MeshFactory;
@@ -17,44 +15,9 @@ import maspack.matrix.Point3d;
 import maspack.matrix.RigidTransform3d;
 import maspack.matrix.Vector3d;
 import maspack.render.RenderProps;
-import maspack.render.Renderer;
 
 // -model artisynth.demos.growth.models.paper.Intricate_RippleBouquet
 public class Intricate_RippleBouquet extends GrowDemo {
-
-   /**
-    * Use 0, 8.33, 16.66, and 25.00 as time increments Color = 5th left block
-    * from most-yellow
-    */
-
-   /* Figure uses default polarity. Use mPolDir=(0,0,1) to grow upwards */
-
-   /*
-    * Top-Down:
-    * 
-    * mCameraEye = new Point3d(0.00840759, 0.00982214, 10.2219);
-    * 
-    * mCameraCenter = new Point3d(0.00528906, 0.0176713, -0.384257);
-    * 
-    * Perspective:
-    * 
-    * mCameraEye = new Point3d(1.55666, -8.16246, 4.52825);
-    * 
-    * mCameraCenter = new Point3d(-0.0481113 -0.20805 -0.559241);
-    * 
-    * Side:
-    * 
-    * mCameraEye = new Point3d(0.0316826, -8.00221, -0.49313);
-    * 
-    * mCameraCenter = new Point3d(0.0316826, 0.0176713, -0.49313);
-    * 
-    * Top-Down (no edge exp):
-    * 
-    * mCameraEye = new Point3d(0.0322226 0.00913619
-    * 
-    * 10.2464); mCameraCenter = new Point3d(0.0316826 0.0176713 -0.49313);
-    * 
-    */
 
    protected double mMorphogenSrcConc = 0.5;
 
@@ -75,12 +38,8 @@ public class Intricate_RippleBouquet extends GrowDemo {
       mMorphogenSrcConc = 0.5;
       mPauseEveryInterval = 8.33;
 
-      // Collision partitioning test
       mEnableCollisionHandling = true;
 
-      // -disableHybridSolves
-
-      // DEBUG
       mPauseEveryInterval = 25;
       m_youngsModulus = 1e5;
       mShowColorBar = false;
@@ -255,15 +214,4 @@ public class Intricate_RippleBouquet extends GrowDemo {
 
       return (pnt.z > -2.00) && MeshUtil.isBoundaryVtx (vtx);
    }
-
-   public void render (Renderer renderer, int flags) {
-
-      ContinuousRenderable contRend = CollisionDetector.mContRend;
-      if (contRend != null) {
-         // contRend.render (renderer, flags);
-      }
-
-      super.render (renderer, flags);
-   }
-
 }

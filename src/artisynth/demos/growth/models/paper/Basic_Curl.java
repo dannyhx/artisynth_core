@@ -7,9 +7,8 @@ import maspack.matrix.Point3d;
 import maspack.matrix.Vector3d;
 
 /*
--model artisynth.demos.growth.models.paper.Basic_Curl
-*/
-
+ * -model artisynth.demos.growth.models.paper.Basic_Curl
+ */
 public class Basic_Curl extends Basic_Base {
    protected void build_pre () {
       super.build_pre ();

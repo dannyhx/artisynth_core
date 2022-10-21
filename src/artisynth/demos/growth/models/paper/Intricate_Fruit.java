@@ -21,12 +21,6 @@ public class Intricate_Fruit extends GrowDemo {
 
       mMesh = new PolygonalMesh[M];
       mMesh[0] = MeshFactory.createIcosahedralSphere (0.5, 4);
-      // mMesh.transform ( tns );
-      // for (Vertex3d vtx : mMesh.getVertices ()) {
-      // vtx.setPosition (new Point3d(
-      // vtx.pnt.x, vtx.pnt.y, vtx.pnt.z*0.1
-      // ));
-      // }
    }
 
    protected void build_pre () {
@@ -41,13 +35,10 @@ public class Intricate_Fruit extends GrowDemo {
 
       // Benchmark:
       mRemeshFreq = 0.25;
-      mPauseEveryInterval = 25;
+      mPauseEveryInterval = 20;
       mEnableCollisionHandling = false;
       mRenderMode = RenderMode.MORPHOLOGY;
 
-      // Post bug fix: Young modulus was previous capped to 1e5
-      // m_youngsModulus = 1e5;
-      mPauseEveryInterval = 20; // 6.66
       mShowColorBar = false;
 
       // Perspective
@@ -77,7 +68,6 @@ public class Intricate_Fruit extends GrowDemo {
    protected void build_post () {
       super.build_post ();
 
-      // PolarityElementAux.createPolGradientAgainstAxis (mFemModel[0], 1, +1);
       this.mFixedParDir = new Vector3d (0, 1, 0);
       this.mFixedPerDir = null;
    }

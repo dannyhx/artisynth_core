@@ -9,8 +9,6 @@ import maspack.geometry.Vertex3d;
 import maspack.matrix.Point3d;
 
 /* -model artisynth.demos.growth.models.paper.Intricate_RippleCascade
- * 
- * Grow up to 20 seconds in 6.66 intervals.
  */
 public class Intricate_RippleCascade extends GrowDemo {
 
@@ -36,13 +34,7 @@ public class Intricate_RippleCascade extends GrowDemo {
       mIsActivatePER = true;
 
       mShowColorBar = false;
-
-      // Collision test
       mEnableCollisionHandling = false;
-      mEnableProximityDetection = true;
-      mEnableContinuousDetection = false;
-      mEnableImpactZoneDetection = true;
-      mPenetrationTol = -1e-3;
 
       mPauseEveryInterval = 18;
 
@@ -75,12 +67,12 @@ public class Intricate_RippleCascade extends GrowDemo {
       cfg.mBackgroundColor = Color.WHITE;
 
       // Front-View
-      mCameraEye = new Point3d (0.00221373, -3.18407, 0.00573919);
-      mCameraCenter = new Point3d (0.00221373, -0.0263626, 0.00573919);
+      // mCameraEye = new Point3d (0.00221373, -3.18407, 0.00573919);
+      // mCameraCenter = new Point3d (0.00221373, -0.0263626, 0.00573919);
 
       // Perspective
-      // mCameraEye = new Point3d (1.981, -1.84654, 0.301408);
-      // mCameraCenter = new Point3d (0.302009, -0.301062, -0.0870515);
+      mCameraEye = new Point3d (1.981, -1.84654, 0.301408);
+      mCameraCenter = new Point3d (0.302009, -0.301062, -0.0870515);
 
       // Close-up
       // mCameraEye = new Point3d (0.214431, -0.687118, 0.08121);
