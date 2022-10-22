@@ -4,7 +4,6 @@ import java.awt.Color;
 import java.util.ArrayList;
 
 import artisynth.demos.growth.GrowNode3d;
-import artisynth.demos.growth.PolarityElementAux;
 import artisynth.demos.growth.models.base.GrowDemo;
 import artisynth.demos.growth.util.MeshUtil;
 import maspack.geometry.MeshFactory;
@@ -50,6 +49,12 @@ public class Intricate_RippleBouquet extends GrowDemo {
       // Camera
       mCameraEye = new Point3d (0.00840759, 0.00982214, 10.2219);
       mCameraCenter = new Point3d (0.00528906, 0.0176713, -0.384257);
+
+      this.mIsActivatePAR = true;
+      this.mIsActivatePER = true;
+      this.mIsActivateNOR = false;
+      this.mFixedParDir = new Vector3d (0, 1, 0);
+      this.mFixedPerDir = null;
    }
 
    protected void build_modelSkeleton () {
@@ -182,7 +187,8 @@ public class Intricate_RippleBouquet extends GrowDemo {
 
    protected void build_post () {
       for (int m = 0; m < M; m++) {
-         PolarityElementAux.createPolGradientAgainstAxis (mFemModel[m], 2, +1);
+         // PolarityElementAux.createPolGradientAgainstAxis (mFemModel[m], 1,
+         // +1);
 
          for (int v = 0; v < mMesh[m].numVertices (); v++) {
             if (isMorphogenSrcNode (m, v)) {

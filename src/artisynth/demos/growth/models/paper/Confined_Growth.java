@@ -14,7 +14,6 @@ import artisynth.core.driver.Main;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.modelbase.ModelComponentBase;
 import artisynth.demos.growth.GrowNode3d;
-import artisynth.demos.growth.PolarityElementAux;
 import artisynth.demos.growth.models.base.GrowDemo;
 import artisynth.demos.growth.util.MeshUtil;
 import maspack.geometry.Face;
@@ -105,7 +104,7 @@ public class Confined_Growth extends GrowDemo {
       // Slower growth rate
       mSizeMin = 0.35;
       mSizeMax = mSizeMin * 100;
-      mMorphogenSrcConc = 1.025; // 1.0 oK
+      mMorphogenSrcConc = 1.1;
       m_shellThickness = 1e-3;
       m_youngsModulus = 1e5;
       mSubDivide = 2;
@@ -135,6 +134,12 @@ public class Confined_Growth extends GrowDemo {
       // mCameraCenter = new Point3d(0,0,0);
 
       // Side
+
+      this.mIsActivatePAR = true;
+      this.mIsActivatePER = true;
+      this.mIsActivateNOR = false;
+      this.mFixedParDir = new Vector3d (0, 1, 0);
+      this.mFixedPerDir = null;
    }
 
    boolean isDome = true;
@@ -368,12 +373,12 @@ public class Confined_Growth extends GrowDemo {
 
       // Configure nodes
       for (int m = 0; m < M; m++) {
-         if (m < polGradRulers.size ()) {
-            PolarityElementAux
-               .createPolGradientAgainstParallelVector (
-                  mFemModel[m], mFemModel[m].getNode (0).getPosition (),
-                  polGradRulers.get (m));
-         }
+         // if (m < polGradRulers.size ()) {
+         // PolarityElementAux
+         // .createPolGradientAgainstParallelVector (
+         // mFemModel[m], mFemModel[m].getNode (0).getPosition (),
+         // polGradRulers.get (m));
+         // }
 
          // TODO NEW
          mFemModel[m].setAbortOnInvertedElements (true);
