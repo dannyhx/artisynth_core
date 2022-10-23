@@ -104,7 +104,7 @@ public class Confined_Growth extends GrowDemo {
       // Slower growth rate
       mSizeMin = 0.35;
       mSizeMax = mSizeMin * 100;
-      mMorphogenSrcConc = 1.1;
+      mMorphogenSrcConc = 1.0125;
       m_shellThickness = 1e-3;
       m_youngsModulus = 1e5;
       mSubDivide = 2;

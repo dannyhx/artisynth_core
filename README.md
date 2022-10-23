@@ -18,8 +18,9 @@ https://git-scm.com/downloads
 # Download and install the Java development kit (JDK).
 https://www.oracle.com/ca-en/java/technologies/javase-downloads.html
 
-# Download and install the "Eclipse IDE for Java Developers".
-# When installed, do not open the application just yet.
+# Download the Eclipse IDE. 
+# When prompted by the installer, choose "Eclipse IDE for Java Developers".
+# When installed, close the installer; do not open the application just yet.
 https://www.eclipse.org/downloads/
 
 # Create an Eclipse IDE workspace directory:
@@ -34,35 +35,43 @@ cd artisynth_core
 git checkout growth
 
 # Download the libraries required for ArtiSynth.
-cd bin
-./updateArtisynthLibs     # Linux/Mac
-./updateArtisynthLibs.bat # Windows
+bin/updateArtisynthLibs     # Linux/Mac
+bin/updateArtisynthLibs.bat # Windows
 
 # Unzip the eclipse settings.
-# If using a GUI zip program, accept any overwrite if prompted.
+# Accept any overwrite if prompted.
 unzip eclipseSettings.zip
 
 # Open Eclipse.
 # When prompted for the workspace directory, specify the workspace
 # directory that was created earlier.
 
-# Open the Java Perspective view. Its icon is located in the top-right corner.
+# Import the Artisynth git repository as follows:
+> File (located in top taskbar) 
+> Import 
+> Git 
+> Projects from Git 
+> Next 
+> Existing local repository 
+> Next 
+> Add 
+> Browse 
+> Select the artisynth_core directory
 
-# Import the Artisynth git repository.
-File (located in top taskbar) > Import > Git > Projects from Git > Next >
-Existing local repository > Next > Add... 
-
-# Set the Directory to your eclipse workspace. The
-# `artisynth_core` repository should automatically appear
-# in the search results afterwards
-Tick its checkbox > Finish > Next > Next (Import existing Eclipse projects) > Finish
+# `artisynth_core` repository should automatically appear under Search results now.
+# Proceed with its import:
+Tick its checkbox > Add > Next > Next (Import existing Eclipse projects) > Finish
 
 # The Package Explorer (left sidebar) should appear now, 
 # with artisynth_core visible.
 
 # Setup the Run configurations.
-Run (located in top taskbar) > Run Configurations ... > Java Application > 
-ArtiSynth > Arguments tab > Set the Program arguments to
+> Run (located in top taskbar) 
+> Run Configurations ... 
+> Java Application (located in left side-bar) 
+> ArtiSynth 
+> Arguments tab 
+> Set the Program arguments to
 
     -model artisynth.demos.growth.models.paper.Intricate_Wrinkles   
     -noTimeline     
@@ -70,8 +79,9 @@ ArtiSynth > Arguments tab > Set the Program arguments to
     -disableHybridSolves    
     -numSolverThreads 1  
 
-Set the VM arguments to 
--Xmx10g                 
+> Set the VM arguments to 
+
+    -Xmx10g                 
 
 > Apply > Close
 

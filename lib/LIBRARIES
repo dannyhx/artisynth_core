@@ -79,3 +79,7 @@ libiomp5md.dll
 gdcmjni.dll
 libgdcmjni.so   
 libgdcmjni.dylib
+
+# Legacy libary
+gluegen-rt-2.3.2.jar
+jogl-all-2.3.2.jar
