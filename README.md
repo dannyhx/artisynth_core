@@ -16,6 +16,7 @@ to setup and run the growth simulator.
 https://git-scm.com/downloads
 
 # Download and install the Java development kit (JDK).
+# We use 19.0.1, but the latest JDK will be sufficient.
 https://www.oracle.com/ca-en/java/technologies/javase-downloads.html
 
 # Download the Eclipse IDE. 
