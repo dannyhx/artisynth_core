@@ -14,6 +14,7 @@ import artisynth.core.driver.Main;
 import artisynth.core.femmodels.FemNode3d;
 import artisynth.core.modelbase.ModelComponentBase;
 import artisynth.demos.growth.GrowNode3d;
+import artisynth.demos.growth.PolarityElementAux;
 import artisynth.demos.growth.models.base.GrowDemo;
 import artisynth.demos.growth.util.MeshUtil;
 import maspack.geometry.Face;
@@ -27,13 +28,13 @@ import maspack.render.RenderProps;
 import maspack.render.Renderer;
 import maspack.render.Renderer.Shading;
 
-// -model artisynth.demos.growth.models.paper.Confined_Growth
+/* -model artisynth.demos.growth.models.paper.Confined_Growth
+ * 
+ * Update 2022/10/30:
+ *      Switched to polarity-based growth instead of fixing PER to the z-axis.
+ *      Creates a more uniform growth.
+ */
 public class Confined_Growth extends GrowDemo {
-
-   /**
-    * Use 0, 8.33, 16.66, and 25.00 as time increments Color = 5th color on left
-    * of most yellow
-    */
 
    protected double mMorphogenSrcConc = 0.5;
 
@@ -65,81 +66,16 @@ public class Confined_Growth extends GrowDemo {
       // self-intersection. Disable self-collision to speed up simulation.
       mEnableSelfCollision = false;
 
-      // -disableHybridSolves
-      // 4 OMP_NUM_THREADS
-
-      /*
-       * Observations: - if youngs modulus too high, it will oscilate a lot
-       * around clamp node.
-       */
-
-      // High res good
-      // mSizeMin = 0.25;
-      // mSizeMax = mSizeMin*100;
-      // mMorphogenSrcConc = 1.5; // 1.1 ->
-      // m_shellThickness = 2e-3;
-      // m_youngsModulus = 5e5;
-      // mSubDivide = 2;
-      // mNumRings = 1;
-      // mRemeshFreq = 0.25;
-      // mPenetrationTol = -5e-2;
-      // mPauseEveryInterval = 40; // 43
-      //
-      // mDomeCollisionOnly = false;
-      //
-      // ContinuousCollider.myImpactZonePenetrationTol = -1e-3;
-
-      // 0.35 res good (single thread)
-      mSizeMin = 0.35;
+      mSizeMin = 0.30;
       mSizeMax = mSizeMin * 100;
-      mMorphogenSrcConc = 1.1;
+      mMorphogenSrcConc = 1.00;
       m_shellThickness = 1e-3;
       m_youngsModulus = 1e5;
       mSubDivide = 2;
       mNumRings = 1;
       mRemeshFreq = 0.25;
       mPenetrationTol = -8e-2;
-      mPauseEveryInterval = 40; // 43 // 37.666 out of memory
-
-      // Slower growth rate
-      mSizeMin = 0.35;
-      mSizeMax = mSizeMin * 100;
-      mMorphogenSrcConc = 1.0125;
-      m_shellThickness = 1e-3;
-      m_youngsModulus = 1e5;
-      mSubDivide = 2;
-      mNumRings = 1;
-      mRemeshFreq = 0.25;
-      mPenetrationTol = -8e-2;
-      mPauseEveryInterval = 40; // 43 // 37.666 out of memory
-
-      mShowColorBar = false;
-
-      // Low res good
-      // mSizeMin = 0.40;
-      // mSizeMax = mSizeMin*100;
-      // mMorphogenSrcConc = 1.0; // 1.1 ->
-      // m_shellThickness = 1e-3;
-      // m_youngsModulus = 1e5;
-      // mSubDivide = 2;
-      // mNumRings = 1;
-      // mRemeshFreq = 0.25;
-      // mPenetrationTol = -7.5e-2;
-      // mPauseEveryInterval = 40; // 43
-
-      mDomeCollisionOnly = false;
-
-      // Top
-      // mCameraEye = new Point3d(0, 0, 8.09756);
-      // mCameraCenter = new Point3d(0,0,0);
-
-      // Side
-
-      this.mIsActivatePAR = true;
-      this.mIsActivatePER = true;
-      this.mIsActivateNOR = false;
-      this.mFixedParDir = new Vector3d (0, 1, 0);
-      this.mFixedPerDir = null;
+      mPauseEveryInterval = 40;
    }
 
    boolean isDome = true;
@@ -317,32 +253,6 @@ public class Confined_Growth extends GrowDemo {
          RenderProps.setBackColor (mFemModel[m], backColors[m]);
       }
 
-      // // Unique color for each leaf
-      // float h = 0.0f;
-      // float s = 0.7f;
-      // float v = 0.7f;
-      //
-      // boolean tick = true;
-      // for (int i=0; i<(M/2)+1;) {
-      // int m = -1;
-      // if (tick) {
-      // m = i;
-      // }
-      // else {
-      // m = (M-1)-i;
-      // i++;
-      // }
-      // tick = !tick;
-      //
-      // Color frontColor = Color.getHSBColor (h, s/1.5f, v);
-      // RenderProps.setFaceColor (mFemModel[m], frontColor);
-      //
-      // Color backColor = Color.getHSBColor (h, s, v);
-      // RenderProps.setBackColor (mFemModel[m], backColor);
-      //
-      // h += 0.15;
-      // }
-
       // Dome transparent
 
       int m = M - 1;
@@ -373,12 +283,12 @@ public class Confined_Growth extends GrowDemo {
 
       // Configure nodes
       for (int m = 0; m < M; m++) {
-         // if (m < polGradRulers.size ()) {
-         // PolarityElementAux
-         // .createPolGradientAgainstParallelVector (
-         // mFemModel[m], mFemModel[m].getNode (0).getPosition (),
-         // polGradRulers.get (m));
-         // }
+         if (m < polGradRulers.size ()) {
+            PolarityElementAux
+               .createPolGradientAgainstParallelVector (
+                  mFemModel[m], mFemModel[m].getNode (0).getPosition (),
+                  polGradRulers.get (m));
+         }
 
          // TODO NEW
          mFemModel[m].setAbortOnInvertedElements (true);
@@ -457,20 +367,4 @@ public class Confined_Growth extends GrowDemo {
          }
       }
    }
-
-   // public void render (Renderer renderer, int flags) {
-   // renderer.setShading (Shading.NONE); // turn off lighting
-   // renderer.setLineWidth (3);
-   // renderer.setColor (Color.BLUE);
-   //
-   // for (int m = 0; m < M - 1; m++) {
-   // Point3d s = mFemModel[m].getNode (0).getPosition ();
-   // Vector3d v = polGradRulers.get (m);
-   //
-   // Point3d e = (Point3d)new Point3d (s).add (v);
-   //
-   // renderer.drawLine (s, e);
-   // }
-   // }
-
 }

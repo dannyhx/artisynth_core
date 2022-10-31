@@ -5,18 +5,23 @@ solid-shells. The growth simulator was developed for the paper titled
 _Large Growth Deformations of Thin Tissue using Solid-Shells_, and has been made open-source to 
 ensure reproducibility of the methods and experiments.
 
-## Installation
+## Table of Contents
 
-The growth simulator can be setup by downloading the code repository and 
-compiling the code using the Eclipse IDE. The steps below can be followed 
-to setup and run the growth simulator.
+1. [Installation (Eclipse IDE approach)](#installation-eclipse-ide-approach)
+2. [Installation (Standalone approach)](#installation-standalone-approach)
+9. [Source Code Layout](#source-code-layout)
+10. [Paper Experiments](#paper-experiments)
+11. [Coding Settings for Eclipse IDE](#coding-settings-for-eclipse-ide)
+
+## Installation (Eclipse IDE)
+
+The growth simulator can be setup alongside with the Eclipse IDE. This is the recommended method if you plan to get involved with the source code.
 
 ```bash
-# Download and install Git (if haven't done so).
+# Install Git (if haven't done so).
 https://git-scm.com/downloads
 
-# Download and install the Java development kit (JDK).
-# We use 19.0.1, but the latest JDK will be sufficient.
+# Install Java SDK (19 or latest is fine)
 https://www.oracle.com/ca-en/java/technologies/javase-downloads.html
 
 # Download the Eclipse IDE. 
@@ -98,6 +103,50 @@ Tick its checkbox > Add > Next > Next (Import existing Eclipse projects) > Finis
 # -model.
 ```
 
+## Installation (Standalone approach)
+
+Alternatively, the growth simulator can be setup without any IDE dependency.
+
+```bash
+# Install Git (and the included Git Bash if on Windows)
+https://git-scm.com/downloads
+
+# Install Java SDK (19 or latest is fine)
+https://www.oracle.com/java/technologies/downloads/
+
+# Open the terminal. If on Windows, open the Git Bash console 
+# (not the Windows Command Prompt).
+
+git clone https://github.com/dannyhx/artisynth_core.git
+cd artisynth_core
+
+git checkout growth 
+
+# Download .jar dependencies.
+bin/updateArtisynthLibs
+
+# Compile.
+mkdir classes 
+bin/compile 
+
+# See the "Paper Experiments" section in this README.md for other experiments.
+EXPERIMENT="artisynth.demos.growth.models.paper.Intricate_RippleBouquet"
+
+CLASS_PATH="classes;lib\argparser.jar;lib\jass.jar;lib\jython.jar;lib\jmf.jar;lib\quickhull3d.jar;lib\vclipx.jar;lib\jipopt.jar;lib\javaosc.jar;lib\vfs2.jar;lib\gluegen-rt-2.3.2.jar;lib\jogl-all-2.3.2.jar;lib\matconsolectl-4.4.4.jar;lib\jsoup-1.11.2.jar;lib\gdcm.jar"
+
+# Run the experiment. Use `jawaw.exe` instead of `javaw` if on Windows.
+javaw \
+-Xmx10g \
+-Dfile.encoding=UTF-8 \
+-classpath $CLASS_PATH \
+-XX:+ShowCodeDetailsInExceptionMessages artisynth.core.driver.Launcher \
+-model $EXPERIMENT \
+-noTimeline \
+-play \
+-disableHybridSolves \
+-numSolverThreads 1 
+```
+
 ## Source Code Layout
 
 The source code relating to growth is contained in the `artisynth.demos.growth.`
@@ -127,6 +176,8 @@ Documentation on ArtiSynth itself can be found at https://www.artisynth.org/Soft
 
 You can update the java command-line arguments in the Run Configurations to specify the desired experiment to be simulated.
 
+Note that each of these experiments have hard-coded parameters in the `build_pre()` function of their respective source file. For example, in `DualCurl.java`, the `mEleClass` variable can be set to `ElementClass.SHELL` to simulate the Solid-Shell curling.
+
 ```bash
 # Basic Shapes
 -model artisynth.demos.growth.models.paper.Basic_Base
@@ -155,7 +206,7 @@ You can update the java command-line arguments in the Run Configurations to spec
 -model artisynth.demos.growth.models.ts.test.DualCurl
 ```
 
-## Coding Settings
+## Coding Settings for Eclipse IDE
 
 I recommend using an Eclipse plugin that allows you to cut/copy/paste lines of code
 much like in Visual Studio Code.

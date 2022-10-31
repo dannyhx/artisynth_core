@@ -84,8 +84,8 @@ public class DualCurl extends Basic_Base {
       t = 3;
 
       // mEleClass = ElementClass.VOLUMETRIC;
-      // mEleClass = ElementClass.SHELL;
-      mEleClass = ElementClass.MEMBRANE;
+      mEleClass = ElementClass.SHELL;
+      // mEleClass = ElementClass.MEMBRANE;
 
       // this.mTsType = ThinShellType.NARAIN;
       this.mTsType = ThinShellType.EVOUGA;
