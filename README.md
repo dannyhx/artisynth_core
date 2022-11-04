@@ -171,7 +171,7 @@ get a feel of how things to setup and configured. Afterwards, new growth experim
 created in the `growth.models.paper` package. The paper package itself provides many examples of
 custom growth experiments.
 
-Documentation on ArtiSynth itself can be found at https://www.artisynth.org/Software/Documentation.
+Documentation on ArtiSynth itself can be found at https://www.artisynth.org
 
 ## Paper Experiments
 
