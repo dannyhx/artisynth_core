@@ -7,8 +7,8 @@ ensure reproducibility of the methods and experiments.
 
 ## Table of Contents
 
-1. [Installation (Eclipse IDE approach)](#installation-eclipse-ide-approach)
-2. [Installation (Standalone approach)](#installation-standalone-approach)
+1. [Installation (Eclipse IDE)](#installation-eclipse-ide)
+2. [Installation (Standalone)](#installation-standalone)
 9. [Source Code Layout](#source-code-layout)
 10. [Paper Experiments](#paper-experiments)
 11. [Coding Settings for Eclipse IDE](#coding-settings-for-eclipse-ide)
@@ -100,10 +100,11 @@ Tick its checkbox > Add > Next > Next (Import existing Eclipse projects) > Finis
 # beforehand so Eclipse knows which package to run.
 
 # You can switch to different growth experiments by changing the argument to 
-# -model.
+# -model. See the "Paper Experiments" section in this README.md for other existing 
+# experiments.
 ```
 
-## Installation (Standalone approach)
+## Installation (Standalone)
 
 Alternatively, the growth simulator can be setup without any IDE dependency.
 
