@@ -6,6 +6,12 @@ then
     exit
 fi
 
+if ! command -v javaw &> /dev/null
+then
+    echo "javaw program could not be found. Please install the Java SDK (19+)."
+    exit
+fi
+
 echo "Downloading dependenecies..."
 bin/updateArtisynthLibs
 
