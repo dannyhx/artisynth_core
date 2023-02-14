@@ -2,16 +2,16 @@
 
 This is a fork of [ArtiSynth](https://www.artisynth.org) to enable growth for
 solid-shells. The growth simulator was developed for the paper titled
-_Large Growth Deformations of Thin Tissue using Solid-Shells_, and has been made open-source to 
+[_Large Growth Deformations of Thin Tissue using Solid-Shells_](https://dannyhx.github.io/Large_Growth_Deformations_of_Thin_Tissue_using_Solid-Shells_early_access.pdf), and has been made open-source to 
 ensure reproducibility of the methods and experiments.
 
 ## Table of Contents
 
 1. [Installation (Eclipse IDE)](#installation-eclipse-ide)
-2. [Installation (Standalone)](#installation-standalone)
-9. [Source Code Layout](#source-code-layout)
-10. [Paper Experiments](#paper-experiments)
-11. [Coding Settings for Eclipse IDE](#coding-settings-for-eclipse-ide)
+1. [Installation (Standalone)](#installation-standalone)
+1. [Source Code Layout](#source-code-layout)
+1. [Paper Experiments](#paper-experiments)
+1. [Coding Settings for Eclipse IDE](#coding-settings-for-eclipse-ide)
 
 ## Installation (Eclipse IDE)
 
