@@ -2,7 +2,7 @@
 
 This is a fork of [ArtiSynth](https://www.artisynth.org) to enable growth for
 solid-shells. The growth simulator was developed for the paper titled
-[_Large Growth Deformations of Thin Tissue using Solid-Shells_](https://dannyhx.github.io/Large_Growth_Deformations_of_Thin_Tissue_using_Solid-Shells_early_access.pdf), and has been made open-source to 
+[_Large Growth Deformations of Thin Tissue using Solid-Shells_](https://dannyhx.github.io/ieee_tvcg_2022_9928368.pdf), and has been made open-source to 
 ensure reproducibility of the methods and experiments.
 
 ## Table of Contents
