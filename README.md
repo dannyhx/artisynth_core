@@ -5,6 +5,8 @@ solid-shells. The growth simulator was developed for the paper titled
 [_Large Growth Deformations of Thin Tissue using Solid-Shells_](https://dannyhx.github.io/ieee_tvcg_2022_9928368.pdf), and has been made open-source to 
 ensure reproducibility of the methods and experiments.
 
+Video Demo (110 MB Stream): https://drive.google.com/file/d/1N363GPpE-rwxP25TtFLOj4U_sK0gN8uT/view?usp=sharing
+
 ## Table of Contents
 
 1. [Installation (Eclipse IDE)](#installation-eclipse-ide)
@@ -216,4 +218,5 @@ much like in Visual Studio Code.
 The CTRL+SHIFT+R shortcut is also very handy, which allows you quick search for a specific filename.
 
 You can enable automatic formatting and automatic import organization:
+
 `Window > Preferences > Java > Editor > Save Actions`
