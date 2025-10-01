@@ -6,14 +6,12 @@
 *.glsl text
 Makefile  text
 Makedefs  text
-
 ###########################
 # Scripts
 ###########################
 *.bat text eol=crlf
 *.sh  text eol=lf
 *.command text eol=lf
-
 ###########################
 # Geometry
 ###########################
@@ -23,7 +21,6 @@ Makedefs  text
 *.node   text
 *.ply    text
 *.stl    text=auto
-
 ###########################
 # Text files
 ###########################
@@ -31,7 +28,6 @@ Makedefs  text
 *.tex    text
 *.gradle text
 *.xml    text
-
 ###########################
 # Binary files
 ###########################
@@ -46,3 +42,5 @@ Makedefs  text
 .gitattributes text
 .gitmodules    text
 .gitignore     text
+
+demo.mp4 filter=lfs diff=lfs merge=lfs -text
